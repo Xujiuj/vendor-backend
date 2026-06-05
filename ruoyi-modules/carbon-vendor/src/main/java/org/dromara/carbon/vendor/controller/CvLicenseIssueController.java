@@ -5,6 +5,7 @@ import lombok.RequiredArgsConstructor;
 import org.dromara.carbon.vendor.domain.bo.CvLicenseIssueBo;
 import org.dromara.carbon.vendor.domain.license.CvLicenseIssueRequest;
 import org.dromara.carbon.vendor.domain.license.CvLicenseIssueResult;
+import org.dromara.carbon.vendor.domain.license.CvLicenseReissueRequest;
 import org.dromara.carbon.vendor.domain.vo.CvLicenseIssueVo;
 import org.dromara.carbon.vendor.service.ICvLicenseIssueService;
 import org.dromara.common.core.domain.R;
@@ -60,6 +61,20 @@ public class CvLicenseIssueController extends BaseController {
     public R<CvLicenseIssueResult> issue(@Validated @RequestBody CvLicenseIssueRequest request) {
         request.setIssuedBy(resolveIssuedBy());
         CvLicenseIssueResult result = licenseIssueService.issueManualLicense(request);
+        if (result.isIssued()) {
+            return R.ok(result);
+        }
+        return R.fail(result.getStatus() + ": " + result.getMessage(), result);
+    }
+
+    /**
+     * Reissue a revoked license file using append-only audit history.
+     */
+    @SaCheckPermission("vendor:licenseIssue:issue")
+    @PostMapping("/reissue")
+    public R<CvLicenseIssueResult> reissue(@Validated @RequestBody CvLicenseReissueRequest request) {
+        request.setIssuedBy(resolveIssuedBy());
+        CvLicenseIssueResult result = licenseIssueService.reissueRevokedLicense(request);
         if (result.isIssued()) {
             return R.ok(result);
         }

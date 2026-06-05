@@ -2,6 +2,7 @@ package org.dromara.carbon.vendor.service;
 
 import org.dromara.carbon.vendor.domain.bo.CvLicenseIssueBo;
 import org.dromara.carbon.vendor.domain.license.CvLicenseIssueRequest;
+import org.dromara.carbon.vendor.domain.license.CvLicenseReissueRequest;
 import org.dromara.carbon.vendor.domain.license.CvLicenseIssueResult;
 import org.dromara.carbon.vendor.domain.vo.CvLicenseIssueVo;
 import org.dromara.common.mybatis.core.page.PageQuery;
@@ -36,4 +37,12 @@ public interface ICvLicenseIssueService {
      * @return issue result
      */
     CvLicenseIssueResult issueManualLicense(CvLicenseIssueRequest request);
+
+    /**
+     * Reissue a revoked license and persist a new append-only issue record.
+     *
+     * @param request reissue request
+     * @return issue result
+     */
+    CvLicenseIssueResult reissueRevokedLicense(CvLicenseReissueRequest request);
 }

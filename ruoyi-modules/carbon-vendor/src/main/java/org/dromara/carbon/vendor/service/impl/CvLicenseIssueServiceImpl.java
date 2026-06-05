@@ -14,6 +14,7 @@ import org.dromara.carbon.vendor.domain.license.CvLicenseEnvelope;
 import org.dromara.carbon.vendor.domain.license.CvLicenseIssueRequest;
 import org.dromara.carbon.vendor.domain.license.CvLicenseIssueResult;
 import org.dromara.carbon.vendor.domain.license.CvLicensePayload;
+import org.dromara.carbon.vendor.domain.license.CvLicenseReissueRequest;
 import org.dromara.carbon.vendor.domain.vo.CvLicenseIssueVo;
 import org.dromara.carbon.vendor.mapper.CvCustomerMapper;
 import org.dromara.carbon.vendor.mapper.CvLicenseIssueMapper;
@@ -54,6 +55,7 @@ public class CvLicenseIssueServiceImpl implements ICvLicenseIssueService {
     private static final String ISSUE_STATUS_ISSUED = "issued";
     private static final String ISSUE_STATUS_REVOKED = "revoked";
     private static final String ISSUE_TYPE_MANUAL = "manual";
+    private static final String ISSUE_TYPE_REISSUE = "reissue";
     private static final String CUSTOMER_STATUS_DISABLED = "disabled";
     private static final String CUSTOMER_STATUS_INACTIVE = "inactive";
 
@@ -77,6 +79,48 @@ public class CvLicenseIssueServiceImpl implements ICvLicenseIssueService {
 
     @Override
     public CvLicenseIssueResult issueManualLicense(CvLicenseIssueRequest request) {
+        return issueLicense(request, ISSUE_TYPE_MANUAL, false);
+    }
+
+    @Override
+    public CvLicenseIssueResult reissueRevokedLicense(CvLicenseReissueRequest request) {
+        if (request == null) {
+            return CvLicenseIssueResult.failed("MALFORMED_REQUEST", "reissue request is empty");
+        }
+        if (StringUtils.isBlank(request.getSourceLicenseId())) {
+            return CvLicenseIssueResult.failed("MALFORMED_REQUEST", "reissue request misses sourceLicenseId");
+        }
+
+        CvLicenseIssue sourceIssue = findIssueByLicenseId(request.getSourceLicenseId());
+        if (sourceIssue == null) {
+            return CvLicenseIssueResult.failed("SOURCE_LICENSE_NOT_FOUND", "revoked source license does not exist");
+        }
+        if (!isRevokedIssue(sourceIssue)) {
+            return CvLicenseIssueResult.failed("SOURCE_LICENSE_NOT_REVOKED", "source license is not revoked");
+        }
+        if (request.getCustomerId() != null && !Objects.equals(request.getCustomerId(), sourceIssue.getCustomerId())) {
+            return CvLicenseIssueResult.failed("SOURCE_LICENSE_CUSTOMER_MISMATCH", "source license does not belong to this customer");
+        }
+        if (StringUtils.equals(request.getLicenseId(), sourceIssue.getLicenseId())) {
+            return CvLicenseIssueResult.failed("DUPLICATE_LICENSE_ID", "reissued license must use a new licenseId");
+        }
+        if (hasReissueFromSource(sourceIssue.getLicenseId())) {
+            return CvLicenseIssueResult.failed("SOURCE_LICENSE_ALREADY_REISSUED", "revoked source license has already been reissued");
+        }
+
+        String effectiveInstallId = resolveReissueInstallId(request, sourceIssue);
+        if (effectiveInstallId == null) {
+            return CvLicenseIssueResult.failed(
+                "INSTALL_ID_CHANGE_NOT_ALLOWED",
+                "reissue installId must match revoked source license unless installId change is explicitly allowed");
+        }
+
+        request.setInstallId(effectiveInstallId);
+        request.setIssueType(ISSUE_TYPE_REISSUE);
+        return issueLicense(request, ISSUE_TYPE_REISSUE, true);
+    }
+
+    private CvLicenseIssueResult issueLicense(CvLicenseIssueRequest request, String defaultIssueType, boolean allowRevokedHistory) {
         CvLicenseIssueResult validation = validateIssueRequest(request);
         if (!validation.isIssued()) {
             return validation;
@@ -94,13 +138,12 @@ public class CvLicenseIssueServiceImpl implements ICvLicenseIssueService {
         request.setCustomerName(customer.getCustomerName());
 
         List<CvLicenseIssue> existingIssues = findIssuesForCustomerInstall(request.getCustomerId(), request.getInstallId());
-        if (hasRevokedHistory(existingIssues)) {
-            // TODO: replace this conservative block when explicit revoke/reissue workflow is implemented.
+        if (!allowRevokedHistory && hasRevokedHistory(existingIssues)) {
             return CvLicenseIssueResult.failed(
                 "REVOKED_LICENSE_REISSUE_BLOCKED",
                 "revoked license history exists for this customer and installId; manual review is required");
         }
-        if (hasExactDuplicate(existingIssues, request)) {
+        if (hasExactDuplicate(existingIssues, request, !allowRevokedHistory)) {
             return CvLicenseIssueResult.failed(
                 "DUPLICATE_LICENSE_ISSUE",
                 "license already issued for the same customer, installId, and validity window");
@@ -123,7 +166,7 @@ public class CvLicenseIssueServiceImpl implements ICvLicenseIssueService {
             String signatureText = signPayload(signingKeyMaterial, canonicalPayload.getBytes(StandardCharsets.UTF_8));
             CvLicenseEnvelope envelope = buildEnvelope(payload, signingKey, signatureText);
             String licenseContent = objectMapper.writeValueAsString(envelope);
-            CvLicenseIssue issue = buildIssueRecord(request, signingKey, issuedTime, canonicalPayload, signatureText, payload);
+            CvLicenseIssue issue = buildIssueRecord(request, signingKey, issuedTime, canonicalPayload, signatureText, payload, defaultIssueType);
             baseMapper.insert(issue);
             return CvLicenseIssueResult.issued(licenseContent, issue);
         } catch (Exception e) {
@@ -146,6 +189,7 @@ public class CvLicenseIssueServiceImpl implements ICvLicenseIssueService {
         lqw.like(StringUtils.isNotBlank(bo.getInstallId()), CvLicenseIssue::getInstallId, bo.getInstallId());
         lqw.eq(StringUtils.isNotBlank(bo.getIssueStatus()), CvLicenseIssue::getIssueStatus, bo.getIssueStatus());
         lqw.eq(StringUtils.isNotBlank(bo.getIssueType()), CvLicenseIssue::getIssueType, bo.getIssueType());
+        lqw.eq(StringUtils.isNotBlank(bo.getSourceLicenseId()), CvLicenseIssue::getSourceLicenseId, bo.getSourceLicenseId());
         lqw.like(StringUtils.isNotBlank(bo.getIssuedBy()), CvLicenseIssue::getIssuedBy, bo.getIssuedBy());
         lqw.between(params.get("beginTime") != null && params.get("endTime") != null,
             CvLicenseIssue::getIssuedTime, params.get("beginTime"), params.get("endTime"));
@@ -187,15 +231,31 @@ public class CvLicenseIssueServiceImpl implements ICvLicenseIssueService {
             .orderByDesc(CvLicenseIssue::getId));
     }
 
-    private boolean hasRevokedHistory(List<CvLicenseIssue> existingIssues) {
-        return existingIssues.stream().anyMatch(issue ->
-            issue.getRevokedTime() != null || ISSUE_STATUS_REVOKED.equals(normalizeStatus(issue.getIssueStatus())));
+    private CvLicenseIssue findIssueByLicenseId(String licenseId) {
+        return baseMapper.selectOne(new LambdaQueryWrapper<CvLicenseIssue>()
+            .eq(CvLicenseIssue::getLicenseId, licenseId), false);
     }
 
-    private boolean hasExactDuplicate(List<CvLicenseIssue> existingIssues, CvLicenseIssueRequest request) {
-        return existingIssues.stream().anyMatch(issue ->
+    private boolean hasReissueFromSource(String sourceLicenseId) {
+        return baseMapper.selectCount(new LambdaQueryWrapper<CvLicenseIssue>()
+            .eq(CvLicenseIssue::getIssueType, ISSUE_TYPE_REISSUE)
+            .eq(CvLicenseIssue::getSourceLicenseId, sourceLicenseId)) > 0;
+    }
+
+    private boolean hasRevokedHistory(List<CvLicenseIssue> existingIssues) {
+        return existingIssues.stream().anyMatch(this::isRevokedIssue);
+    }
+
+    private boolean hasExactDuplicate(List<CvLicenseIssue> existingIssues, CvLicenseIssueRequest request, boolean includeRevokedIssues) {
+        return existingIssues.stream()
+            .filter(issue -> includeRevokedIssues || !isRevokedIssue(issue))
+            .anyMatch(issue ->
             Objects.equals(issue.getValidFrom(), request.getValidFrom())
                 && Objects.equals(issue.getValidTo(), request.getValidTo()));
+    }
+
+    private boolean isRevokedIssue(CvLicenseIssue issue) {
+        return issue.getRevokedTime() != null || ISSUE_STATUS_REVOKED.equals(normalizeStatus(issue.getIssueStatus()));
     }
 
     private boolean isDisabledCustomer(String customerStatus) {
@@ -245,7 +305,8 @@ public class CvLicenseIssueServiceImpl implements ICvLicenseIssueService {
     }
 
     private CvLicenseIssue buildIssueRecord(CvLicenseIssueRequest request, CvSigningKey signingKey, Date issuedTime,
-                                            String canonicalPayload, String signatureText, CvLicensePayload payload)
+                                            String canonicalPayload, String signatureText, CvLicensePayload payload,
+                                            String defaultIssueType)
         throws Exception {
         CvLicenseIssue issue = new CvLicenseIssue();
         issue.setLicenseId(payload.getLicenseId());
@@ -259,12 +320,30 @@ public class CvLicenseIssueServiceImpl implements ICvLicenseIssueService {
         issue.setValidFrom(request.getValidFrom());
         issue.setValidTo(request.getValidTo());
         issue.setIssueStatus(ISSUE_STATUS_ISSUED);
-        issue.setIssueType(Objects.requireNonNullElse(request.getIssueType(), ISSUE_TYPE_MANUAL));
+        issue.setIssueType(Objects.requireNonNullElse(request.getIssueType(), defaultIssueType));
+        if (request instanceof CvLicenseReissueRequest reissueRequest) {
+            issue.setSourceLicenseId(reissueRequest.getSourceLicenseId());
+        }
         issue.setIssuedBy(request.getIssuedBy());
         issue.setIssuedTime(issuedTime);
         issue.setLicensePayload(canonicalPayload);
         issue.setSignatureText(signatureText);
         return issue;
+    }
+
+    private String resolveReissueInstallId(CvLicenseReissueRequest request, CvLicenseIssue sourceIssue) {
+        String sourceInstallId = sourceIssue.getInstallId();
+        String targetInstallId = request.getTargetInstallId();
+        if (!Boolean.TRUE.equals(request.getAllowInstallIdChange())) {
+            if (StringUtils.isNotBlank(targetInstallId) && !Objects.equals(sourceInstallId, targetInstallId)) {
+                return null;
+            }
+            return sourceInstallId;
+        }
+        if (StringUtils.isBlank(targetInstallId)) {
+            return null;
+        }
+        return targetInstallId;
     }
 
     private String signPayload(String signingKeyMaterial, byte[] canonicalPayload) throws Exception {

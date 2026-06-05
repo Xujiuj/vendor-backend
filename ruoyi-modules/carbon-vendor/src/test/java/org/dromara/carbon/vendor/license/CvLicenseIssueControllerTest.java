@@ -4,6 +4,7 @@ import org.dromara.carbon.vendor.controller.CvLicenseIssueController;
 import org.dromara.carbon.vendor.domain.CvLicenseIssue;
 import org.dromara.carbon.vendor.domain.license.CvLicenseIssueRequest;
 import org.dromara.carbon.vendor.domain.license.CvLicenseIssueResult;
+import org.dromara.carbon.vendor.domain.license.CvLicenseReissueRequest;
 import org.dromara.carbon.vendor.service.ICvLicenseIssueService;
 import org.dromara.common.core.domain.R;
 import org.junit.jupiter.api.Tag;
@@ -68,5 +69,23 @@ class CvLicenseIssueControllerTest {
             "DUPLICATE_LICENSE_ISSUE: license already issued for the same customer, installId, and validity window",
             response.getMsg());
         assertSame(issueResult, response.getData());
+    }
+
+    @Test
+    void reissueOverridesRequestOperatorWithServerSideOperatorAndReturnsLicenseResult() {
+        ICvLicenseIssueService service = mock(ICvLicenseIssueService.class);
+        CvLicenseIssueController controller = new CvLicenseIssueController(service);
+        CvLicenseIssueResult issueResult = CvLicenseIssueResult.issued("{\"schemaVersion\":\"license.v1\"}", new CvLicenseIssue());
+        when(service.reissueRevokedLicense(any())).thenReturn(issueResult);
+        CvLicenseReissueRequest request = new CvLicenseReissueRequest();
+        request.setIssuedBy("client-forged-user");
+
+        R<CvLicenseIssueResult> response = controller.reissue(request);
+
+        assertEquals(R.SUCCESS, response.getCode());
+        assertSame(issueResult, response.getData());
+        ArgumentCaptor<CvLicenseReissueRequest> requestCaptor = ArgumentCaptor.forClass(CvLicenseReissueRequest.class);
+        verify(service).reissueRevokedLicense(requestCaptor.capture());
+        assertEquals("vendor-system", requestCaptor.getValue().getIssuedBy());
     }
 }

@@ -84,6 +84,11 @@ public class CvLicenseIssueVo implements Serializable {
     private String issueType;
 
     /**
+     * Source license identifier for append-only reissue audit.
+     */
+    private String sourceLicenseId;
+
+    /**
      * Operator that issued the license.
      */
     private String issuedBy;
