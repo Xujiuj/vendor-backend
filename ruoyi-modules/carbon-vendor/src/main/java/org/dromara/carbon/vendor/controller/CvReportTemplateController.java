@@ -6,10 +6,12 @@ import org.dromara.carbon.vendor.domain.bo.CvReportTemplateBo;
 import org.dromara.carbon.vendor.domain.vo.CvReportTemplateVo;
 import org.dromara.carbon.vendor.service.ICvReportTemplateService;
 import org.dromara.common.core.domain.R;
+import org.dromara.common.core.utils.StringUtils;
 import org.dromara.common.core.validate.AddGroup;
 import org.dromara.common.core.validate.EditGroup;
 import org.dromara.common.mybatis.core.page.PageQuery;
 import org.dromara.common.mybatis.core.page.TableDataInfo;
+import org.dromara.common.satoken.utils.LoginHelper;
 import org.dromara.common.web.core.BaseController;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -79,5 +81,29 @@ public class CvReportTemplateController extends BaseController {
     @DeleteMapping("/{ids}")
     public R<Void> remove(@PathVariable Long[] ids) {
         return toAjax(reportTemplateService.deleteReportTemplateByIds(ids));
+    }
+
+    /**
+     * Publish vendor report template metadata.
+     */
+    @SaCheckPermission("vendor:reportTemplate:edit")
+    @PostMapping("/{id}/publish")
+    public R<Void> publish(@PathVariable Long id) {
+        reportTemplateService.publishReportTemplate(id, resolveOperator());
+        return R.ok();
+    }
+
+    /**
+     * Disable vendor report template metadata.
+     */
+    @SaCheckPermission("vendor:reportTemplate:edit")
+    @PostMapping("/{id}/disable")
+    public R<Void> disable(@PathVariable Long id) {
+        reportTemplateService.disableReportTemplate(id, resolveOperator());
+        return R.ok();
+    }
+
+    private String resolveOperator() {
+        return StringUtils.blankToDefault(LoginHelper.getUsername(), "vendor-system");
     }
 }

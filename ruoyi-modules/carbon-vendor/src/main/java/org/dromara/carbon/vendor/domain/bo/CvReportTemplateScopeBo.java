@@ -32,7 +32,6 @@ public class CvReportTemplateScopeBo extends BaseEntity {
      /**
      * Customer identifier.
      */
-    @NotNull(message = "customerId cannot be null", groups = { AddGroup.class, EditGroup.class })
     private Long customerId;
 
     /**

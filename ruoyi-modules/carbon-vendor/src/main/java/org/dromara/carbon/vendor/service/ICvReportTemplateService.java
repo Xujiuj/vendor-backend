@@ -19,4 +19,8 @@ public interface ICvReportTemplateService {
     int updateReportTemplate(CvReportTemplateBo bo);
 
     int deleteReportTemplateByIds(Long[] ids);
+
+    void publishReportTemplate(Long id, String operatedBy);
+
+    void disableReportTemplate(Long id, String operatedBy);
 }
