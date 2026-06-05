@@ -34,6 +34,11 @@ public class CvFactorCustomerScopeVo implements Serializable {
     private Long customerId;
 
     /**
+     * Edition code.
+     */
+    private String edition;
+
+    /**
      * License identifier.
      */
     private String licenseId;

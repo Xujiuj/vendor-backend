@@ -17,23 +17,27 @@ import org.dromara.common.mybatis.core.domain.BaseEntity;
 @AutoMapper(target = CvFactorCustomerScope.class, reverseConvertGenerate = false)
 public class CvFactorCustomerScopeBo extends BaseEntity {
 
-     /**
+    /**
      * Primary key.
      */
     @NotNull(message = "id cannot be null", groups = { EditGroup.class })
     private Long id;
 
-     /**
+    /**
      * Factor version identifier.
      */
     @NotNull(message = "versionId cannot be null", groups = { AddGroup.class, EditGroup.class })
     private Long versionId;
 
-     /**
+    /**
      * Customer identifier.
      */
-    @NotNull(message = "customerId cannot be null", groups = { AddGroup.class, EditGroup.class })
     private Long customerId;
+
+    /**
+     * Edition code.
+     */
+    private String edition;
 
     /**
      * License identifier.

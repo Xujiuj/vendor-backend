@@ -95,12 +95,17 @@ CREATE TABLE IF NOT EXISTS cv_factor_record (
 CREATE TABLE IF NOT EXISTS cv_factor_customer_scope (
     id BIGINT NOT NULL AUTO_INCREMENT,
     version_id BIGINT NOT NULL,
-    customer_id BIGINT NOT NULL,
+    customer_id BIGINT DEFAULT NULL,
+    edition VARCHAR(64) DEFAULT NULL,
     license_id VARCHAR(128) DEFAULT NULL,
+    scope_customer_key BIGINT GENERATED ALWAYS AS (IFNULL(customer_id, 0)) STORED,
+    scope_edition_key VARCHAR(64) GENERATED ALWAYS AS (IFNULL(edition, '')) STORED,
+    scope_license_key VARCHAR(128) GENERATED ALWAYS AS (IFNULL(license_id, '')) STORED,
     scope_status VARCHAR(32) NOT NULL DEFAULT 'enabled',
     create_time DATETIME DEFAULT CURRENT_TIMESTAMP,
     PRIMARY KEY (id),
-    UNIQUE KEY uk_cv_factor_customer_scope (version_id, customer_id),
+    UNIQUE KEY uk_cv_factor_scope_entitlement (version_id, scope_customer_key, scope_edition_key, scope_license_key),
+    KEY idx_cv_factor_scope_lookup (version_id, scope_status, customer_id, edition),
     CONSTRAINT fk_cv_factor_scope_version
         FOREIGN KEY (version_id) REFERENCES cv_factor_version (id),
     CONSTRAINT fk_cv_factor_scope_customer

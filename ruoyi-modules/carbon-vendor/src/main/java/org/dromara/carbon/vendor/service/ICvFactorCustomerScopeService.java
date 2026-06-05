@@ -18,5 +18,7 @@ public interface ICvFactorCustomerScopeService {
 
     int updateFactorCustomerScope(CvFactorCustomerScopeBo bo);
 
+    boolean isFactorVersionAuthorized(Long versionId, Long customerId, String edition, String licenseId);
+
     int deleteFactorCustomerScopeByIds(Long[] ids);
 }
