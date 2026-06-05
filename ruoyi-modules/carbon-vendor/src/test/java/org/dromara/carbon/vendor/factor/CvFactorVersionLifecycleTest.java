@@ -99,6 +99,31 @@ class CvFactorVersionLifecycleTest {
         assertTrue(updated.getRemark().contains("factor-version-retire"));
     }
 
+    @Test
+    void rejectsRetireWhenDraftVersionHasFrozenFlag() {
+        CvFactorVersion version = draftVersion();
+        version.setFrozenFlag(Boolean.TRUE);
+        when(factorVersionMapper.selectById(101L)).thenReturn(version);
+
+        ServiceException exception = assertThrows(ServiceException.class,
+            () -> service.retireFactorVersion(101L, "vendor-admin"));
+
+        assertEquals("Inconsistent factor version lifecycle metadata", exception.getMessage());
+    }
+
+    @Test
+    void rejectsBlankStatusWhenFrozenFlagIsSet() {
+        CvFactorVersion version = draftVersion();
+        version.setPublishStatus(" ");
+        version.setFrozenFlag(Boolean.TRUE);
+        when(factorVersionMapper.selectById(101L)).thenReturn(version);
+
+        ServiceException exception = assertThrows(ServiceException.class,
+            () -> service.freezeFactorVersion(101L, "auditor"));
+
+        assertEquals("Inconsistent factor version lifecycle metadata", exception.getMessage());
+    }
+
     private CvFactorVersion draftVersion() {
         CvFactorVersion version = baseVersion();
         version.setPublishStatus("draft");

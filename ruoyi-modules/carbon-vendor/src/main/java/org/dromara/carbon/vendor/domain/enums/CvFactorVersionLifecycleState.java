@@ -28,19 +28,20 @@ public enum CvFactorVersionLifecycleState {
 
     public static CvFactorVersionLifecycleState fromVersion(CvFactorVersion version) {
         String normalizedStatus = normalizeStatus(version.getPublishStatus());
-        if (RETIRED.status.equals(normalizedStatus)) {
+        boolean frozen = Boolean.TRUE.equals(version.getFrozenFlag());
+        if (RETIRED.status.equals(normalizedStatus) && !frozen) {
             return RETIRED;
         }
-        if (Boolean.TRUE.equals(version.getFrozenFlag())) {
+        if (RELEASED.status.equals(normalizedStatus) && frozen) {
             return FROZEN;
         }
-        if (RELEASED.status.equals(normalizedStatus)) {
+        if (RELEASED.status.equals(normalizedStatus) && !frozen) {
             return RELEASED;
         }
-        if (DRAFT.status.equals(normalizedStatus)) {
+        if (DRAFT.status.equals(normalizedStatus) && !frozen) {
             return DRAFT;
         }
-        throw new ServiceException("Unsupported factor version lifecycle status: " + version.getPublishStatus());
+        throw new ServiceException("Inconsistent factor version lifecycle metadata");
     }
 
     public static String normalizeStatus(String status) {
