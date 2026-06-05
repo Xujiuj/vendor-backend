@@ -6,14 +6,19 @@ import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import lombok.RequiredArgsConstructor;
 import org.dromara.carbon.vendor.domain.CvFactorVersion;
 import org.dromara.carbon.vendor.domain.bo.CvFactorVersionBo;
+import org.dromara.carbon.vendor.domain.enums.CvFactorVersionLifecycleState;
 import org.dromara.carbon.vendor.domain.vo.CvFactorVersionVo;
 import org.dromara.carbon.vendor.mapper.CvFactorVersionMapper;
 import org.dromara.carbon.vendor.service.ICvFactorVersionService;
+import org.dromara.common.core.enums.FormatsType;
+import org.dromara.common.core.exception.ServiceException;
+import org.dromara.common.core.utils.DateUtils;
 import org.dromara.common.core.utils.StringUtils;
 import org.dromara.common.mybatis.core.page.PageQuery;
 import org.dromara.common.mybatis.core.page.TableDataInfo;
 import org.springframework.stereotype.Service;
 
+import java.util.Date;
 import java.util.Map;
 
 /**
@@ -37,6 +42,50 @@ public class CvFactorVersionServiceImpl implements ICvFactorVersionService {
         return baseMapper.selectVoById(id);
     }
 
+    @Override
+    public void releaseFactorVersion(Long id, String operatedBy) {
+        CvFactorVersion version = requireFactorVersion(id);
+        CvFactorVersionLifecycleState currentState = CvFactorVersionLifecycleState.fromVersion(version);
+        if (currentState != CvFactorVersionLifecycleState.DRAFT) {
+            throw new ServiceException("Only draft factor versions can be released");
+        }
+        Date operationTime = DateUtils.getNowDate();
+        version.setPublishStatus(CvFactorVersionLifecycleState.RELEASED.getStatus());
+        version.setFrozenFlag(Boolean.FALSE);
+        version.setPublishedBy(requireOperator(operatedBy));
+        version.setPublishedTime(operationTime);
+        version.setRemark(appendAuditRemark(version.getRemark(), "release", operatedBy, operationTime));
+        baseMapper.updateById(version);
+    }
+
+    @Override
+    public void freezeFactorVersion(Long id, String operatedBy) {
+        CvFactorVersion version = requireFactorVersion(id);
+        CvFactorVersionLifecycleState currentState = CvFactorVersionLifecycleState.fromVersion(version);
+        if (currentState != CvFactorVersionLifecycleState.RELEASED) {
+            throw new ServiceException("Only released factor versions can be frozen");
+        }
+        Date operationTime = DateUtils.getNowDate();
+        version.setFrozenFlag(Boolean.TRUE);
+        version.setRemark(appendAuditRemark(version.getRemark(), "freeze", operatedBy, operationTime));
+        baseMapper.updateById(version);
+    }
+
+    @Override
+    public void retireFactorVersion(Long id, String operatedBy) {
+        CvFactorVersion version = requireFactorVersion(id);
+        CvFactorVersionLifecycleState currentState = CvFactorVersionLifecycleState.fromVersion(version);
+        if (currentState != CvFactorVersionLifecycleState.RELEASED
+            && currentState != CvFactorVersionLifecycleState.FROZEN) {
+            throw new ServiceException("Only released or frozen factor versions can be retired");
+        }
+        Date operationTime = DateUtils.getNowDate();
+        version.setPublishStatus(CvFactorVersionLifecycleState.RETIRED.getStatus());
+        version.setFrozenFlag(Boolean.FALSE);
+        version.setRemark(appendAuditRemark(version.getRemark(), "retire", operatedBy, operationTime));
+        baseMapper.updateById(version);
+    }
+
     private LambdaQueryWrapper<CvFactorVersion> buildQueryWrapper(CvFactorVersionBo bo) {
         Map<String, Object> params = bo.getParams();
         LambdaQueryWrapper<CvFactorVersion> lqw = Wrappers.lambdaQuery();
@@ -51,5 +100,33 @@ public class CvFactorVersionServiceImpl implements ICvFactorVersionService {
         lqw.orderByDesc(CvFactorVersion::getCreateTime);
         lqw.orderByAsc(CvFactorVersion::getId);
         return lqw;
+    }
+
+    private CvFactorVersion requireFactorVersion(Long id) {
+        if (id == null) {
+            throw new ServiceException("Factor version id cannot be null");
+        }
+        CvFactorVersion version = baseMapper.selectById(id);
+        if (version == null) {
+            throw new ServiceException("Factor version does not exist");
+        }
+        return version;
+    }
+
+    private String requireOperator(String operatedBy) {
+        if (StringUtils.isBlank(operatedBy)) {
+            throw new ServiceException("Factor version lifecycle operator cannot be blank");
+        }
+        return operatedBy.trim();
+    }
+
+    private String appendAuditRemark(String currentRemark, String action, String operatedBy, Date operationTime) {
+        String auditEntry = String.format(
+            "[%s] factor-version-%s by %s",
+            DateUtils.parseDateToStr(FormatsType.YYYY_MM_DD_HH_MM_SS, operationTime),
+            action,
+            requireOperator(operatedBy)
+        );
+        return StringUtils.isBlank(currentRemark) ? auditEntry : currentRemark + System.lineSeparator() + auditEntry;
     }
 }

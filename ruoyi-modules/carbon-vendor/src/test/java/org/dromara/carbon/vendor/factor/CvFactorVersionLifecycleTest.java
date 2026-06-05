@@ -1,0 +1,135 @@
+package org.dromara.carbon.vendor.factor;
+
+import org.dromara.carbon.vendor.domain.CvFactorVersion;
+import org.dromara.carbon.vendor.mapper.CvFactorVersionMapper;
+import org.dromara.carbon.vendor.service.impl.CvFactorVersionServiceImpl;
+import org.dromara.common.core.exception.ServiceException;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Tag;
+import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
+
+import java.util.Date;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
+
+@Tag("dev")
+class CvFactorVersionLifecycleTest {
+
+    private CvFactorVersionMapper factorVersionMapper;
+    private CvFactorVersionServiceImpl service;
+
+    @BeforeEach
+    void setUp() {
+        factorVersionMapper = mock(CvFactorVersionMapper.class);
+        service = new CvFactorVersionServiceImpl(factorVersionMapper);
+    }
+
+    @Test
+    void releasesDraftVersionAndPersistsAuditMetadata() {
+        when(factorVersionMapper.selectById(101L)).thenReturn(draftVersion());
+
+        service.releaseFactorVersion(101L, "vendor-admin");
+
+        ArgumentCaptor<CvFactorVersion> updateCaptor = ArgumentCaptor.forClass(CvFactorVersion.class);
+        verify(factorVersionMapper).updateById(updateCaptor.capture());
+        CvFactorVersion updated = updateCaptor.getValue();
+        assertEquals("released", updated.getPublishStatus());
+        assertFalse(updated.getFrozenFlag());
+        assertEquals("vendor-admin", updated.getPublishedBy());
+        assertNotNull(updated.getPublishedTime());
+        assertTrue(updated.getRemark().contains("factor-version-release"));
+        assertTrue(updated.getRemark().contains("vendor-admin"));
+    }
+
+    @Test
+    void rejectsReleaseFromFrozenState() {
+        when(factorVersionMapper.selectById(101L)).thenReturn(frozenVersion());
+
+        ServiceException exception = assertThrows(ServiceException.class,
+            () -> service.releaseFactorVersion(101L, "vendor-admin"));
+
+        assertEquals("Only draft factor versions can be released", exception.getMessage());
+    }
+
+    @Test
+    void freezesReleasedVersionAndAppendsAuditRemark() {
+        when(factorVersionMapper.selectById(101L)).thenReturn(releasedVersion());
+
+        service.freezeFactorVersion(101L, "auditor");
+
+        ArgumentCaptor<CvFactorVersion> updateCaptor = ArgumentCaptor.forClass(CvFactorVersion.class);
+        verify(factorVersionMapper).updateById(updateCaptor.capture());
+        CvFactorVersion updated = updateCaptor.getValue();
+        assertTrue(updated.getFrozenFlag());
+        assertEquals("released", updated.getPublishStatus());
+        assertTrue(updated.getRemark().contains("existing remark"));
+        assertTrue(updated.getRemark().contains("factor-version-freeze"));
+        assertTrue(updated.getRemark().contains("auditor"));
+    }
+
+    @Test
+    void rejectsFreezeFromDraftState() {
+        when(factorVersionMapper.selectById(101L)).thenReturn(draftVersion());
+
+        ServiceException exception = assertThrows(ServiceException.class,
+            () -> service.freezeFactorVersion(101L, "auditor"));
+
+        assertEquals("Only released factor versions can be frozen", exception.getMessage());
+    }
+
+    @Test
+    void retiresFrozenVersionWithoutReadingEnterpriseData() {
+        when(factorVersionMapper.selectById(101L)).thenReturn(frozenVersion());
+
+        service.retireFactorVersion(101L, "vendor-admin");
+
+        ArgumentCaptor<CvFactorVersion> updateCaptor = ArgumentCaptor.forClass(CvFactorVersion.class);
+        verify(factorVersionMapper).updateById(updateCaptor.capture());
+        CvFactorVersion updated = updateCaptor.getValue();
+        assertEquals("retired", updated.getPublishStatus());
+        assertFalse(updated.getFrozenFlag());
+        assertTrue(updated.getRemark().contains("factor-version-retire"));
+    }
+
+    private CvFactorVersion draftVersion() {
+        CvFactorVersion version = baseVersion();
+        version.setPublishStatus("draft");
+        version.setFrozenFlag(Boolean.FALSE);
+        version.setPublishedBy(null);
+        version.setPublishedTime(null);
+        version.setRemark(null);
+        return version;
+    }
+
+    private CvFactorVersion releasedVersion() {
+        CvFactorVersion version = baseVersion();
+        version.setPublishStatus("released");
+        version.setFrozenFlag(Boolean.FALSE);
+        version.setPublishedBy("release-user");
+        version.setPublishedTime(new Date());
+        version.setRemark("existing remark");
+        return version;
+    }
+
+    private CvFactorVersion frozenVersion() {
+        CvFactorVersion version = releasedVersion();
+        version.setFrozenFlag(Boolean.TRUE);
+        return version;
+    }
+
+    private CvFactorVersion baseVersion() {
+        CvFactorVersion version = new CvFactorVersion();
+        version.setId(101L);
+        version.setVersionCode("FACTOR-2026-01");
+        version.setVersionName("Factor 2026.01");
+        return version;
+    }
+}
