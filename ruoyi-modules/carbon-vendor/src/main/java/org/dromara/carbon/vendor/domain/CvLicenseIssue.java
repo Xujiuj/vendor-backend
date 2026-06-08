@@ -105,6 +105,16 @@ public class CvLicenseIssue implements Serializable {
     private Date revokedTime;
 
     /**
+     * Operator that revoked the license.
+     */
+    private String revokedBy;
+
+    /**
+     * Revocation audit reason.
+     */
+    private String revokeReason;
+
+    /**
      * Serialized license payload.
      */
     private String licensePayload;

@@ -35,6 +35,8 @@ import java.util.Map;
 @Service
 public class CvFactorCustomerScopeServiceImpl implements ICvFactorCustomerScopeService {
 
+    private static final String ISSUE_STATUS_REVOKED = "revoked";
+
     private final CvFactorCustomerScopeMapper baseMapper;
     private final CvFactorVersionMapper factorVersionMapper;
     private final CvCustomerMapper customerMapper;
@@ -74,11 +76,14 @@ public class CvFactorCustomerScopeServiceImpl implements ICvFactorCustomerScopeS
 
     @Override
     public boolean isFactorVersionAuthorized(Long versionId, Long customerId, String edition, String licenseId) {
-        CvFactorVersion version = requireReleasedVersion(versionId);
+        CvFactorVersion version = requirePublishedOrFrozenVersion(versionId);
         String normalizedEdition = normalizeEdition(edition);
         String normalizedLicenseId = normalizeLicenseId(licenseId);
         CvLicenseIssue entitlement = findLicenseIssue(normalizedLicenseId);
         if (entitlement == null) {
+            return false;
+        }
+        if (isRevokedIssue(entitlement)) {
             return false;
         }
         Long resolvedCustomerId = entitlementCustomerId(entitlement);
@@ -121,11 +126,11 @@ public class CvFactorCustomerScopeServiceImpl implements ICvFactorCustomerScopeS
     }
 
     private void validateScope(CvFactorCustomerScopeBo bo) {
-        requireReleasedVersion(bo.getVersionId());
+        requirePublishedOrFrozenVersion(bo.getVersionId());
         String normalizedEdition = normalizeEdition(bo.getEdition());
         String normalizedLicenseId = normalizeLicenseId(bo.getLicenseId());
-        if (bo.getCustomerId() == null && normalizedEdition == null && normalizedLicenseId == null) {
-            throw new ServiceException("Factor scope must reference customer, edition, or license entitlement metadata");
+        if (normalizedLicenseId == null) {
+            throw new ServiceException("Factor scope must reference vendor license entitlement metadata");
         }
         if (bo.getCustomerId() != null) {
             CvCustomer customer = customerMapper.selectById(bo.getCustomerId());
@@ -135,6 +140,9 @@ public class CvFactorCustomerScopeServiceImpl implements ICvFactorCustomerScopeS
         }
         CvLicenseIssue entitlement = loadLicenseIssue(normalizedLicenseId);
         if (entitlement != null) {
+            if (isRevokedIssue(entitlement)) {
+                throw new ServiceException("Referenced vendor license entitlement is revoked");
+            }
             if (bo.getCustomerId() != null && entitlement.getCustomerId() != null
                 && !bo.getCustomerId().equals(entitlement.getCustomerId())) {
                 throw new ServiceException("Referenced vendor license entitlement does not match customer metadata");
@@ -149,7 +157,7 @@ public class CvFactorCustomerScopeServiceImpl implements ICvFactorCustomerScopeS
         }
     }
 
-    private CvFactorVersion requireReleasedVersion(Long versionId) {
+    private CvFactorVersion requirePublishedOrFrozenVersion(Long versionId) {
         if (versionId == null) {
             throw new ServiceException("Factor version id cannot be null");
         }
@@ -157,8 +165,9 @@ public class CvFactorCustomerScopeServiceImpl implements ICvFactorCustomerScopeS
         if (version == null) {
             throw new ServiceException("Factor version does not exist");
         }
-        if (CvFactorVersionLifecycleState.fromVersion(version) != CvFactorVersionLifecycleState.RELEASED) {
-            throw new ServiceException("Only released factor versions can be scoped");
+        CvFactorVersionLifecycleState state = CvFactorVersionLifecycleState.fromVersion(version);
+        if (state != CvFactorVersionLifecycleState.PUBLISHED && state != CvFactorVersionLifecycleState.FROZEN) {
+            throw new ServiceException("Only published or frozen factor versions can be scoped");
         }
         return version;
     }
@@ -180,6 +189,10 @@ public class CvFactorCustomerScopeServiceImpl implements ICvFactorCustomerScopeS
         }
         return licenseIssueMapper.selectOne(Wrappers.<CvLicenseIssue>lambdaQuery()
             .eq(CvLicenseIssue::getLicenseId, licenseId), false);
+    }
+
+    private boolean isRevokedIssue(CvLicenseIssue issue) {
+        return issue.getRevokedTime() != null || ISSUE_STATUS_REVOKED.equals(normalizeStatus(issue.getIssueStatus()));
     }
 
     private boolean hasDuplicateScope(CvFactorCustomerScopeBo bo, String normalizedEdition, String normalizedLicenseId) {
@@ -222,6 +235,10 @@ public class CvFactorCustomerScopeServiceImpl implements ICvFactorCustomerScopeS
 
     private String normalizeEdition(String edition) {
         return StringUtils.isBlank(edition) ? null : edition.trim().toLowerCase(Locale.ROOT);
+    }
+
+    private String normalizeStatus(String status) {
+        return StringUtils.isBlank(status) ? null : status.trim().toLowerCase(Locale.ROOT);
     }
 
     private String normalizeLicenseId(String licenseId) {

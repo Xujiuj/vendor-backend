@@ -44,15 +44,23 @@ CREATE TABLE cv_license_issue (
     valid_to DATETIME2 NOT NULL,
     issue_status NVARCHAR(32) NOT NULL DEFAULT 'issued',
     issue_type NVARCHAR(32) NOT NULL DEFAULT 'manual',
+    source_license_id NVARCHAR(128) NULL,
     issued_by NVARCHAR(64) NULL,
     issued_time DATETIME2 NULL DEFAULT SYSUTCDATETIME(),
     revoked_time DATETIME2 NULL,
+    revoked_by NVARCHAR(64) NULL,
+    revoke_reason NVARCHAR(500) NULL,
     license_payload NVARCHAR(MAX) NOT NULL,
     signature_text NVARCHAR(MAX) NOT NULL,
     CONSTRAINT uk_cv_license_issue_id UNIQUE (license_id),
     CONSTRAINT fk_cv_license_issue_customer
         FOREIGN KEY (customer_id) REFERENCES cv_customer (id)
 );
+GO
+
+CREATE UNIQUE INDEX uk_cv_license_reissue_source
+    ON cv_license_issue (source_license_id)
+    WHERE source_license_id IS NOT NULL;
 GO
 
 CREATE TABLE cv_factor_version (
@@ -89,16 +97,24 @@ GO
 CREATE TABLE cv_factor_customer_scope (
     id BIGINT IDENTITY(1,1) NOT NULL PRIMARY KEY,
     version_id BIGINT NOT NULL,
-    customer_id BIGINT NOT NULL,
+    customer_id BIGINT NULL,
+    edition NVARCHAR(64) NULL,
     license_id NVARCHAR(128) NULL,
+    scope_customer_key AS ISNULL(customer_id, CONVERT(BIGINT, 0)) PERSISTED,
+    scope_edition_key AS ISNULL(edition, N'') PERSISTED,
+    scope_license_key AS ISNULL(license_id, N'') PERSISTED,
     scope_status NVARCHAR(32) NOT NULL DEFAULT 'enabled',
     create_time DATETIME2 NULL DEFAULT SYSUTCDATETIME(),
-    CONSTRAINT uk_cv_factor_customer_scope UNIQUE (version_id, customer_id),
+    CONSTRAINT uk_cv_factor_scope_entitlement UNIQUE (version_id, scope_customer_key, scope_edition_key, scope_license_key),
     CONSTRAINT fk_cv_factor_scope_version
         FOREIGN KEY (version_id) REFERENCES cv_factor_version (id),
     CONSTRAINT fk_cv_factor_scope_customer
         FOREIGN KEY (customer_id) REFERENCES cv_customer (id)
 );
+GO
+
+CREATE INDEX idx_cv_factor_scope_lookup
+    ON cv_factor_customer_scope (version_id, scope_status, customer_id, edition);
 GO
 
 CREATE TABLE cv_report_template (

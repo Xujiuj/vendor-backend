@@ -3,6 +3,7 @@ package org.dromara.carbon.vendor.controller;
 import cn.dev33.satoken.annotation.SaCheckPermission;
 import lombok.RequiredArgsConstructor;
 import org.dromara.carbon.vendor.domain.bo.CvRenewalOrderBo;
+import org.dromara.carbon.vendor.domain.renewal.CvRenewalCallbackRequest;
 import org.dromara.carbon.vendor.domain.vo.CvRenewalOrderVo;
 import org.dromara.carbon.vendor.service.ICvRenewalOrderService;
 import org.dromara.common.core.domain.R;
@@ -68,6 +69,15 @@ public class CvRenewalOrderController extends BaseController {
     @PutMapping
     public R<Void> edit(@Validated(EditGroup.class) @RequestBody CvRenewalOrderBo renewalOrder) {
         return toAjax(renewalOrderService.updateRenewalOrder(renewalOrder));
+    }
+
+    /**
+     * Apply vendor payment/authorization callback metadata.
+     */
+    @SaCheckPermission("vendor:renewalOrder:edit")
+    @PostMapping("/callback")
+    public R<Void> callback(@RequestBody CvRenewalCallbackRequest callbackRequest) {
+        return toAjax(renewalOrderService.applyRenewalCallback(callbackRequest));
     }
 
     /**

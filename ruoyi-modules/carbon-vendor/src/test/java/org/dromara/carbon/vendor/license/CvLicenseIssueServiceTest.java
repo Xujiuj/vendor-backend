@@ -7,6 +7,7 @@ import org.dromara.carbon.vendor.domain.CvLicenseIssue;
 import org.dromara.carbon.vendor.domain.CvSigningKey;
 import org.dromara.carbon.vendor.domain.license.CvLicenseIssueRequest;
 import org.dromara.carbon.vendor.domain.license.CvLicenseIssueResult;
+import org.dromara.carbon.vendor.domain.license.CvLicenseRevokeRequest;
 import org.dromara.carbon.vendor.domain.license.CvTemplateEntitlement;
 import org.dromara.carbon.vendor.mapper.CvCustomerMapper;
 import org.dromara.carbon.vendor.mapper.CvLicenseIssueMapper;
@@ -31,6 +32,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
@@ -136,6 +138,20 @@ class CvLicenseIssueServiceTest {
     }
 
     @Test
+    void rejectsNumericDisabledCustomerBeforeIssuing() {
+        CvCustomer customer = activeCustomer();
+        customer.setCustomerStatus("1");
+        when(customerMapper.selectById(eq(1001L))).thenReturn(customer);
+        CvLicenseIssueServiceImpl service = newService(signingKeyMaterial());
+
+        CvLicenseIssueResult result = service.issueManualLicense(validRequest());
+
+        assertFalse(result.isIssued());
+        assertEquals("CUSTOMER_DISABLED", result.getStatus());
+        verify(licenseIssueMapper, never()).insert(any(CvLicenseIssue.class));
+    }
+
+    @Test
     void rejectsDuplicateIssueForSameCustomerInstallAndValidityWindow() {
         when(licenseIssueMapper.selectList(any())).thenReturn(List.of(existingIssuedRecord()));
         CvLicenseIssueServiceImpl service = newService(signingKeyMaterial());
@@ -158,6 +174,39 @@ class CvLicenseIssueServiceTest {
         assertEquals("REVOKED_LICENSE_REISSUE_BLOCKED", result.getStatus());
         assertTrue(result.getMessage().contains("manual review"));
         verify(licenseIssueMapper, never()).insert(any(CvLicenseIssue.class));
+    }
+
+    @Test
+    void revokesIssuedLicenseWithAuditMetadata() {
+        when(licenseIssueMapper.selectOne(any(), any(Boolean.class))).thenReturn(existingIssuedRecord());
+        CvLicenseIssueServiceImpl service = newService(signingKeyMaterial());
+        CvLicenseRevokeRequest request = new CvLicenseRevokeRequest();
+        request.setLicenseId("LIC-EXISTING-001");
+        request.setRevokedBy("vendor-auditor");
+        request.setRevokedAt(Date.from(Instant.parse("2026-06-12T00:00:00Z")));
+        request.setRevokeReason("contract cancelled");
+
+        service.revokeLicense(request);
+
+        ArgumentCaptor<CvLicenseIssue> issueCaptor = ArgumentCaptor.forClass(CvLicenseIssue.class);
+        verify(licenseIssueMapper).updateById(issueCaptor.capture());
+        CvLicenseIssue update = issueCaptor.getValue();
+        assertEquals("revoked", update.getIssueStatus());
+        assertEquals("vendor-auditor", update.getRevokedBy());
+        assertEquals("contract cancelled", update.getRevokeReason());
+        assertEquals(Date.from(Instant.parse("2026-06-12T00:00:00Z")), update.getRevokedTime());
+    }
+
+    @Test
+    void rejectsDuplicateRevocationWithoutChangingAuditRecord() {
+        when(licenseIssueMapper.selectOne(any(), any(Boolean.class))).thenReturn(existingRevokedRecord());
+        CvLicenseIssueServiceImpl service = newService(signingKeyMaterial());
+        CvLicenseRevokeRequest request = new CvLicenseRevokeRequest();
+        request.setLicenseId("LIC-EXISTING-001");
+
+        assertThrows(RuntimeException.class, () -> service.revokeLicense(request));
+
+        verify(licenseIssueMapper, never()).updateById(any(CvLicenseIssue.class));
     }
 
     private CvLicenseIssueServiceImpl newService(String signingKeyMaterial) {

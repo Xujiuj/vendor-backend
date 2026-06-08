@@ -15,15 +15,18 @@ import org.dromara.carbon.vendor.domain.license.CvLicenseIssueRequest;
 import org.dromara.carbon.vendor.domain.license.CvLicenseIssueResult;
 import org.dromara.carbon.vendor.domain.license.CvLicensePayload;
 import org.dromara.carbon.vendor.domain.license.CvLicenseReissueRequest;
+import org.dromara.carbon.vendor.domain.license.CvLicenseRevokeRequest;
 import org.dromara.carbon.vendor.domain.vo.CvLicenseIssueVo;
 import org.dromara.carbon.vendor.mapper.CvCustomerMapper;
 import org.dromara.carbon.vendor.mapper.CvLicenseIssueMapper;
 import org.dromara.carbon.vendor.mapper.CvSigningKeyMapper;
 import org.dromara.carbon.vendor.service.CvLicensePrivateKeyProvider;
 import org.dromara.carbon.vendor.service.ICvLicenseIssueService;
+import org.dromara.common.core.exception.ServiceException;
 import org.dromara.common.core.utils.StringUtils;
 import org.dromara.common.mybatis.core.page.PageQuery;
 import org.dromara.common.mybatis.core.page.TableDataInfo;
+import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Service;
 
 import java.nio.charset.StandardCharsets;
@@ -58,6 +61,9 @@ public class CvLicenseIssueServiceImpl implements ICvLicenseIssueService {
     private static final String ISSUE_TYPE_REISSUE = "reissue";
     private static final String CUSTOMER_STATUS_DISABLED = "disabled";
     private static final String CUSTOMER_STATUS_INACTIVE = "inactive";
+    private static final String CUSTOMER_STATUS_STOPPED = "stopped";
+    private static final String CUSTOMER_STATUS_SUSPENDED = "suspended";
+    private static final String CUSTOMER_STATUS_NUMERIC_DISABLED = "1";
 
     private final CvLicenseIssueMapper baseMapper;
     private final CvCustomerMapper customerMapper;
@@ -120,6 +126,27 @@ public class CvLicenseIssueServiceImpl implements ICvLicenseIssueService {
         return issueLicense(request, ISSUE_TYPE_REISSUE, true);
     }
 
+    @Override
+    public int revokeLicense(CvLicenseRevokeRequest request) {
+        if (request == null || StringUtils.isBlank(request.getLicenseId())) {
+            throw new ServiceException("licenseId cannot be blank");
+        }
+        CvLicenseIssue issue = findIssueByLicenseId(request.getLicenseId());
+        if (issue == null) {
+            throw new ServiceException("Vendor license issue record does not exist");
+        }
+        if (isRevokedIssue(issue)) {
+            throw new ServiceException("Vendor license is already revoked");
+        }
+        CvLicenseIssue update = new CvLicenseIssue();
+        update.setId(issue.getId());
+        update.setIssueStatus(ISSUE_STATUS_REVOKED);
+        update.setRevokedTime(Objects.requireNonNullElseGet(request.getRevokedAt(), Date::new));
+        update.setRevokedBy(StringUtils.blankToDefault(request.getRevokedBy(), "vendor-system"));
+        update.setRevokeReason(request.getRevokeReason());
+        return baseMapper.updateById(update);
+    }
+
     private CvLicenseIssueResult issueLicense(CvLicenseIssueRequest request, String defaultIssueType, boolean allowRevokedHistory) {
         CvLicenseIssueResult validation = validateIssueRequest(request);
         if (!validation.isIssued()) {
@@ -167,7 +194,19 @@ public class CvLicenseIssueServiceImpl implements ICvLicenseIssueService {
             CvLicenseEnvelope envelope = buildEnvelope(payload, signingKey, signatureText);
             String licenseContent = objectMapper.writeValueAsString(envelope);
             CvLicenseIssue issue = buildIssueRecord(request, signingKey, issuedTime, canonicalPayload, signatureText, payload, defaultIssueType);
-            baseMapper.insert(issue);
+            try {
+                baseMapper.insert(issue);
+            } catch (DuplicateKeyException e) {
+                if (ISSUE_TYPE_REISSUE.equals(issue.getIssueType())
+                    && StringUtils.isNotBlank(issue.getSourceLicenseId())
+                    && isSourceLicenseUniqueViolation(e)) {
+                    log.warn("Rejected duplicate reissue for revoked sourceLicenseId={}", issue.getSourceLicenseId());
+                    return CvLicenseIssueResult.failed(
+                        "SOURCE_LICENSE_ALREADY_REISSUED",
+                        "revoked source license has already been reissued");
+                }
+                throw e;
+            }
             return CvLicenseIssueResult.issued(licenseContent, issue);
         } catch (Exception e) {
             log.error("Failed to issue vendor license for customerId={}, installId={}, keyId={}",
@@ -191,6 +230,7 @@ public class CvLicenseIssueServiceImpl implements ICvLicenseIssueService {
         lqw.eq(StringUtils.isNotBlank(bo.getIssueType()), CvLicenseIssue::getIssueType, bo.getIssueType());
         lqw.eq(StringUtils.isNotBlank(bo.getSourceLicenseId()), CvLicenseIssue::getSourceLicenseId, bo.getSourceLicenseId());
         lqw.like(StringUtils.isNotBlank(bo.getIssuedBy()), CvLicenseIssue::getIssuedBy, bo.getIssuedBy());
+        lqw.like(StringUtils.isNotBlank(bo.getRevokedBy()), CvLicenseIssue::getRevokedBy, bo.getRevokedBy());
         lqw.between(params.get("beginTime") != null && params.get("endTime") != null,
             CvLicenseIssue::getIssuedTime, params.get("beginTime"), params.get("endTime"));
         lqw.orderByDesc(CvLicenseIssue::getIssuedTime);
@@ -258,9 +298,19 @@ public class CvLicenseIssueServiceImpl implements ICvLicenseIssueService {
         return issue.getRevokedTime() != null || ISSUE_STATUS_REVOKED.equals(normalizeStatus(issue.getIssueStatus()));
     }
 
+    private boolean isSourceLicenseUniqueViolation(DuplicateKeyException exception) {
+        String message = exception.getMessage();
+        return StringUtils.isNotBlank(message)
+            && (message.contains("uk_cv_license_reissue_source") || message.contains("source_license_id"));
+    }
+
     private boolean isDisabledCustomer(String customerStatus) {
         String normalizedStatus = normalizeStatus(customerStatus);
-        return CUSTOMER_STATUS_DISABLED.equals(normalizedStatus) || CUSTOMER_STATUS_INACTIVE.equals(normalizedStatus);
+        return CUSTOMER_STATUS_DISABLED.equals(normalizedStatus)
+            || CUSTOMER_STATUS_INACTIVE.equals(normalizedStatus)
+            || CUSTOMER_STATUS_STOPPED.equals(normalizedStatus)
+            || CUSTOMER_STATUS_SUSPENDED.equals(normalizedStatus)
+            || CUSTOMER_STATUS_NUMERIC_DISABLED.equals(normalizedStatus);
     }
 
     private String normalizeStatus(String status) {

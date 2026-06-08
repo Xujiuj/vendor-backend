@@ -33,7 +33,7 @@ class CvFactorVersionLifecycleTest {
     }
 
     @Test
-    void releasesDraftVersionAndPersistsAuditMetadata() {
+    void publishesDraftVersionAndPersistsAuditMetadata() {
         when(factorVersionMapper.selectById(101L)).thenReturn(draftVersion());
 
         service.releaseFactorVersion(101L, "vendor-admin");
@@ -41,11 +41,11 @@ class CvFactorVersionLifecycleTest {
         ArgumentCaptor<CvFactorVersion> updateCaptor = ArgumentCaptor.forClass(CvFactorVersion.class);
         verify(factorVersionMapper).updateById(updateCaptor.capture());
         CvFactorVersion updated = updateCaptor.getValue();
-        assertEquals("released", updated.getPublishStatus());
+        assertEquals("published", updated.getPublishStatus());
         assertFalse(updated.getFrozenFlag());
         assertEquals("vendor-admin", updated.getPublishedBy());
         assertNotNull(updated.getPublishedTime());
-        assertTrue(updated.getRemark().contains("factor-version-release"));
+        assertTrue(updated.getRemark().contains("factor-version-publish"));
         assertTrue(updated.getRemark().contains("vendor-admin"));
     }
 
@@ -56,12 +56,12 @@ class CvFactorVersionLifecycleTest {
         ServiceException exception = assertThrows(ServiceException.class,
             () -> service.releaseFactorVersion(101L, "vendor-admin"));
 
-        assertEquals("Only draft factor versions can be released", exception.getMessage());
+        assertEquals("Only draft factor versions can be published", exception.getMessage());
     }
 
     @Test
-    void freezesReleasedVersionAndAppendsAuditRemark() {
-        when(factorVersionMapper.selectById(101L)).thenReturn(releasedVersion());
+    void freezesPublishedVersionAndAppendsAuditRemark() {
+        when(factorVersionMapper.selectById(101L)).thenReturn(publishedVersion());
 
         service.freezeFactorVersion(101L, "auditor");
 
@@ -69,7 +69,7 @@ class CvFactorVersionLifecycleTest {
         verify(factorVersionMapper).updateById(updateCaptor.capture());
         CvFactorVersion updated = updateCaptor.getValue();
         assertTrue(updated.getFrozenFlag());
-        assertEquals("released", updated.getPublishStatus());
+        assertEquals("frozen", updated.getPublishStatus());
         assertTrue(updated.getRemark().contains("existing remark"));
         assertTrue(updated.getRemark().contains("factor-version-freeze"));
         assertTrue(updated.getRemark().contains("auditor"));
@@ -82,7 +82,7 @@ class CvFactorVersionLifecycleTest {
         ServiceException exception = assertThrows(ServiceException.class,
             () -> service.freezeFactorVersion(101L, "auditor"));
 
-        assertEquals("Only released factor versions can be frozen", exception.getMessage());
+        assertEquals("Only published factor versions can be frozen", exception.getMessage());
     }
 
     @Test
@@ -134,9 +134,9 @@ class CvFactorVersionLifecycleTest {
         return version;
     }
 
-    private CvFactorVersion releasedVersion() {
+    private CvFactorVersion publishedVersion() {
         CvFactorVersion version = baseVersion();
-        version.setPublishStatus("released");
+        version.setPublishStatus("published");
         version.setFrozenFlag(Boolean.FALSE);
         version.setPublishedBy("release-user");
         version.setPublishedTime(new Date());
@@ -145,7 +145,8 @@ class CvFactorVersionLifecycleTest {
     }
 
     private CvFactorVersion frozenVersion() {
-        CvFactorVersion version = releasedVersion();
+        CvFactorVersion version = publishedVersion();
+        version.setPublishStatus("frozen");
         version.setFrozenFlag(Boolean.TRUE);
         return version;
     }

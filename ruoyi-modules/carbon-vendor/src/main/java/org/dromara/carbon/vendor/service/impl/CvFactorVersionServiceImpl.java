@@ -47,14 +47,14 @@ public class CvFactorVersionServiceImpl implements ICvFactorVersionService {
         CvFactorVersion version = requireFactorVersion(id);
         CvFactorVersionLifecycleState currentState = CvFactorVersionLifecycleState.fromVersion(version);
         if (currentState != CvFactorVersionLifecycleState.DRAFT) {
-            throw new ServiceException("Only draft factor versions can be released");
+            throw new ServiceException("Only draft factor versions can be published");
         }
         Date operationTime = DateUtils.getNowDate();
-        version.setPublishStatus(CvFactorVersionLifecycleState.RELEASED.getStatus());
+        version.setPublishStatus(CvFactorVersionLifecycleState.PUBLISHED.getStatus());
         version.setFrozenFlag(Boolean.FALSE);
         version.setPublishedBy(requireOperator(operatedBy));
         version.setPublishedTime(operationTime);
-        version.setRemark(appendAuditRemark(version.getRemark(), "release", operatedBy, operationTime));
+        version.setRemark(appendAuditRemark(version.getRemark(), "publish", operatedBy, operationTime));
         baseMapper.updateById(version);
     }
 
@@ -62,10 +62,11 @@ public class CvFactorVersionServiceImpl implements ICvFactorVersionService {
     public void freezeFactorVersion(Long id, String operatedBy) {
         CvFactorVersion version = requireFactorVersion(id);
         CvFactorVersionLifecycleState currentState = CvFactorVersionLifecycleState.fromVersion(version);
-        if (currentState != CvFactorVersionLifecycleState.RELEASED) {
-            throw new ServiceException("Only released factor versions can be frozen");
+        if (currentState != CvFactorVersionLifecycleState.PUBLISHED) {
+            throw new ServiceException("Only published factor versions can be frozen");
         }
         Date operationTime = DateUtils.getNowDate();
+        version.setPublishStatus(CvFactorVersionLifecycleState.FROZEN.getStatus());
         version.setFrozenFlag(Boolean.TRUE);
         version.setRemark(appendAuditRemark(version.getRemark(), "freeze", operatedBy, operationTime));
         baseMapper.updateById(version);
@@ -75,9 +76,9 @@ public class CvFactorVersionServiceImpl implements ICvFactorVersionService {
     public void retireFactorVersion(Long id, String operatedBy) {
         CvFactorVersion version = requireFactorVersion(id);
         CvFactorVersionLifecycleState currentState = CvFactorVersionLifecycleState.fromVersion(version);
-        if (currentState != CvFactorVersionLifecycleState.RELEASED
+        if (currentState != CvFactorVersionLifecycleState.PUBLISHED
             && currentState != CvFactorVersionLifecycleState.FROZEN) {
-            throw new ServiceException("Only released or frozen factor versions can be retired");
+            throw new ServiceException("Only published or frozen factor versions can be retired");
         }
         Date operationTime = DateUtils.getNowDate();
         version.setPublishStatus(CvFactorVersionLifecycleState.RETIRED.getStatus());

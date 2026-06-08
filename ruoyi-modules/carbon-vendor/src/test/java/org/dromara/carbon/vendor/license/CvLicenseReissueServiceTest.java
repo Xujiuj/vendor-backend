@@ -17,6 +17,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
+import org.springframework.dao.DuplicateKeyException;
 
 import java.nio.charset.StandardCharsets;
 import java.security.KeyPair;
@@ -185,6 +186,19 @@ class CvLicenseReissueServiceTest {
         assertFalse(result.isIssued());
         assertEquals("SOURCE_LICENSE_ALREADY_REISSUED", result.getStatus());
         verify(licenseIssueMapper, never()).insert(any(CvLicenseIssue.class));
+    }
+
+    @Test
+    void treatsConcurrentSourceLicenseUniqueViolationAsReissueReplay() {
+        when(licenseIssueMapper.insert(any(CvLicenseIssue.class)))
+            .thenThrow(new DuplicateKeyException("uk_cv_license_reissue_source"));
+        CvLicenseIssueServiceImpl service = newService(signingKeyMaterial());
+
+        CvLicenseIssueResult result = service.reissueRevokedLicense(validReissueRequest());
+
+        assertFalse(result.isIssued());
+        assertEquals("SOURCE_LICENSE_ALREADY_REISSUED", result.getStatus());
+        assertEquals("revoked source license has already been reissued", result.getMessage());
     }
 
     @Test

@@ -4,6 +4,7 @@ import org.dromara.carbon.vendor.domain.bo.CvLicenseIssueBo;
 import org.dromara.carbon.vendor.domain.license.CvLicenseIssueRequest;
 import org.dromara.carbon.vendor.domain.license.CvLicenseReissueRequest;
 import org.dromara.carbon.vendor.domain.license.CvLicenseIssueResult;
+import org.dromara.carbon.vendor.domain.license.CvLicenseRevokeRequest;
 import org.dromara.carbon.vendor.domain.vo.CvLicenseIssueVo;
 import org.dromara.common.mybatis.core.page.PageQuery;
 import org.dromara.common.mybatis.core.page.TableDataInfo;
@@ -45,4 +46,12 @@ public interface ICvLicenseIssueService {
      * @return issue result
      */
     CvLicenseIssueResult reissueRevokedLicense(CvLicenseReissueRequest request);
+
+    /**
+     * Revoke an issued license and keep revocation audit metadata on the vendor record.
+     *
+     * @param request revoke request
+     * @return affected row count
+     */
+    int revokeLicense(CvLicenseRevokeRequest request);
 }

@@ -70,4 +70,9 @@ public class CvLicenseIssueBo extends BaseEntity {
      * Operator that issued the license.
      */
     private String issuedBy;
+
+    /**
+     * Operator that revoked the license.
+     */
+    private String revokedBy;
 }

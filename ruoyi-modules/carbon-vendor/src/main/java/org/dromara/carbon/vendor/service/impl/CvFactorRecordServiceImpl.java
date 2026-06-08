@@ -5,10 +5,14 @@ import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import lombok.RequiredArgsConstructor;
 import org.dromara.carbon.vendor.domain.CvFactorRecord;
+import org.dromara.carbon.vendor.domain.CvFactorVersion;
 import org.dromara.carbon.vendor.domain.bo.CvFactorRecordBo;
+import org.dromara.carbon.vendor.domain.enums.CvFactorVersionLifecycleState;
 import org.dromara.carbon.vendor.domain.vo.CvFactorRecordVo;
 import org.dromara.carbon.vendor.mapper.CvFactorRecordMapper;
+import org.dromara.carbon.vendor.mapper.CvFactorVersionMapper;
 import org.dromara.carbon.vendor.service.ICvFactorRecordService;
+import org.dromara.common.core.exception.ServiceException;
 import org.dromara.common.core.utils.MapstructUtils;
 import org.dromara.common.core.utils.StringUtils;
 import org.dromara.common.mybatis.core.page.PageQuery;
@@ -26,6 +30,7 @@ import java.util.Map;
 public class CvFactorRecordServiceImpl implements ICvFactorRecordService {
 
     private final CvFactorRecordMapper baseMapper;
+    private final CvFactorVersionMapper factorVersionMapper;
 
     @Override
     public TableDataInfo<CvFactorRecordVo> selectPageFactorRecordList(CvFactorRecordBo bo, PageQuery pageQuery) {
@@ -41,18 +46,31 @@ public class CvFactorRecordServiceImpl implements ICvFactorRecordService {
 
     @Override
     public int insertFactorRecord(CvFactorRecordBo bo) {
-        CvFactorRecord factorRecord = MapstructUtils.convert(bo, CvFactorRecord.class);
+        assertFactorVersionMutable(bo.getVersionId());
+        CvFactorRecord factorRecord = toEntity(bo);
         return baseMapper.insert(factorRecord);
     }
 
     @Override
     public int updateFactorRecord(CvFactorRecordBo bo) {
-        CvFactorRecord factorRecord = MapstructUtils.convert(bo, CvFactorRecord.class);
+        CvFactorRecord existing = requireFactorRecord(bo.getId());
+        assertFactorVersionMutable(existing.getVersionId());
+        if (!existing.getVersionId().equals(bo.getVersionId())) {
+            assertFactorVersionMutable(bo.getVersionId());
+        }
+        CvFactorRecord factorRecord = toEntity(bo);
         return baseMapper.updateById(factorRecord);
     }
 
     @Override
     public int deleteFactorRecordByIds(Long[] ids) {
+        if (ids == null || ids.length == 0) {
+            return 0;
+        }
+        for (CvFactorRecord factorRecord : baseMapper.selectList(Wrappers.<CvFactorRecord>lambdaQuery()
+            .in(CvFactorRecord::getId, Arrays.asList(ids)))) {
+            assertFactorVersionMutable(factorRecord.getVersionId());
+        }
         return baseMapper.deleteByIds(Arrays.asList(ids));
     }
 
@@ -71,5 +89,34 @@ public class CvFactorRecordServiceImpl implements ICvFactorRecordService {
         lqw.orderByDesc(CvFactorRecord::getCreateTime);
         lqw.orderByAsc(CvFactorRecord::getId);
         return lqw;
+    }
+
+    private CvFactorRecord requireFactorRecord(Long id) {
+        if (id == null) {
+            throw new ServiceException("Factor record id cannot be null");
+        }
+        CvFactorRecord factorRecord = baseMapper.selectById(id);
+        if (factorRecord == null) {
+            throw new ServiceException("Factor record does not exist");
+        }
+        return factorRecord;
+    }
+
+    protected CvFactorRecord toEntity(CvFactorRecordBo bo) {
+        return MapstructUtils.convert(bo, CvFactorRecord.class);
+    }
+
+    private void assertFactorVersionMutable(Long versionId) {
+        if (versionId == null) {
+            throw new ServiceException("Factor version id cannot be null");
+        }
+        CvFactorVersion version = factorVersionMapper.selectById(versionId);
+        if (version == null) {
+            throw new ServiceException("Factor version does not exist");
+        }
+        CvFactorVersionLifecycleState state = CvFactorVersionLifecycleState.fromVersion(version);
+        if (state == CvFactorVersionLifecycleState.FROZEN || state == CvFactorVersionLifecycleState.RETIRED) {
+            throw new ServiceException("Frozen or retired factor versions cannot modify core factor records");
+        }
     }
 }

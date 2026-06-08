@@ -12,7 +12,7 @@ import java.util.Locale;
 public enum CvFactorVersionLifecycleState {
 
     DRAFT("draft"),
-    RELEASED("released"),
+    PUBLISHED("published"),
     FROZEN("frozen"),
     RETIRED("retired");
 
@@ -32,11 +32,14 @@ public enum CvFactorVersionLifecycleState {
         if (RETIRED.status.equals(normalizedStatus) && !frozen) {
             return RETIRED;
         }
-        if (RELEASED.status.equals(normalizedStatus) && frozen) {
+        if (FROZEN.status.equals(normalizedStatus) && frozen) {
             return FROZEN;
         }
-        if (RELEASED.status.equals(normalizedStatus) && !frozen) {
-            return RELEASED;
+        if (PUBLISHED.status.equals(normalizedStatus) && frozen) {
+            return FROZEN;
+        }
+        if (PUBLISHED.status.equals(normalizedStatus) && !frozen) {
+            return PUBLISHED;
         }
         if (DRAFT.status.equals(normalizedStatus) && !frozen) {
             return DRAFT;

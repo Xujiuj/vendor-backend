@@ -6,6 +6,7 @@ import org.dromara.carbon.vendor.domain.bo.CvLicenseIssueBo;
 import org.dromara.carbon.vendor.domain.license.CvLicenseIssueRequest;
 import org.dromara.carbon.vendor.domain.license.CvLicenseIssueResult;
 import org.dromara.carbon.vendor.domain.license.CvLicenseReissueRequest;
+import org.dromara.carbon.vendor.domain.license.CvLicenseRevokeRequest;
 import org.dromara.carbon.vendor.domain.vo.CvLicenseIssueVo;
 import org.dromara.carbon.vendor.service.ICvLicenseIssueService;
 import org.dromara.common.core.domain.R;
@@ -79,6 +80,16 @@ public class CvLicenseIssueController extends BaseController {
             return R.ok(result);
         }
         return R.fail(result.getStatus() + ": " + result.getMessage(), result);
+    }
+
+    /**
+     * Revoke an issued license with vendor-side audit metadata.
+     */
+    @SaCheckPermission("vendor:licenseIssue:revoke")
+    @PostMapping("/revoke")
+    public R<Void> revoke(@Validated @RequestBody CvLicenseRevokeRequest request) {
+        request.setRevokedBy(resolveIssuedBy());
+        return toAjax(licenseIssueService.revokeLicense(request));
     }
 
     private String resolveIssuedBy() {

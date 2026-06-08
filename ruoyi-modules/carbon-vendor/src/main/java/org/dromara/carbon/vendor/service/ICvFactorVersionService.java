@@ -28,7 +28,7 @@ public interface ICvFactorVersionService {
     CvFactorVersionVo selectFactorVersionById(Long id);
 
     /**
-     * Release a draft factor version.
+     * Publish a draft factor version.
      *
      * @param id primary key
      * @param operatedBy operator identifier for audit metadata
@@ -36,7 +36,7 @@ public interface ICvFactorVersionService {
     void releaseFactorVersion(Long id, String operatedBy);
 
     /**
-     * Freeze a released factor version.
+     * Freeze a published factor version.
      *
      * @param id primary key
      * @param operatedBy operator identifier for audit metadata
@@ -44,7 +44,7 @@ public interface ICvFactorVersionService {
     void freezeFactorVersion(Long id, String operatedBy);
 
     /**
-     * Retire a released or frozen factor version.
+     * Retire a published or frozen factor version.
      *
      * @param id primary key
      * @param operatedBy operator identifier for audit metadata

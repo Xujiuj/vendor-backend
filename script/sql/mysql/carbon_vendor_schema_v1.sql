@@ -53,11 +53,13 @@ CREATE TABLE IF NOT EXISTS cv_license_issue (
     issued_by VARCHAR(64) DEFAULT NULL,
     issued_time DATETIME DEFAULT CURRENT_TIMESTAMP,
     revoked_time DATETIME DEFAULT NULL,
+    revoked_by VARCHAR(64) DEFAULT NULL,
+    revoke_reason VARCHAR(500) DEFAULT NULL,
     license_payload TEXT NOT NULL,
     signature_text TEXT NOT NULL,
     PRIMARY KEY (id),
     UNIQUE KEY uk_cv_license_issue_id (license_id),
-    KEY idx_cv_license_reissue_source (source_license_id),
+    UNIQUE KEY uk_cv_license_reissue_source (source_license_id),
     KEY idx_cv_license_issue_customer (customer_id, issue_status),
     CONSTRAINT fk_cv_license_issue_customer
         FOREIGN KEY (customer_id) REFERENCES cv_customer (id)
