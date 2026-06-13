@@ -123,6 +123,7 @@ class VendorPortalMenuContractTest {
             "system/user/index",
             "system/role/index",
             "system/menu/index",
+            "system/tenantPackage/index",
             "system/dept/index",
             "system/post/index",
             "system/dict/index",
@@ -131,7 +132,38 @@ class VendorPortalMenuContractTest {
             "monitor/logininfor/index",
             "monitor/operlog/index",
             "tool/gen/index",
-            "tool:gen:list"
+            "tool:gen:list",
+            "菜单管理",
+            "角色管理",
+            "套餐管理",
+            "用户管理",
+            "部门管理",
+            "岗位管理",
+            "字典管理",
+            "参数设置",
+            "公告配置",
+            "system:menu:list",
+            "system:role:list",
+            "system:user:list",
+            "system:dept:list",
+            "system:post:list",
+            "system:dict:list",
+            "system:config:list",
+            "system:notice:list",
+            "system:tenantPackage:list",
+            "system:tenantPackage:add",
+            "system:tenantPackage:edit",
+            "system:tenantPackage:remove"
+        ));
+
+        assertContainsAll(sql, List.of(
+            "menu_name = '套餐管理', parent_id = 1, order_num = 8, path = 'tenantPackage', component = 'system/tenantPackage/index', perms = 'system:tenantPackage:list', icon = 'form'",
+            "visible = '0', status = '0', remark =",
+            "where menu_id = 122",
+            "update sys_menu set visible = '1' where menu_id in (6, 121);"
+        ));
+        assertContainsNone(sql, List.of(
+            "update sys_menu set visible = '1' where menu_id in (6, 121, 122)"
         ));
     }
 
@@ -155,6 +187,15 @@ class VendorPortalMenuContractTest {
             "insert ignore into sys_role_menu (role_id, menu_id)",
             "r.role_key in ('test1', 'test2')",
             "m.menu_id between 910100 and 910199",
+            "1, 100, 101, 102, 103, 104, 105, 106, 107, 122, 130, 131, 132",
+            "1008, 1009, 1010, 1011, 1012",
+            "1013, 1014, 1015, 1016",
+            "1017, 1018, 1019, 1020",
+            "1021, 1022, 1023, 1024, 1025",
+            "1026, 1027, 1028, 1029, 1030",
+            "1031, 1032, 1033, 1034, 1035",
+            "1036, 1037, 1038, 1039",
+            "1611, 1612, 1613, 1614, 1615",
             "select 1, menu_id"
         ));
     }

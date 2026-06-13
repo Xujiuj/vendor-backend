@@ -116,6 +116,18 @@ Requirements:
 - Failed automatic issue must be auditable and retryable.
 - Renewal must not create enterprise-local workflow data in vendor backend.
 
+### VB-6: Vendor System Management Menu Coverage
+
+Vendor backend keeps the RuoYi system module for administrator workflows. No duplicate carbon-vendor system-management API is required while RuoYi already covers the workflow.
+
+Requirements:
+
+- `/system/menu`, `/system/role`, `/system/tenant/package`, `/system/user`, `/system/dept`, `/system/post`, `/system/dict`, `/system/config`, and `/system/notice` remain backed by the vendor database only.
+- `script/sql/portal/vendor_portal_menu.sql` must keep the System Management directory visible for vendor administrators.
+- Menu management, role management, and package management must be present in the vendor portal menu seed and role-menu seed.
+- Package management is an administrator system function under System Management; the old RuoYi tenant/customer management directory stays hidden from vendor business navigation.
+- Do not add enterprise-local workflow menus or enterprise permissions to vendor menu seed data.
+
 ## Code Style
 
 Follow existing RuoYi layering:
@@ -175,6 +187,7 @@ Conventions:
 - Reissue workflow is audited and does not mutate old issue history.
 - Report template lifecycle can publish/distribute templates without enterprise data access.
 - Renewal/payment callback path can issue or queue License creation idempotently.
+- Vendor System Management exposes menu, role, and package management without adding duplicate vendor business APIs.
 
 ## Open Questions
 

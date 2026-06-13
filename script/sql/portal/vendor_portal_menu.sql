@@ -103,31 +103,56 @@ values
 (910120, '续费订单删除', 910107, 2, '', '', '', 1, 0, 'F', '0', '0', 'vendor:renewalOrder:remove', '#', 103, 1, sysdate(), null, null, '续费订单删除权限');
 
 -- Keep RuoYi native system management, logs, and generator routes available.
-update sys_menu set component = 'system/user/index', perms = 'system:user:list' where menu_id = 100;
-update sys_menu set component = 'system/role/index', perms = 'system:role:list' where menu_id = 101;
-update sys_menu set component = 'system/menu/index', perms = 'system:menu:list' where menu_id = 102;
-update sys_menu set component = 'system/dept/index', perms = 'system:dept:list' where menu_id = 103;
-update sys_menu set component = 'system/post/index', perms = 'system:post:list' where menu_id = 104;
-update sys_menu set component = 'system/dict/index', perms = 'system:dict:list' where menu_id = 105;
-update sys_menu set component = 'system/config/index', perms = 'system:config:list' where menu_id = 106;
-update sys_menu set menu_name = '公告配置', component = 'system/notice/index', perms = 'system:notice:list', icon = 'message' where menu_id = 107;
+update sys_menu set menu_name = '系统管理', path = 'system', component = null, visible = '0', status = '0', remark = '厂商端系统管理目录' where menu_id = 1;
+update sys_menu set menu_name = '用户管理', parent_id = 1, order_num = 1, path = 'user', component = 'system/user/index', perms = 'system:user:list', icon = 'user', visible = '0', status = '0', remark = '厂商端用户管理菜单' where menu_id = 100;
+update sys_menu set menu_name = '角色管理', parent_id = 1, order_num = 2, path = 'role', component = 'system/role/index', perms = 'system:role:list', icon = 'peoples', visible = '0', status = '0', remark = '厂商端角色管理菜单' where menu_id = 101;
+update sys_menu set menu_name = '菜单管理', parent_id = 1, order_num = 3, path = 'menu', component = 'system/menu/index', perms = 'system:menu:list', icon = 'tree-table', visible = '0', status = '0', remark = '厂商端菜单管理菜单' where menu_id = 102;
+update sys_menu set menu_name = '部门管理', parent_id = 1, order_num = 4, path = 'dept', component = 'system/dept/index', perms = 'system:dept:list', icon = 'tree', visible = '0', status = '0', remark = '厂商端部门管理菜单' where menu_id = 103;
+update sys_menu set menu_name = '岗位管理', parent_id = 1, order_num = 5, path = 'post', component = 'system/post/index', perms = 'system:post:list', icon = 'post', visible = '0', status = '0', remark = '厂商端岗位管理菜单' where menu_id = 104;
+update sys_menu set menu_name = '字典管理', parent_id = 1, order_num = 6, path = 'dict', component = 'system/dict/index', perms = 'system:dict:list', icon = 'dict', visible = '0', status = '0', remark = '厂商端字典管理菜单' where menu_id = 105;
+update sys_menu set menu_name = '参数设置', parent_id = 1, order_num = 7, path = 'config', component = 'system/config/index', perms = 'system:config:list', icon = 'edit', visible = '0', status = '0', remark = '厂商端参数设置菜单' where menu_id = 106;
+update sys_menu set menu_name = '公告配置', parent_id = 1, order_num = 9, path = 'notice', component = 'system/notice/index', perms = 'system:notice:list', icon = 'message', visible = '0', status = '0', remark = '厂商端公告配置菜单' where menu_id = 107;
+update sys_menu set menu_name = '套餐管理', parent_id = 1, order_num = 8, path = 'tenantPackage', component = 'system/tenantPackage/index', perms = 'system:tenantPackage:list', icon = 'form', visible = '0', status = '0', remark = '厂商端系统套餐管理，用于配置角色可用菜单范围' where menu_id = 122;
+update sys_menu set menu_name = '套餐查询', parent_id = 122, order_num = 1, perms = 'system:tenantPackage:query', visible = '0', status = '0' where menu_id = 1611;
+update sys_menu set menu_name = '套餐新增', parent_id = 122, order_num = 2, perms = 'system:tenantPackage:add', visible = '0', status = '0' where menu_id = 1612;
+update sys_menu set menu_name = '套餐修改', parent_id = 122, order_num = 3, perms = 'system:tenantPackage:edit', visible = '0', status = '0' where menu_id = 1613;
+update sys_menu set menu_name = '套餐删除', parent_id = 122, order_num = 4, perms = 'system:tenantPackage:remove', visible = '0', status = '0' where menu_id = 1614;
+update sys_menu set menu_name = '套餐导出', parent_id = 122, order_num = 5, perms = 'system:tenantPackage:export', visible = '0', status = '0' where menu_id = 1615;
 update sys_menu set component = 'monitor/operlog/index', perms = 'monitor:operlog:list' where menu_id = 500;
 update sys_menu set component = 'monitor/logininfor/index', perms = 'monitor:logininfor:list' where menu_id = 501;
 update sys_menu set component = 'tool/gen/index', perms = 'tool:gen:list' where menu_id = 115;
 
--- Vendor business logic no longer exposes RuoYi tenant management as a
+-- Vendor business logic no longer exposes RuoYi tenant/customer management as a
 -- customer-facing module. Keep the inherited records for framework
--- compatibility, but hide them from the vendor navigation tree.
-update sys_menu set visible = '1' where menu_id in (6, 121, 122);
+-- compatibility, but hide the customer records from the vendor navigation tree.
+-- Package management is still an administrator system function and is moved
+-- under System Management above.
+update sys_menu set visible = '1' where menu_id in (6, 121);
 
 -- Non-super-admin users only receive menus through sys_role_menu.
--- Seed the built-in RuoYi test roles with vendor-owned business menus.
+-- Seed the built-in RuoYi test roles with vendor-owned business menus and the
+-- administrative System Management surface needed to manage menus, roles, and
+-- packages in the vendor portal.
 insert ignore into sys_role_menu (role_id, menu_id)
 select r.role_id, m.menu_id
 from sys_role r
 cross join sys_menu m
 where r.role_key in ('test1', 'test2')
-  and m.menu_id between 910100 and 910199;
+  and (
+    m.menu_id between 910100 and 910199
+    or m.menu_id in (
+      1, 100, 101, 102, 103, 104, 105, 106, 107, 122, 130, 131, 132,
+      1001, 1002, 1003, 1004, 1005, 1006, 1007,
+      1008, 1009, 1010, 1011, 1012,
+      1013, 1014, 1015, 1016,
+      1017, 1018, 1019, 1020,
+      1021, 1022, 1023, 1024, 1025,
+      1026, 1027, 1028, 1029, 1030,
+      1031, 1032, 1033, 1034, 1035,
+      1036, 1037, 1038, 1039,
+      1611, 1612, 1613, 1614, 1615
+    )
+  );
 
 -- Keep the built-in superadmin role fully assigned for role/menu
 -- management screens and seeded database consistency.
