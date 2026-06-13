@@ -40,6 +40,46 @@ public class CvRenewalOrderVo implements Serializable {
     private String licenseId;
 
     /**
+     * Installation identifier from the original license.
+     */
+    private String installId;
+
+    /**
+     * Requested renewal edition.
+     */
+    private String requestedEdition;
+
+    /**
+     * Requested renewal period.
+     */
+    private String renewalPeriod;
+
+    /**
+     * Request contact name.
+     */
+    private String contactName;
+
+    /**
+     * Request contact email.
+     */
+    private String contactEmail;
+
+    /**
+     * Request contact phone.
+     */
+    private String contactPhone;
+
+    /**
+     * External idempotency key for open API retries.
+     */
+    private String idempotencyKey;
+
+    /**
+     * Request source.
+     */
+    private String requestSource;
+
+    /**
      * Order lifecycle status.
      */
     private String orderStatus;

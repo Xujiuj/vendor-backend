@@ -1,7 +1,7 @@
 # 开发环境配置
 server:
   # 服务器的HTTP端口，默认为8080
-  port: 8081
+  port: 18000
   servlet:
     # 应用的访问路径
     context-path: /
@@ -116,6 +116,7 @@ security:
     - /*/api-docs
     - /*/api-docs/**
     - /warm-flow-ui/config
+    - /open/**
 
 # 多租户配置
 tenant:

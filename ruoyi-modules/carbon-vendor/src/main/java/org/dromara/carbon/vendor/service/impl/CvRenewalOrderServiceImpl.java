@@ -113,6 +113,14 @@ public class CvRenewalOrderServiceImpl implements ICvRenewalOrderService {
         lqw.like(StringUtils.isNotBlank(bo.getOrderNo()), CvRenewalOrder::getOrderNo, bo.getOrderNo());
         lqw.eq(bo.getCustomerId() != null, CvRenewalOrder::getCustomerId, bo.getCustomerId());
         lqw.like(StringUtils.isNotBlank(bo.getLicenseId()), CvRenewalOrder::getLicenseId, bo.getLicenseId());
+        lqw.like(StringUtils.isNotBlank(bo.getInstallId()), CvRenewalOrder::getInstallId, bo.getInstallId());
+        lqw.eq(StringUtils.isNotBlank(bo.getRequestedEdition()), CvRenewalOrder::getRequestedEdition, bo.getRequestedEdition());
+        lqw.eq(StringUtils.isNotBlank(bo.getRenewalPeriod()), CvRenewalOrder::getRenewalPeriod, bo.getRenewalPeriod());
+        lqw.like(StringUtils.isNotBlank(bo.getContactName()), CvRenewalOrder::getContactName, bo.getContactName());
+        lqw.like(StringUtils.isNotBlank(bo.getContactEmail()), CvRenewalOrder::getContactEmail, bo.getContactEmail());
+        lqw.like(StringUtils.isNotBlank(bo.getContactPhone()), CvRenewalOrder::getContactPhone, bo.getContactPhone());
+        lqw.eq(StringUtils.isNotBlank(bo.getIdempotencyKey()), CvRenewalOrder::getIdempotencyKey, bo.getIdempotencyKey());
+        lqw.eq(StringUtils.isNotBlank(bo.getRequestSource()), CvRenewalOrder::getRequestSource, bo.getRequestSource());
         lqw.eq(StringUtils.isNotBlank(bo.getOrderStatus()), CvRenewalOrder::getOrderStatus, bo.getOrderStatus());
         lqw.eq(StringUtils.isNotBlank(bo.getPayChannel()), CvRenewalOrder::getPayChannel, bo.getPayChannel());
         lqw.like(StringUtils.isNotBlank(bo.getIssuedLicenseId()), CvRenewalOrder::getIssuedLicenseId, bo.getIssuedLicenseId());

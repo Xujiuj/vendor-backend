@@ -31,10 +31,13 @@ class VendorPortalMenuContractTest {
         "cv_license_issue",
         "cv_factor_version",
         "cv_factor_record",
+        "cv_dimension_record",
         "cv_factor_customer_scope",
         "cv_report_template",
         "cv_report_template_scope",
-        "cv_renewal_order"
+        "cv_report_template_download_token",
+        "cv_renewal_order",
+        "cv_open_api_audit"
     );
 
     @Test
@@ -43,29 +46,57 @@ class VendorPortalMenuContractTest {
 
         assertContainsAll(sql, List.of(
             "厂商运营",
+            "数据管理",
             "客户档案",
             "License 授权管理",
             "因子版本",
+            "因子明细",
             "因子开放范围",
             "模板库",
             "模板分发",
+            "维表管理",
+            "公告管理",
             "续费订单",
+            "vendor/customer/index",
             "system/license/index",
             "vendor/factorVersion/index",
+            "vendor/factorRecord/index",
             "vendor/factorScope/index",
             "vendor/reportTemplate/index",
             "vendor/templateScope/index",
+            "vendor/dimension/index",
+            "vendor/announcement/index",
             "vendor/renewalOrder/index",
+            "(910136, '数据管理', 0, 2, 'data-management', 'Layout'",
+            "(910103, '因子版本', 910136",
+            "(910104, '因子明细', 910136",
+            "(910121, '因子开放范围', 910136",
+            "(910105, '模板库', 910136",
+            "(910106, '模板分发', 910136",
+            "(910131, '维表管理', 910136",
+            "(910126, '公告管理', 910136",
             "vendor:customer:list",
             "vendor:licenseIssue:list",
             "vendor:factorVersion:list",
+            "vendor:factorRecord:list",
             "vendor:factorCustomerScope:list",
             "vendor:reportTemplate:list",
             "vendor:reportTemplateScope:list",
-            "vendor:renewalOrder:list"
+            "vendor:dimension:list",
+            "vendor:announcement:list",
+            "vendor:renewalOrder:list",
+            "vendor:customer:query",
+            "vendor:factorRecord:remove",
+            "vendor:factorCustomerScope:remove",
+            "vendor:reportTemplate:remove",
+            "vendor:reportTemplateScope:remove",
+            "vendor:dimension:remove",
+            "vendor:announcement:remove",
+            "vendor:renewalOrder:remove"
         ));
 
         assertContainsNone(sql, List.of(
+            "system/tenant/index",
             "01 配置排放源",
             "02 确认排放因子",
             "03 活动数据",
@@ -117,6 +148,18 @@ class VendorPortalMenuContractTest {
     }
 
     @Test
+    void vendorMenuSqlSeedsRuoyiRolesByRoleKey() throws Exception {
+        String sql = Files.readString(resolveProjectFile(MENU_SQL_RELATIVE_PATH));
+
+        assertContainsAll(sql, List.of(
+            "insert ignore into sys_role_menu (role_id, menu_id)",
+            "r.role_key in ('test1', 'test2')",
+            "m.menu_id between 910100 and 910199",
+            "select 1, menu_id"
+        ));
+    }
+
+    @Test
     void vendorSchemaSqlContainsOnlyVendorBusinessTables() throws Exception {
         String mysql = Files.readString(resolveProjectFile(MYSQL_SCHEMA_RELATIVE_PATH));
         String sqlServer = Files.readString(resolveProjectFile(SQLSERVER_SCHEMA_RELATIVE_PATH));
@@ -164,8 +207,14 @@ class VendorPortalMenuContractTest {
             "scope_license_key",
             "template_version",
             "license_id",
+            "download_token",
+            "token_status",
+            "expires_time",
             "pay_channel",
-            "issued_license_id"
+            "issued_license_id",
+            "api_path",
+            "response_status",
+            "request_summary"
         ));
         assertContainsAll(sqlServer, List.of(
             "customer_code",
@@ -176,8 +225,14 @@ class VendorPortalMenuContractTest {
             "scope_license_key",
             "template_version",
             "license_id",
+            "download_token",
+            "token_status",
+            "expires_time",
             "pay_channel",
-            "issued_license_id"
+            "issued_license_id",
+            "api_path",
+            "response_status",
+            "request_summary"
         ));
     }
 
