@@ -35,6 +35,16 @@ public class CvFactorCustomerScopeBo extends BaseEntity {
     private Long customerId;
 
     /**
+     * Package identifier controlling this scope.
+     */
+    private Long packageId;
+
+    /**
+     * Package name snapshot.
+     */
+    private String packageName;
+
+    /**
      * Edition code.
      */
     private String edition;

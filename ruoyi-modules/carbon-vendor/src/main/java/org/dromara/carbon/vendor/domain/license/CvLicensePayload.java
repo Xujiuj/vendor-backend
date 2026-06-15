@@ -13,6 +13,8 @@ import java.util.List;
     "licenseId",
     "customerId",
     "customerName",
+    "packageId",
+    "packageName",
     "edition",
     "features",
     "installId",
@@ -30,6 +32,10 @@ public class CvLicensePayload {
     private String customerId;
 
     private String customerName;
+
+    private Long packageId;
+
+    private String packageName;
 
     private String edition;
 

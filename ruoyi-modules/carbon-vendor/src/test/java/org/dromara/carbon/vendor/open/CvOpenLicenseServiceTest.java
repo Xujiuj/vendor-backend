@@ -13,6 +13,7 @@ import org.dromara.carbon.vendor.mapper.CvRenewalOrderMapper;
 import org.dromara.carbon.vendor.service.ICvOpenApiAuditService;
 import org.dromara.carbon.vendor.service.impl.CvOpenLicenseServiceImpl;
 import org.dromara.common.core.exception.ServiceException;
+import org.dromara.system.mapper.SysTenantPackageMapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
@@ -40,6 +41,7 @@ class CvOpenLicenseServiceTest {
     private CvLicenseIssueMapper licenseIssueMapper;
     private CvCustomerMapper customerMapper;
     private CvRenewalOrderMapper renewalOrderMapper;
+    private SysTenantPackageMapper tenantPackageMapper;
     private ICvOpenApiAuditService openApiAuditService;
     private CvOpenLicenseServiceImpl service;
 
@@ -48,11 +50,13 @@ class CvOpenLicenseServiceTest {
         licenseIssueMapper = mock(CvLicenseIssueMapper.class);
         customerMapper = mock(CvCustomerMapper.class);
         renewalOrderMapper = mock(CvRenewalOrderMapper.class);
+        tenantPackageMapper = mock(SysTenantPackageMapper.class);
         openApiAuditService = mock(ICvOpenApiAuditService.class);
         service = new CvOpenLicenseServiceImpl(
             licenseIssueMapper,
             customerMapper,
             renewalOrderMapper,
+            tenantPackageMapper,
             openApiAuditService
         );
     }
@@ -131,7 +135,7 @@ class CvOpenLicenseServiceTest {
         assertEquals("renewal order created for manual processing", response.getMessage());
         verify(openApiAuditService).recordSuccess(
             eq("/open/renewal-orders"), eq("POST"), eq("LIC-001"), eq("INSTALL-001"), eq(1001L),
-            eq("edition=standard;renewalPeriod=P1Y;contactName=Ops;contactEmail=ops@example.com;contactPhone=13800000000;idempotencyKey=IDEMP-001"));
+            eq("edition=standard;packageId=;renewalPeriod=P1Y;contactName=Ops;contactEmail=ops@example.com;contactPhone=13800000000;idempotencyKey=IDEMP-001"));
     }
 
     @Test
@@ -170,7 +174,7 @@ class CvOpenLicenseServiceTest {
         verify(renewalOrderMapper, never()).insert(any(CvRenewalOrder.class));
         verify(openApiAuditService).recordFailure(
             eq("/open/renewal-orders"), eq("POST"), eq("LIC-001"), eq("INSTALL-001"), eq(1001L),
-            eq("edition=standard;renewalPeriod=P1Y;contactName=Ops;contactEmail=ops@example.com;contactPhone=13800000000;idempotencyKey=IDEMP-001"),
+            eq("edition=standard;packageId=;renewalPeriod=P1Y;contactName=Ops;contactEmail=ops@example.com;contactPhone=13800000000;idempotencyKey=IDEMP-001"),
             eq("Disabled customer cannot create renewal metadata"));
     }
 

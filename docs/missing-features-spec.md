@@ -1,6 +1,6 @@
 # Spec: Vendor Backend Missing Features
 
-Updated: 2026-06-05
+Updated: 2026-06-14
 
 ## Objective
 
@@ -9,6 +9,8 @@ Finish the vendor-side central backend for customer, License, factor, template, 
 Current baseline:
 
 - Manual License issue service exists.
+- Vendor data-management APIs and menu SQL are owned by `carbon-vendor`.
+- Factor open scope is version/customer/edition based; per-License rows are compatibility data, not the normal control model.
 - License issue hardening is complete:
   - vendor customer is resolved by `customerId`
   - disabled/inactive customers are rejected
@@ -127,6 +129,18 @@ Requirements:
 - Menu management, role management, and package management must be present in the vendor portal menu seed and role-menu seed.
 - Package management is an administrator system function under System Management; the old RuoYi tenant/customer management directory stays hidden from vendor business navigation.
 - Do not add enterprise-local workflow menus or enterprise permissions to vendor menu seed data.
+
+### VB-7: Vendor Data Management and Version-Based Factor Scope
+
+Vendor backend owns the data sources that enterprise can request through vendor open APIs. This is a vendor-only navigation and API ownership boundary; enterprise menus continue to follow the enterprise-side documents and must not gain a duplicate first-level Data Management directory from this vendor requirement.
+
+Requirements:
+
+- `script/sql/portal/vendor_portal_menu.sql` keeps `数据管理` as a first-level vendor portal directory for factor versions, factor records, factor open scope, report templates, template distribution, dimension data, and announcements.
+- Vendor administrators have full control permissions for vendor-owned data management pages. Factor open scope must include list, detail, add, edit, and delete permissions when the backend endpoint exists.
+- Factor open scope controls availability by factor `versionId`, optional vendor `customerId`, and optional purchased `edition` or package/version code.
+- Factor open scope must not require assigning each `licenseId`. License remains the authenticated open-API credential and derives its accessible scope from the enterprise customer's purchased edition/version.
+- Existing `license_id` columns may remain for backward compatibility, but new factor scope business logic must not depend on per-license scope rows.
 
 ## Code Style
 

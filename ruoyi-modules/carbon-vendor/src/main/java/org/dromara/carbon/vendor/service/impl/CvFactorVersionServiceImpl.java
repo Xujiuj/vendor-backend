@@ -87,6 +87,21 @@ public class CvFactorVersionServiceImpl implements ICvFactorVersionService {
         baseMapper.updateById(version);
     }
 
+    @Override
+    public void restoreFactorVersion(Long id, String operatedBy) {
+        CvFactorVersion version = requireFactorVersion(id);
+        String normalizedStatus = CvFactorVersionLifecycleState.normalizeStatus(version.getPublishStatus());
+        boolean frozen = Boolean.TRUE.equals(version.getFrozenFlag());
+        if (!CvFactorVersionLifecycleState.RETIRED.getStatus().equals(normalizedStatus) || frozen) {
+            throw new ServiceException("Only retired factor versions can be restored");
+        }
+        Date operationTime = DateUtils.getNowDate();
+        version.setPublishStatus(CvFactorVersionLifecycleState.DRAFT.getStatus());
+        version.setFrozenFlag(Boolean.FALSE);
+        version.setRemark(appendAuditRemark(version.getRemark(), "restore", operatedBy, operationTime));
+        baseMapper.updateById(version);
+    }
+
     private LambdaQueryWrapper<CvFactorVersion> buildQueryWrapper(CvFactorVersionBo bo) {
         Map<String, Object> params = bo.getParams();
         LambdaQueryWrapper<CvFactorVersion> lqw = Wrappers.lambdaQuery();

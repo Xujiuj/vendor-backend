@@ -13,6 +13,8 @@ import org.dromara.carbon.vendor.mapper.CvLicenseIssueMapper;
 import org.dromara.carbon.vendor.mapper.CvSigningKeyMapper;
 import org.dromara.carbon.vendor.service.CvLicensePrivateKeyProvider;
 import org.dromara.carbon.vendor.service.impl.CvLicenseIssueServiceImpl;
+import org.dromara.system.domain.SysTenantPackage;
+import org.dromara.system.mapper.SysTenantPackageMapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
@@ -51,6 +53,7 @@ class CvLicenseReissueServiceTest {
     private CvCustomerMapper customerMapper;
     private CvLicenseIssueMapper licenseIssueMapper;
     private CvSigningKeyMapper signingKeyMapper;
+    private SysTenantPackageMapper tenantPackageMapper;
     private KeyPair keyPair;
 
     @BeforeEach
@@ -59,9 +62,11 @@ class CvLicenseReissueServiceTest {
         customerMapper = mock(CvCustomerMapper.class);
         licenseIssueMapper = mock(CvLicenseIssueMapper.class);
         signingKeyMapper = mock(CvSigningKeyMapper.class);
+        tenantPackageMapper = mock(SysTenantPackageMapper.class);
         keyPair = KeyPairGenerator.getInstance("RSA").generateKeyPair();
         when(signingKeyMapper.selectOne(any(), any(Boolean.class))).thenReturn(activeSigningKey());
         when(customerMapper.selectById(eq(1001L))).thenReturn(activeCustomer());
+        when(tenantPackageMapper.selectById(eq(1001L))).thenReturn(activePackage());
         when(licenseIssueMapper.selectOne(any(), any(Boolean.class))).thenReturn(revokedSourceIssue());
         when(licenseIssueMapper.selectList(any())).thenReturn(List.of(revokedSourceIssue()));
         when(licenseIssueMapper.selectCount(any())).thenReturn(0L);
@@ -84,6 +89,8 @@ class CvLicenseReissueServiceTest {
         CvLicenseIssue issue = issueCaptor.getValue();
 
         assertEquals("LIC-REISSUE-001", issue.getLicenseId());
+        assertEquals(1001L, issue.getPackageId());
+        assertEquals("标准版", issue.getPackageName());
         assertEquals("reissue", issue.getIssueType());
         assertEquals("LIC-REVOKED-001", issue.getSourceLicenseId());
         assertEquals("INSTALL-ENTERPRISE-001", issue.getInstallId());
@@ -94,6 +101,8 @@ class CvLicenseReissueServiceTest {
         assertEquals("LIC-REISSUE-001", payload.get("licenseId").asText());
         assertEquals("CUST-001", payload.get("customerId").asText());
         assertEquals("Test Manufacturing Co", payload.get("customerName").asText());
+        assertEquals(1001L, payload.get("packageId").asLong());
+        assertEquals("标准版", payload.get("packageName").asText());
         assertEquals("INSTALL-ENTERPRISE-001", payload.get("installId").asText());
         assertTrue(verifySignature(payload.toString(), envelope.get("signature").asText()));
     }
@@ -231,6 +240,7 @@ class CvLicenseReissueServiceTest {
             licenseIssueMapper,
             customerMapper,
             signingKeyMapper,
+            tenantPackageMapper,
             keyProvider,
             objectMapper
         );
@@ -248,6 +258,7 @@ class CvLicenseReissueServiceTest {
         request.setKeyId("test-key-2026-01");
         request.setSchemaVersion("license.v1");
         request.setAlgorithm("RS256");
+        request.setPackageId(1001L);
         request.setEdition("standard");
         request.setFeatures(List.of("factor_api", "report_template"));
         request.setValidFrom(VALID_FROM);
@@ -282,6 +293,8 @@ class CvLicenseReissueServiceTest {
         CvLicenseIssue issue = new CvLicenseIssue();
         issue.setLicenseId("LIC-REVOKED-001");
         issue.setCustomerId(1001L);
+        issue.setPackageId(1001L);
+        issue.setPackageName("标准版");
         issue.setInstallId("INSTALL-ENTERPRISE-001");
         issue.setValidFrom(Date.from(Instant.parse("2025-06-01T00:00:00Z")));
         issue.setValidTo(Date.from(Instant.parse("2026-06-01T00:00:00Z")));
@@ -296,6 +309,15 @@ class CvLicenseReissueServiceTest {
         issue.setIssueStatus("issued");
         issue.setRevokedTime(null);
         return issue;
+    }
+
+    private SysTenantPackage activePackage() {
+        SysTenantPackage tenantPackage = new SysTenantPackage();
+        tenantPackage.setPackageId(1001L);
+        tenantPackage.setPackageName("标准版");
+        tenantPackage.setStatus("0");
+        tenantPackage.setDelFlag("0");
+        return tenantPackage;
     }
 
     private CvLicenseIssue existingReissueTarget() {

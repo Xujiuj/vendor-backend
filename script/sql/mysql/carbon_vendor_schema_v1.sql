@@ -39,6 +39,8 @@ CREATE TABLE IF NOT EXISTS cv_license_issue (
     id BIGINT NOT NULL AUTO_INCREMENT,
     license_id VARCHAR(128) NOT NULL,
     customer_id BIGINT NOT NULL,
+    package_id BIGINT DEFAULT NULL,
+    package_name VARCHAR(64) DEFAULT NULL,
     key_id VARCHAR(64) NOT NULL,
     algorithm VARCHAR(64) NOT NULL,
     schema_version VARCHAR(32) NOT NULL,
@@ -61,6 +63,7 @@ CREATE TABLE IF NOT EXISTS cv_license_issue (
     UNIQUE KEY uk_cv_license_issue_id (license_id),
     UNIQUE KEY uk_cv_license_reissue_source (source_license_id),
     KEY idx_cv_license_issue_customer (customer_id, issue_status),
+    KEY idx_cv_license_issue_package (package_id),
     CONSTRAINT fk_cv_license_issue_customer
         FOREIGN KEY (customer_id) REFERENCES cv_customer (id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='Vendor manual license issue record';
@@ -102,7 +105,6 @@ CREATE TABLE IF NOT EXISTS cv_dimension_record (
     record_code VARCHAR(128) NOT NULL,
     record_name VARCHAR(255) NOT NULL,
     parent_code VARCHAR(128) DEFAULT NULL,
-    source_type VARCHAR(32) NOT NULL DEFAULT 'vendor',
     field01 VARCHAR(255) DEFAULT NULL,
     field02 VARCHAR(255) DEFAULT NULL,
     field03 VARCHAR(255) DEFAULT NULL,
@@ -124,16 +126,19 @@ CREATE TABLE IF NOT EXISTS cv_factor_customer_scope (
     id BIGINT NOT NULL AUTO_INCREMENT,
     version_id BIGINT NOT NULL,
     customer_id BIGINT DEFAULT NULL,
+    package_id BIGINT DEFAULT NULL,
+    package_name VARCHAR(64) DEFAULT NULL,
     edition VARCHAR(64) DEFAULT NULL,
     license_id VARCHAR(128) DEFAULT NULL,
     scope_customer_key BIGINT GENERATED ALWAYS AS (IFNULL(customer_id, 0)) STORED,
+    scope_package_key BIGINT GENERATED ALWAYS AS (IFNULL(package_id, 0)) STORED,
     scope_edition_key VARCHAR(64) GENERATED ALWAYS AS (IFNULL(edition, '')) STORED,
     scope_license_key VARCHAR(128) GENERATED ALWAYS AS (IFNULL(license_id, '')) STORED,
     scope_status VARCHAR(32) NOT NULL DEFAULT 'enabled',
     create_time DATETIME DEFAULT CURRENT_TIMESTAMP,
     PRIMARY KEY (id),
-    UNIQUE KEY uk_cv_factor_scope_entitlement (version_id, scope_customer_key, scope_edition_key, scope_license_key),
-    KEY idx_cv_factor_scope_lookup (version_id, scope_status, customer_id, edition),
+    UNIQUE KEY uk_cv_factor_scope_entitlement (version_id, scope_customer_key, scope_package_key, scope_edition_key, scope_license_key),
+    KEY idx_cv_factor_scope_lookup (version_id, scope_status, customer_id, package_id, edition),
     CONSTRAINT fk_cv_factor_scope_version
         FOREIGN KEY (version_id) REFERENCES cv_factor_version (id),
     CONSTRAINT fk_cv_factor_scope_customer
@@ -161,15 +166,20 @@ CREATE TABLE IF NOT EXISTS cv_report_template_scope (
     template_id BIGINT NOT NULL,
     customer_id BIGINT DEFAULT NULL,
     license_id VARCHAR(128) DEFAULT NULL,
+    package_id BIGINT DEFAULT NULL,
+    package_name VARCHAR(64) DEFAULT NULL,
+    edition VARCHAR(64) DEFAULT NULL,
     scope_customer_key BIGINT GENERATED ALWAYS AS (IFNULL(customer_id, 0)) STORED,
+    scope_package_key BIGINT GENERATED ALWAYS AS (IFNULL(package_id, 0)) STORED,
+    scope_edition_key VARCHAR(64) GENERATED ALWAYS AS (IFNULL(edition, '')) STORED,
     scope_license_key VARCHAR(128) GENERATED ALWAYS AS (IFNULL(license_id, '')) STORED,
     scope_status VARCHAR(32) NOT NULL DEFAULT 'enabled',
     create_time DATETIME DEFAULT CURRENT_TIMESTAMP,
     PRIMARY KEY (id),
-    UNIQUE KEY uk_cv_report_template_scope (template_id, scope_customer_key, scope_license_key),
-    KEY idx_cv_report_template_scope_lookup (template_id, scope_status, customer_id, license_id),
+    UNIQUE KEY uk_cv_report_template_scope (template_id, scope_customer_key, scope_package_key, scope_edition_key, scope_license_key),
+    KEY idx_cv_report_template_scope_lookup (template_id, scope_status, customer_id, package_id, edition, license_id),
     CONSTRAINT chk_cv_report_template_scope_entitlement
-        CHECK (customer_id IS NOT NULL OR license_id IS NOT NULL),
+        CHECK (customer_id IS NOT NULL OR package_id IS NOT NULL OR edition IS NOT NULL OR license_id IS NOT NULL),
     CONSTRAINT fk_cv_report_scope_template
         FOREIGN KEY (template_id) REFERENCES cv_report_template (id),
     CONSTRAINT fk_cv_report_scope_customer
@@ -205,6 +215,8 @@ CREATE TABLE IF NOT EXISTS cv_renewal_order (
     customer_id BIGINT NOT NULL,
     license_id VARCHAR(128) DEFAULT NULL,
     install_id VARCHAR(128) DEFAULT NULL,
+    requested_package_id BIGINT DEFAULT NULL,
+    requested_package_name VARCHAR(64) DEFAULT NULL,
     requested_edition VARCHAR(64) DEFAULT NULL,
     renewal_period VARCHAR(64) DEFAULT NULL,
     contact_name VARCHAR(128) DEFAULT NULL,
@@ -213,6 +225,7 @@ CREATE TABLE IF NOT EXISTS cv_renewal_order (
     idempotency_key VARCHAR(128) DEFAULT NULL,
     request_source VARCHAR(32) DEFAULT NULL,
     order_status VARCHAR(32) NOT NULL DEFAULT 'pending',
+    issue_status VARCHAR(32) NOT NULL DEFAULT 'pending_issue',
     pay_channel VARCHAR(32) DEFAULT NULL,
     amount DECIMAL(18, 2) NOT NULL DEFAULT 0.00,
     paid_time DATETIME DEFAULT NULL,
@@ -223,6 +236,8 @@ CREATE TABLE IF NOT EXISTS cv_renewal_order (
     UNIQUE KEY uk_cv_renewal_order_no (order_no),
     UNIQUE KEY uk_cv_renewal_order_idempotency (idempotency_key),
     KEY idx_cv_renewal_order_customer (customer_id, order_status),
+    KEY idx_cv_renewal_order_issue_status (issue_status),
+    KEY idx_cv_renewal_order_package (requested_package_id),
     KEY idx_cv_renewal_order_license (license_id, install_id),
     CONSTRAINT fk_cv_renewal_order_customer
         FOREIGN KEY (customer_id) REFERENCES cv_customer (id)
@@ -249,20 +264,20 @@ CREATE TABLE IF NOT EXISTS cv_open_api_audit (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='Vendor open API call audit';
 
 INSERT INTO cv_dimension_record (
-    dimension_code, record_code, record_name, parent_code, source_type,
+    dimension_code, record_code, record_name, parent_code,
     field01, field02, field03, field04, field05, field06,
     sort_order, status, remark
 )
 SELECT * FROM (
-    SELECT 'admin-division' AS dimension_code, '330000' AS record_code, '浙江省' AS record_name, NULL AS parent_code, 'vendor' AS source_type, '省级' AS field01, '华东电网' AS field02, '中国' AS field03, NULL AS field04, NULL AS field05, NULL AS field06, 1 AS sort_order, '0' AS status, '行政区划示例' AS remark UNION ALL
-    SELECT 'admin-division', '330200', '宁波市', '330000', 'vendor', '市级', '华东电网', '中国', NULL, NULL, NULL, 2, '0', '行政区划示例' UNION ALL
-    SELECT 'emission-source-category', 'SCOPE2-PURCHASED-ELEC', '外购电力', NULL, 'vendor', '范围二', 'kWh', '区域电网平均因子', NULL, NULL, NULL, 1, '0', '排放源分类示例' UNION ALL
-    SELECT 'base-year', 'BASE-2025', '2025基准年', NULL, 'vendor', '2025', '通用企业', '单位营收排放强度', NULL, NULL, NULL, 1, '0', '基准年维度示例' UNION ALL
-    SELECT 'ef-electricity-factor', 'EF-ELEC-ZJ-2025', '浙江电力排放因子', NULL, 'vendor', '330000', '0.5703', 'kgCO2e/kWh', '2025', NULL, NULL, 1, '0', '电力因子示例' UNION ALL
-    SELECT 'ef-electricity-version', 'EV-2025-ZJ', '2025浙江电力因子对应', NULL, 'vendor', '2025', '2025版', '330000', NULL, NULL, NULL, 1, '0', '版本对应示例' UNION ALL
-    SELECT 'ef-electricity-scope', 'GRID-REGIONAL', '区域电网口径', NULL, 'vendor', '区域', '按区域电网平均排放因子核算', NULL, NULL, NULL, NULL, 1, '0', '口径示例' UNION ALL
-    SELECT 'greenhouse-gas', 'CO2', '二氧化碳', NULL, 'vendor', '1', 'AR6', 'CO2', NULL, NULL, NULL, 1, '0', '温室气体示例' UNION ALL
-    SELECT 'report-template-download', 'TPL-PBI-001', '企业碳报表Power BI模板', NULL, 'vendor', 'Power BI', 'v1.0', '/templates/carbon-report.pbix', '2026-06-01', NULL, NULL, 1, '0', '报表模板示例'
+    SELECT 'admin-division' AS dimension_code, '330000' AS record_code, '浙江省' AS record_name, NULL AS parent_code, '省级' AS field01, '华东电网' AS field02, '中国' AS field03, NULL AS field04, NULL AS field05, NULL AS field06, 1 AS sort_order, '0' AS status, '行政区划示例' AS remark UNION ALL
+    SELECT 'admin-division', '330200', '宁波市', '330000', '市级', '华东电网', '中国', NULL, NULL, NULL, 2, '0', '行政区划示例' UNION ALL
+    SELECT 'emission-source-category', 'SCOPE2-PURCHASED-ELEC', '外购电力', NULL, '范围二', 'kWh', '区域电网平均因子', NULL, NULL, NULL, 1, '0', '排放源分类示例' UNION ALL
+    SELECT 'base-year', 'BASE-2025', '2025基准年', NULL, '2025', '通用企业', '单位营收排放强度', NULL, NULL, NULL, 1, '0', '基准年维度示例' UNION ALL
+    SELECT 'ef-electricity-factor', 'EF-ELEC-ZJ-2025', '浙江电力排放因子', NULL, '330000', '0.5703', 'kgCO2e/kWh', '2025', NULL, NULL, 1, '0', '电力因子示例' UNION ALL
+    SELECT 'ef-electricity-version', 'EV-2025-ZJ', '2025浙江电力因子对应', NULL, '2025', '2025版', '330000', NULL, NULL, NULL, 1, '0', '版本对应示例' UNION ALL
+    SELECT 'ef-electricity-scope', 'GRID-REGIONAL', '区域电网口径', NULL, '区域', '按区域电网平均排放因子核算', NULL, NULL, NULL, NULL, 1, '0', '口径示例' UNION ALL
+    SELECT 'greenhouse-gas', 'CO2', '二氧化碳', NULL, '1', 'AR6', 'CO2', NULL, NULL, NULL, 1, '0', '温室气体示例' UNION ALL
+    SELECT 'report-template-download', 'TPL-PBI-001', '企业碳报表Power BI模板', NULL, 'Power BI', 'v1.0', '/templates/carbon-report.pbix', '2026-06-01', NULL, NULL, 1, '0', '报表模板示例'
 ) seed
 WHERE NOT EXISTS (
     SELECT 1

@@ -50,6 +50,16 @@ public class CvRenewalOrderBo extends BaseEntity {
     private String installId;
 
     /**
+     * Requested renewal package identifier.
+     */
+    private Long requestedPackageId;
+
+    /**
+     * Requested renewal package name.
+     */
+    private String requestedPackageName;
+
+    /**
      * Requested renewal edition.
      */
     private String requestedEdition;
@@ -88,6 +98,11 @@ public class CvRenewalOrderBo extends BaseEntity {
      * Order lifecycle status.
      */
     private String orderStatus;
+
+    /**
+     * Renewal license issue status.
+     */
+    private String issueStatus;
 
     /**
      * Payment channel.

@@ -17,6 +17,7 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -112,6 +113,46 @@ class CvFactorVersionLifecycleTest {
     }
 
     @Test
+    void restoresRetiredVersionToDraftAndAppendsAuditRemark() {
+        when(factorVersionMapper.selectById(101L)).thenReturn(retiredVersion());
+
+        service.restoreFactorVersion(101L, "vendor-admin");
+
+        ArgumentCaptor<CvFactorVersion> updateCaptor = ArgumentCaptor.forClass(CvFactorVersion.class);
+        verify(factorVersionMapper).updateById(updateCaptor.capture());
+        CvFactorVersion updated = updateCaptor.getValue();
+        assertEquals("draft", updated.getPublishStatus());
+        assertFalse(updated.getFrozenFlag());
+        assertTrue(updated.getRemark().contains("existing remark"));
+        assertTrue(updated.getRemark().contains("factor-version-restore"));
+        assertTrue(updated.getRemark().contains("vendor-admin"));
+        assertTrue(updated.getRemark().matches("(?s).*\\[[^]]+].*"));
+    }
+
+    @Test
+    void rejectsRestoreFromDraftStateWithoutPersistence() {
+        assertRejectsRestoreWithoutPersistence(draftVersion());
+    }
+
+    @Test
+    void rejectsRestoreFromPublishedStateWithoutPersistence() {
+        assertRejectsRestoreWithoutPersistence(publishedVersion());
+    }
+
+    @Test
+    void rejectsRestoreFromFrozenStateWithoutPersistence() {
+        assertRejectsRestoreWithoutPersistence(frozenVersion());
+    }
+
+    @Test
+    void rejectsRestoreFromInconsistentRetiredMetadataWithoutPersistence() {
+        CvFactorVersion version = retiredVersion();
+        version.setFrozenFlag(Boolean.TRUE);
+
+        assertRejectsRestoreWithoutPersistence(version);
+    }
+
+    @Test
     void rejectsBlankStatusWhenFrozenFlagIsSet() {
         CvFactorVersion version = draftVersion();
         version.setPublishStatus(" ");
@@ -122,6 +163,16 @@ class CvFactorVersionLifecycleTest {
             () -> service.freezeFactorVersion(101L, "auditor"));
 
         assertEquals("Inconsistent factor version lifecycle metadata", exception.getMessage());
+    }
+
+    private void assertRejectsRestoreWithoutPersistence(CvFactorVersion invalidVersion) {
+        when(factorVersionMapper.selectById(101L)).thenReturn(invalidVersion);
+
+        ServiceException exception = assertThrows(ServiceException.class,
+            () -> service.restoreFactorVersion(101L, "vendor-admin"));
+
+        assertEquals("Only retired factor versions can be restored", exception.getMessage());
+        verify(factorVersionMapper, never()).updateById(org.mockito.ArgumentMatchers.any(CvFactorVersion.class));
     }
 
     private CvFactorVersion draftVersion() {
@@ -148,6 +199,13 @@ class CvFactorVersionLifecycleTest {
         CvFactorVersion version = publishedVersion();
         version.setPublishStatus("frozen");
         version.setFrozenFlag(Boolean.TRUE);
+        return version;
+    }
+
+    private CvFactorVersion retiredVersion() {
+        CvFactorVersion version = publishedVersion();
+        version.setPublishStatus("retired");
+        version.setFrozenFlag(Boolean.FALSE);
         return version;
     }
 

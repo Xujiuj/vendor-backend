@@ -69,6 +69,26 @@ public class CvFactorVersionController extends BaseController {
         return R.ok();
     }
 
+    /**
+     * Retire vendor factor version metadata.
+     */
+    @SaCheckPermission("vendor:factorVersion:edit")
+    @PostMapping("/{id}/retire")
+    public R<Void> retire(@PathVariable Long id) {
+        factorVersionService.retireFactorVersion(id, resolveOperator());
+        return R.ok();
+    }
+
+    /**
+     * Restore vendor factor version metadata.
+     */
+    @SaCheckPermission("vendor:factorVersion:edit")
+    @PostMapping("/{id}/restore")
+    public R<Void> restore(@PathVariable Long id) {
+        factorVersionService.restoreFactorVersion(id, resolveOperator());
+        return R.ok();
+    }
+
     private String resolveOperator() {
         return StringUtils.blankToDefault(LoginHelper.getUsername(), "vendor-system");
     }

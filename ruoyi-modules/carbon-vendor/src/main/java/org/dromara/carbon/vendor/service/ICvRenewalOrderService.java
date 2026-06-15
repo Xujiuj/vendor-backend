@@ -21,5 +21,7 @@ public interface ICvRenewalOrderService {
 
     int applyRenewalCallback(CvRenewalCallbackRequest request);
 
+    int retryRenewalIssue(Long id);
+
     int deleteRenewalOrderByIds(Long[] ids);
 }

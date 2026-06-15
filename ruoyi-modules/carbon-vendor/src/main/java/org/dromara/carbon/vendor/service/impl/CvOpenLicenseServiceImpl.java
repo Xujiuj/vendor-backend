@@ -16,6 +16,8 @@ import org.dromara.carbon.vendor.service.ICvOpenApiAuditService;
 import org.dromara.carbon.vendor.service.ICvOpenLicenseService;
 import org.dromara.common.core.exception.ServiceException;
 import org.dromara.common.core.utils.StringUtils;
+import org.dromara.system.domain.SysTenantPackage;
+import org.dromara.system.mapper.SysTenantPackageMapper;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -54,6 +56,7 @@ public class CvOpenLicenseServiceImpl implements ICvOpenLicenseService {
     private final CvLicenseIssueMapper licenseIssueMapper;
     private final CvCustomerMapper customerMapper;
     private final CvRenewalOrderMapper renewalOrderMapper;
+    private final SysTenantPackageMapper tenantPackageMapper;
     private final ICvOpenApiAuditService openApiAuditService;
 
     @Override
@@ -97,7 +100,12 @@ public class CvOpenLicenseServiceImpl implements ICvOpenLicenseService {
             order.setCustomerId(customerId);
             order.setLicenseId(issue.getLicenseId());
             order.setInstallId(issue.getInstallId());
-            order.setRequestedEdition(trimToNull(request.getEdition()));
+            SysTenantPackage requestedPackage = resolveRenewalPackage(request, issue);
+            order.setRequestedPackageId(requestedPackage == null ? issue.getPackageId() : requestedPackage.getPackageId());
+            order.setRequestedPackageName(requestedPackage == null ? issue.getPackageName() : requestedPackage.getPackageName());
+            order.setRequestedEdition(trimToNull(request.getEdition()) == null
+                ? StringUtils.blankToDefault(order.getRequestedPackageName(), issue.getEdition())
+                : trimToNull(request.getEdition()));
             order.setRenewalPeriod(trimToNull(request.getRenewalPeriod()));
             order.setContactName(trimToNull(request.getContactName()));
             order.setContactEmail(trimToNull(request.getContactEmail()));
@@ -164,6 +172,8 @@ public class CvOpenLicenseServiceImpl implements ICvOpenLicenseService {
         response.setLicenseId(issue.getLicenseId());
         response.setCustomerId(issue.getCustomerId());
         response.setStatus(resolveLicenseStatus(issue));
+        response.setPackageId(issue.getPackageId());
+        response.setPackageName(issue.getPackageName());
         response.setEdition(issue.getEdition());
         response.setFeatureCodes(issue.getFeatureCodes());
         response.setKeyId(issue.getKeyId());
@@ -209,6 +219,24 @@ public class CvOpenLicenseServiceImpl implements ICvOpenLicenseService {
         }
     }
 
+    private SysTenantPackage resolveRenewalPackage(CvOpenRenewalOrderRequest request, CvLicenseIssue issue) {
+        Long packageId = request == null ? null : request.getPackageId();
+        if (packageId == null) {
+            packageId = issue.getPackageId();
+        }
+        if (packageId == null) {
+            return null;
+        }
+        SysTenantPackage tenantPackage = tenantPackageMapper.selectById(packageId);
+        if (tenantPackage == null || "1".equals(tenantPackage.getDelFlag())) {
+            throw new ServiceException("renewal package does not exist");
+        }
+        if (!"0".equals(tenantPackage.getStatus())) {
+            throw new ServiceException("renewal package is disabled");
+        }
+        return tenantPackage;
+    }
+
     private boolean isDisabledCustomer(String customerStatus) {
         String normalizedStatus = normalizeStatus(customerStatus);
         return CUSTOMER_STATUS_DISABLED.equals(normalizedStatus)
@@ -237,6 +265,7 @@ public class CvOpenLicenseServiceImpl implements ICvOpenLicenseService {
             return "request=null";
         }
         return "edition=" + nullToBlank(request.getEdition())
+            + ";packageId=" + (request.getPackageId() == null ? "" : request.getPackageId())
             + ";renewalPeriod=" + nullToBlank(request.getRenewalPeriod())
             + ";contactName=" + nullToBlank(request.getContactName())
             + ";contactEmail=" + nullToBlank(request.getContactEmail())

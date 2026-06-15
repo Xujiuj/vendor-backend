@@ -26,6 +26,8 @@ import org.dromara.common.core.exception.ServiceException;
 import org.dromara.common.core.utils.StringUtils;
 import org.dromara.common.mybatis.core.page.PageQuery;
 import org.dromara.common.mybatis.core.page.TableDataInfo;
+import org.dromara.system.domain.SysTenantPackage;
+import org.dromara.system.mapper.SysTenantPackageMapper;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Service;
 
@@ -68,6 +70,7 @@ public class CvLicenseIssueServiceImpl implements ICvLicenseIssueService {
     private final CvLicenseIssueMapper baseMapper;
     private final CvCustomerMapper customerMapper;
     private final CvSigningKeyMapper signingKeyMapper;
+    private final SysTenantPackageMapper tenantPackageMapper;
     private final CvLicensePrivateKeyProvider privateKeyProvider;
     private final ObjectMapper objectMapper;
 
@@ -106,6 +109,9 @@ public class CvLicenseIssueServiceImpl implements ICvLicenseIssueService {
         }
         if (request.getCustomerId() != null && !Objects.equals(request.getCustomerId(), sourceIssue.getCustomerId())) {
             return CvLicenseIssueResult.failed("SOURCE_LICENSE_CUSTOMER_MISMATCH", "source license does not belong to this customer");
+        }
+        if (request.getPackageId() == null) {
+            request.setPackageId(sourceIssue.getPackageId());
         }
         if (StringUtils.equals(request.getLicenseId(), sourceIssue.getLicenseId())) {
             return CvLicenseIssueResult.failed("DUPLICATE_LICENSE_ID", "reissued license must use a new licenseId");
@@ -160,9 +166,18 @@ public class CvLicenseIssueServiceImpl implements ICvLicenseIssueService {
         if (isDisabledCustomer(customer.getCustomerStatus())) {
             return CvLicenseIssueResult.failed("CUSTOMER_DISABLED", "disabled customer cannot issue license");
         }
+        SysTenantPackage tenantPackage;
+        try {
+            tenantPackage = resolveTenantPackage(request);
+        } catch (ServiceException e) {
+            return CvLicenseIssueResult.failed("PACKAGE_INVALID", e.getMessage());
+        }
 
         request.setCustomerCode(customer.getCustomerCode());
         request.setCustomerName(customer.getCustomerName());
+        request.setPackageId(tenantPackage.getPackageId());
+        request.setPackageName(tenantPackage.getPackageName());
+        request.setEdition(tenantPackage.getPackageName());
 
         List<CvLicenseIssue> existingIssues = findIssuesForCustomerInstall(request.getCustomerId(), request.getInstallId());
         if (!allowRevokedHistory && hasRevokedHistory(existingIssues)) {
@@ -224,6 +239,8 @@ public class CvLicenseIssueServiceImpl implements ICvLicenseIssueService {
         lqw.like(StringUtils.isNotBlank(bo.getKeyId()), CvLicenseIssue::getKeyId, bo.getKeyId());
         lqw.eq(StringUtils.isNotBlank(bo.getAlgorithm()), CvLicenseIssue::getAlgorithm, bo.getAlgorithm());
         lqw.eq(StringUtils.isNotBlank(bo.getSchemaVersion()), CvLicenseIssue::getSchemaVersion, bo.getSchemaVersion());
+        lqw.eq(bo.getPackageId() != null, CvLicenseIssue::getPackageId, bo.getPackageId());
+        lqw.like(StringUtils.isNotBlank(bo.getPackageName()), CvLicenseIssue::getPackageName, bo.getPackageName());
         lqw.eq(StringUtils.isNotBlank(bo.getEdition()), CvLicenseIssue::getEdition, bo.getEdition());
         lqw.like(StringUtils.isNotBlank(bo.getInstallId()), CvLicenseIssue::getInstallId, bo.getInstallId());
         lqw.eq(StringUtils.isNotBlank(bo.getIssueStatus()), CvLicenseIssue::getIssueStatus, bo.getIssueStatus());
@@ -243,7 +260,8 @@ public class CvLicenseIssueServiceImpl implements ICvLicenseIssueService {
             return CvLicenseIssueResult.failed("MALFORMED_REQUEST", "issue request is empty");
         }
         if (request.getCustomerId() == null
-            || StringUtils.isAnyBlank(request.getKeyId(), request.getEdition(), request.getInstallId(), request.getIssuedBy())
+            || request.getPackageId() == null
+            || StringUtils.isAnyBlank(request.getKeyId(), request.getInstallId(), request.getIssuedBy())
             || request.getFeatures() == null || request.getFeatures().isEmpty()
             || request.getTemplateEntitlements() == null || request.getTemplateEntitlements().isEmpty()
             || request.getValidFrom() == null || request.getValidTo() == null) {
@@ -261,6 +279,20 @@ public class CvLicenseIssueServiceImpl implements ICvLicenseIssueService {
             return CvLicenseIssueResult.failed("INVALID_VALIDITY_WINDOW", "validFrom must be before validTo");
         }
         return CvLicenseIssueResult.issued(null, null);
+    }
+
+    private SysTenantPackage resolveTenantPackage(CvLicenseIssueRequest request) {
+        SysTenantPackage tenantPackage = tenantPackageMapper.selectById(request.getPackageId());
+        if (tenantPackage == null || "1".equals(tenantPackage.getDelFlag())) {
+            throw new ServiceException("套餐不存在，不能签发 License");
+        }
+        if (!"0".equals(tenantPackage.getStatus())) {
+            throw new ServiceException("套餐已停用，不能签发 License");
+        }
+        if (StringUtils.isBlank(tenantPackage.getPackageName())) {
+            throw new ServiceException("套餐名称为空，不能签发 License");
+        }
+        return tenantPackage;
     }
 
     private List<CvLicenseIssue> findIssuesForCustomerInstall(Long customerId, String installId) {
@@ -332,6 +364,8 @@ public class CvLicenseIssueServiceImpl implements ICvLicenseIssueService {
         payload.setLicenseId(resolveLicenseId(request));
         payload.setCustomerId(request.getCustomerCode());
         payload.setCustomerName(request.getCustomerName());
+        payload.setPackageId(request.getPackageId());
+        payload.setPackageName(request.getPackageName());
         payload.setEdition(request.getEdition());
         payload.setFeatures(request.getFeatures());
         payload.setInstallId(request.getInstallId());
@@ -361,6 +395,8 @@ public class CvLicenseIssueServiceImpl implements ICvLicenseIssueService {
         CvLicenseIssue issue = new CvLicenseIssue();
         issue.setLicenseId(payload.getLicenseId());
         issue.setCustomerId(request.getCustomerId());
+        issue.setPackageId(request.getPackageId());
+        issue.setPackageName(request.getPackageName());
         issue.setKeyId(signingKey.getKeyId());
         issue.setAlgorithm(ALGORITHM);
         issue.setSchemaVersion(SCHEMA_VERSION);

@@ -34,9 +34,24 @@ public class CvReportTemplateScopeVo implements Serializable {
     private Long customerId;
 
     /**
+     * Package identifier controlling this scope.
+     */
+    private Long packageId;
+
+    /**
+     * Package name snapshot.
+     */
+    private String packageName;
+
+    /**
      * License identifier.
      */
     private String licenseId;
+
+    /**
+     * License edition/package scope.
+     */
+    private String edition;
 
     /**
      * Scope lifecycle status.

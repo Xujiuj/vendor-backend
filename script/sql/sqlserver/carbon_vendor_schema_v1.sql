@@ -34,6 +34,8 @@ CREATE TABLE cv_license_issue (
     id BIGINT IDENTITY(1,1) NOT NULL PRIMARY KEY,
     license_id NVARCHAR(128) NOT NULL,
     customer_id BIGINT NOT NULL,
+    package_id BIGINT NULL,
+    package_name NVARCHAR(64) NULL,
     key_id NVARCHAR(64) NOT NULL,
     algorithm NVARCHAR(64) NOT NULL,
     schema_version NVARCHAR(32) NOT NULL,
@@ -61,6 +63,10 @@ GO
 CREATE UNIQUE INDEX uk_cv_license_reissue_source
     ON cv_license_issue (source_license_id)
     WHERE source_license_id IS NOT NULL;
+GO
+
+CREATE INDEX idx_cv_license_issue_package
+    ON cv_license_issue (package_id);
 GO
 
 CREATE TABLE cv_factor_version (
@@ -100,7 +106,6 @@ CREATE TABLE cv_dimension_record (
     record_code NVARCHAR(128) NOT NULL,
     record_name NVARCHAR(255) NOT NULL,
     parent_code NVARCHAR(128) NULL,
-    source_type NVARCHAR(32) NOT NULL DEFAULT 'vendor',
     field01 NVARCHAR(255) NULL,
     field02 NVARCHAR(255) NULL,
     field03 NVARCHAR(255) NULL,
@@ -128,14 +133,17 @@ CREATE TABLE cv_factor_customer_scope (
     id BIGINT IDENTITY(1,1) NOT NULL PRIMARY KEY,
     version_id BIGINT NOT NULL,
     customer_id BIGINT NULL,
+    package_id BIGINT NULL,
+    package_name NVARCHAR(64) NULL,
     edition NVARCHAR(64) NULL,
     license_id NVARCHAR(128) NULL,
     scope_customer_key AS ISNULL(customer_id, CONVERT(BIGINT, 0)) PERSISTED,
+    scope_package_key AS ISNULL(package_id, CONVERT(BIGINT, 0)) PERSISTED,
     scope_edition_key AS ISNULL(edition, N'') PERSISTED,
     scope_license_key AS ISNULL(license_id, N'') PERSISTED,
     scope_status NVARCHAR(32) NOT NULL DEFAULT 'enabled',
     create_time DATETIME2 NULL DEFAULT SYSUTCDATETIME(),
-    CONSTRAINT uk_cv_factor_scope_entitlement UNIQUE (version_id, scope_customer_key, scope_edition_key, scope_license_key),
+    CONSTRAINT uk_cv_factor_scope_entitlement UNIQUE (version_id, scope_customer_key, scope_package_key, scope_edition_key, scope_license_key),
     CONSTRAINT fk_cv_factor_scope_version
         FOREIGN KEY (version_id) REFERENCES cv_factor_version (id),
     CONSTRAINT fk_cv_factor_scope_customer
@@ -144,7 +152,7 @@ CREATE TABLE cv_factor_customer_scope (
 GO
 
 CREATE INDEX idx_cv_factor_scope_lookup
-    ON cv_factor_customer_scope (version_id, scope_status, customer_id, edition);
+    ON cv_factor_customer_scope (version_id, scope_status, customer_id, package_id, edition);
 GO
 
 CREATE TABLE cv_report_template (
@@ -168,13 +176,18 @@ CREATE TABLE cv_report_template_scope (
     template_id BIGINT NOT NULL,
     customer_id BIGINT NULL,
     license_id NVARCHAR(128) NULL,
+    package_id BIGINT NULL,
+    package_name NVARCHAR(64) NULL,
+    edition NVARCHAR(64) NULL,
     scope_customer_key AS ISNULL(customer_id, CONVERT(BIGINT, 0)) PERSISTED,
+    scope_package_key AS ISNULL(package_id, CONVERT(BIGINT, 0)) PERSISTED,
+    scope_edition_key AS ISNULL(edition, N'') PERSISTED,
     scope_license_key AS ISNULL(license_id, N'') PERSISTED,
     scope_status NVARCHAR(32) NOT NULL DEFAULT 'enabled',
     create_time DATETIME2 NULL DEFAULT SYSUTCDATETIME(),
-    CONSTRAINT uk_cv_report_template_scope UNIQUE (template_id, scope_customer_key, scope_license_key),
+    CONSTRAINT uk_cv_report_template_scope UNIQUE (template_id, scope_customer_key, scope_package_key, scope_edition_key, scope_license_key),
     CONSTRAINT chk_cv_report_template_scope_entitlement 
-        CHECK (customer_id IS NOT NULL OR license_id IS NOT NULL),
+        CHECK (customer_id IS NOT NULL OR package_id IS NOT NULL OR edition IS NOT NULL OR license_id IS NOT NULL),
     CONSTRAINT fk_cv_report_scope_template
         FOREIGN KEY (template_id) REFERENCES cv_report_template (id),
     CONSTRAINT fk_cv_report_scope_customer
@@ -183,7 +196,7 @@ CREATE TABLE cv_report_template_scope (
 GO
 
 CREATE INDEX idx_cv_report_template_scope_lookup
-    ON cv_report_template_scope (template_id, scope_status, customer_id, license_id);
+    ON cv_report_template_scope (template_id, scope_status, customer_id, package_id, edition, license_id);
 GO
 
 CREATE TABLE cv_report_template_download_token (
@@ -221,6 +234,8 @@ CREATE TABLE cv_renewal_order (
     customer_id BIGINT NOT NULL,
     license_id NVARCHAR(128) NULL,
     install_id NVARCHAR(128) NULL,
+    requested_package_id BIGINT NULL,
+    requested_package_name NVARCHAR(64) NULL,
     requested_edition NVARCHAR(64) NULL,
     renewal_period NVARCHAR(64) NULL,
     contact_name NVARCHAR(128) NULL,
@@ -229,6 +244,7 @@ CREATE TABLE cv_renewal_order (
     idempotency_key NVARCHAR(128) NULL,
     request_source NVARCHAR(32) NULL,
     order_status NVARCHAR(32) NOT NULL DEFAULT 'pending',
+    issue_status NVARCHAR(32) NOT NULL DEFAULT 'pending_issue',
     pay_channel NVARCHAR(32) NULL,
     amount DECIMAL(18, 2) NOT NULL DEFAULT 0.00,
     paid_time DATETIME2 NULL,
@@ -248,6 +264,14 @@ GO
 
 CREATE INDEX idx_cv_renewal_order_license
     ON cv_renewal_order (license_id, install_id);
+GO
+
+CREATE INDEX idx_cv_renewal_order_issue_status
+    ON cv_renewal_order (issue_status);
+GO
+
+CREATE INDEX idx_cv_renewal_order_package
+    ON cv_renewal_order (requested_package_id);
 GO
 
 CREATE TABLE cv_open_api_audit (

@@ -123,6 +123,36 @@ class CvOpenReportTemplateServiceTest {
     }
 
     @Test
+    void includesEditionOnlyTemplateScopeWhenEditionMatches() {
+        when(licenseIssueMapper.selectOne(any(), eq(false))).thenReturn(activeLicense());
+        CvReportTemplateScope scope = scope(301L, null);
+        scope.setCustomerId(null);
+        scope.setEdition("Professional");
+        when(reportTemplateScopeMapper.selectList(any())).thenReturn(List.of(scope));
+        when(reportTemplateMapper.selectByIds(anyCollection())).thenReturn(List.of(
+            template(301L, "carbon-professional", "2026.1", "published")
+        ));
+
+        CvOpenReportTemplateListResponse response = service.listTemplates(request());
+
+        assertEquals(1, response.getTemplates().size());
+        assertEquals("carbon-professional", response.getTemplates().get(0).getTemplateCode());
+    }
+
+    @Test
+    void excludesTemplateScopeWhenEditionDoesNotMatch() {
+        when(licenseIssueMapper.selectOne(any(), eq(false))).thenReturn(activeLicense());
+        CvReportTemplateScope scope = scope(301L, null);
+        scope.setEdition("group");
+        when(reportTemplateScopeMapper.selectList(any())).thenReturn(List.of(scope));
+
+        CvOpenReportTemplateListResponse response = service.listTemplates(request());
+
+        assertEquals(0, response.getTemplates().size());
+        verify(reportTemplateMapper, never()).selectByIds(anyCollection());
+    }
+
+    @Test
     void rejectsCustomerAndLicenseScopeWhenCustomerDoesNotMatch() {
         when(licenseIssueMapper.selectOne(any(), eq(false))).thenReturn(activeLicense());
         CvReportTemplateScope scope = scope(301L, "LIC-001");
@@ -278,6 +308,7 @@ class CvOpenReportTemplateServiceTest {
         CvLicenseIssue license = new CvLicenseIssue();
         license.setLicenseId("LIC-001");
         license.setCustomerId(1001L);
+        license.setEdition("professional");
         license.setFeatureCodes("report-template-sync");
         license.setInstallId("INSTALL-001");
         license.setIssueStatus("issued");

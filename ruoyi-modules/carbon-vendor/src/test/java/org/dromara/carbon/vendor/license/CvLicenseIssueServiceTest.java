@@ -14,6 +14,8 @@ import org.dromara.carbon.vendor.mapper.CvLicenseIssueMapper;
 import org.dromara.carbon.vendor.mapper.CvSigningKeyMapper;
 import org.dromara.carbon.vendor.service.CvLicensePrivateKeyProvider;
 import org.dromara.carbon.vendor.service.impl.CvLicenseIssueServiceImpl;
+import org.dromara.system.domain.SysTenantPackage;
+import org.dromara.system.mapper.SysTenantPackageMapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
@@ -52,6 +54,7 @@ class CvLicenseIssueServiceTest {
     private CvCustomerMapper customerMapper;
     private CvLicenseIssueMapper licenseIssueMapper;
     private CvSigningKeyMapper signingKeyMapper;
+    private SysTenantPackageMapper tenantPackageMapper;
     private KeyPair keyPair;
 
     @BeforeEach
@@ -60,9 +63,11 @@ class CvLicenseIssueServiceTest {
         customerMapper = mock(CvCustomerMapper.class);
         licenseIssueMapper = mock(CvLicenseIssueMapper.class);
         signingKeyMapper = mock(CvSigningKeyMapper.class);
+        tenantPackageMapper = mock(SysTenantPackageMapper.class);
         keyPair = KeyPairGenerator.getInstance("RSA").generateKeyPair();
         when(signingKeyMapper.selectOne(any(), any(Boolean.class))).thenReturn(activeSigningKey());
         when(customerMapper.selectById(eq(1001L))).thenReturn(activeCustomer());
+        when(tenantPackageMapper.selectById(eq(1001L))).thenReturn(activePackage());
         when(licenseIssueMapper.selectList(any())).thenReturn(List.of());
     }
 
@@ -82,6 +87,9 @@ class CvLicenseIssueServiceTest {
 
         assertEquals("LIC-UNIT-001", issue.getLicenseId());
         assertEquals(1001L, issue.getCustomerId());
+        assertEquals(1001L, issue.getPackageId());
+        assertEquals("标准版", issue.getPackageName());
+        assertEquals("标准版", issue.getEdition());
         assertEquals("test-key-2026-01", issue.getKeyId());
         assertEquals("RS256", issue.getAlgorithm());
         assertEquals("license.v1", issue.getSchemaVersion());
@@ -99,6 +107,8 @@ class CvLicenseIssueServiceTest {
         assertEquals("LIC-UNIT-001", issuedPayload.get("licenseId").asText());
         assertEquals("CUST-001", issuedPayload.get("customerId").asText());
         assertEquals("Test Manufacturing Co", issuedPayload.get("customerName").asText());
+        assertEquals(1001L, issuedPayload.get("packageId").asLong());
+        assertEquals("标准版", issuedPayload.get("packageName").asText());
         assertEquals("CUST-001", persistedPayload.get("customerId").asText());
         assertEquals("Test Manufacturing Co", persistedPayload.get("customerName").asText());
         assertTrue(verifySignature(issuedPayload.toString(), envelope.get("signature").asText()));
@@ -215,6 +225,7 @@ class CvLicenseIssueServiceTest {
             licenseIssueMapper,
             customerMapper,
             signingKeyMapper,
+            tenantPackageMapper,
             keyProvider,
             objectMapper
         );
@@ -233,6 +244,7 @@ class CvLicenseIssueServiceTest {
         request.setKeyId("test-key-2026-01");
         request.setSchemaVersion("license.v1");
         request.setAlgorithm("RS256");
+        request.setPackageId(1001L);
         request.setEdition("standard");
         request.setFeatures(List.of("factor_api", "report_template"));
         request.setInstallId("INSTALL-ENTERPRISE-001");
@@ -268,6 +280,15 @@ class CvLicenseIssueServiceTest {
         CvCustomer customer = activeCustomer();
         customer.setCustomerStatus("disabled");
         return customer;
+    }
+
+    private SysTenantPackage activePackage() {
+        SysTenantPackage tenantPackage = new SysTenantPackage();
+        tenantPackage.setPackageId(1001L);
+        tenantPackage.setPackageName("标准版");
+        tenantPackage.setStatus("0");
+        tenantPackage.setDelFlag("0");
+        return tenantPackage;
     }
 
     private CvLicenseIssue existingIssuedRecord() {

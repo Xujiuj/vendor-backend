@@ -27,6 +27,16 @@ public class CvLicenseIssueBo extends BaseEntity {
     private Long customerId;
 
     /**
+     * Purchased package identifier.
+     */
+    private Long packageId;
+
+    /**
+     * Purchased package name.
+     */
+    private String packageName;
+
+    /**
      * Key identifier.
      */
     private String keyId;

@@ -21,6 +21,10 @@ public class CvOpenLicenseCurrentResponse implements Serializable {
 
     private String status;
 
+    private Long packageId;
+
+    private String packageName;
+
     private String edition;
 
     private String featureCodes;

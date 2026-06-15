@@ -9,6 +9,22 @@ update sys_user set nick_name = '疯狂的狮子Li', remark = '管理员' where 
 update sys_user set nick_name = '本部门及以下 密码666666' where user_name = 'test';
 update sys_user set nick_name = '仅本人 密码666666' where user_name = 'test1';
 
+update sys_dept set dept_name = 'XXX科技' where dept_id = 100;
+update sys_dept set dept_name = '深圳总公司' where dept_id = 101;
+update sys_dept set dept_name = '长沙分公司' where dept_id = 102;
+update sys_dept set dept_name = '研发部门' where dept_id = 103;
+update sys_dept set dept_name = '市场部门' where dept_id = 104;
+update sys_dept set dept_name = '测试部门' where dept_id = 105;
+update sys_dept set dept_name = '财务部门' where dept_id = 106;
+update sys_dept set dept_name = '运维部门' where dept_id = 107;
+update sys_dept set dept_name = '市场部门' where dept_id = 108;
+update sys_dept set dept_name = '财务部门' where dept_id = 109;
+
+update sys_post set post_name = '董事长' where post_id = 1;
+update sys_post set post_name = '项目经理' where post_id = 2;
+update sys_post set post_name = '人力资源' where post_id = 3;
+update sys_post set post_name = '普通员工' where post_id = 4;
+
 update sys_menu set menu_name = '系统管理', remark = '系统管理目录' where menu_id = 1;
 update sys_menu set menu_name = '系统监控', remark = '系统监控目录' where menu_id = 2;
 update sys_menu set menu_name = '系统工具', remark = '系统工具目录' where menu_id = 3;
@@ -168,3 +184,224 @@ update sys_dict_data set dict_label = 'APP' where dict_type = 'sys_device_type' 
 
 update sys_notice set notice_title = '温馨提醒：2018-07-01 新版本发布啦', notice_content = '新版本内容', remark = '管理员' where notice_id = 1;
 update sys_notice set notice_title = '维护通知：2018-07-01 系统凌晨维护', notice_content = '维护内容', remark = '管理员' where notice_id = 2;
+
+insert into sys_tenant_package
+(package_id, package_name, menu_ids, remark, menu_check_strictly, status, del_flag, create_dept, create_by, create_time, update_by, update_time)
+values
+(1001, '标准版', '910100,910101,910102,910107,910136,910103,910104,910121,910105,910106,910131,910126', '默认业务套餐：开放基础客户、License、因子、模板与维表同步能力', 1, '0', '0', 103, 1, sysdate(), null, null),
+(1002, '专业版', '910100,910101,910102,910107,910136,910103,910104,910121,910105,910106,910131,910126', '默认业务套餐：在标准版基础上承载更完整的数据开放范围', 1, '0', '0', 103, 1, sysdate(), null, null),
+(1003, '集团版', '910100,910101,910102,910107,910136,910103,910104,910121,910105,910106,910131,910126,1,100,101,102,103,104,105,106,107,122', '默认业务套餐：集团客户使用，开放全部厂商数据管理能力', 1, '0', '0', 103, 1, sysdate(), null, null)
+on duplicate key update
+    package_name = values(package_name),
+    menu_ids = values(menu_ids),
+    remark = values(remark),
+    menu_check_strictly = values(menu_check_strictly),
+    status = values(status),
+    del_flag = values(del_flag),
+    update_by = 1,
+    update_time = sysdate();
+
+set @schema_name = database();
+
+set @sql = if(
+    exists(select 1 from information_schema.columns where table_schema = @schema_name and table_name = 'cv_license_issue' and column_name = 'package_id'),
+    'select 1',
+    'alter table cv_license_issue add column package_id bigint default null after customer_id'
+);
+prepare stmt from @sql; execute stmt; deallocate prepare stmt;
+
+set @sql = if(
+    exists(select 1 from information_schema.columns where table_schema = @schema_name and table_name = 'cv_license_issue' and column_name = 'package_name'),
+    'select 1',
+    'alter table cv_license_issue add column package_name varchar(64) default null after package_id'
+);
+prepare stmt from @sql; execute stmt; deallocate prepare stmt;
+
+set @sql = if(
+    exists(select 1 from information_schema.statistics where table_schema = @schema_name and table_name = 'cv_license_issue' and index_name = 'idx_cv_license_issue_package'),
+    'select 1',
+    'alter table cv_license_issue add key idx_cv_license_issue_package (package_id)'
+);
+prepare stmt from @sql; execute stmt; deallocate prepare stmt;
+
+set @sql = if(
+    exists(select 1 from information_schema.columns where table_schema = @schema_name and table_name = 'cv_factor_customer_scope' and column_name = 'package_id'),
+    'select 1',
+    'alter table cv_factor_customer_scope add column package_id bigint default null after customer_id'
+);
+prepare stmt from @sql; execute stmt; deallocate prepare stmt;
+
+set @sql = if(
+    exists(select 1 from information_schema.columns where table_schema = @schema_name and table_name = 'cv_factor_customer_scope' and column_name = 'package_name'),
+    'select 1',
+    'alter table cv_factor_customer_scope add column package_name varchar(64) default null after package_id'
+);
+prepare stmt from @sql; execute stmt; deallocate prepare stmt;
+
+set @sql = if(
+    exists(select 1 from information_schema.columns where table_schema = @schema_name and table_name = 'cv_factor_customer_scope' and column_name = 'scope_package_key'),
+    'select 1',
+    'alter table cv_factor_customer_scope add column scope_package_key bigint generated always as (ifnull(package_id, 0)) stored after scope_customer_key'
+);
+prepare stmt from @sql; execute stmt; deallocate prepare stmt;
+
+set @sql = if(
+    exists(select 1 from information_schema.statistics where table_schema = @schema_name and table_name = 'cv_factor_customer_scope' and index_name = 'idx_cv_factor_scope_package_lookup'),
+    'select 1',
+    'alter table cv_factor_customer_scope add key idx_cv_factor_scope_package_lookup (version_id, scope_status, customer_id, package_id, edition)'
+);
+prepare stmt from @sql; execute stmt; deallocate prepare stmt;
+
+set @sql = if(
+    exists(select 1 from information_schema.columns where table_schema = @schema_name and table_name = 'cv_report_template_scope' and column_name = 'package_id'),
+    'select 1',
+    'alter table cv_report_template_scope add column package_id bigint default null after customer_id'
+);
+prepare stmt from @sql; execute stmt; deallocate prepare stmt;
+
+set @sql = if(
+    exists(select 1 from information_schema.columns where table_schema = @schema_name and table_name = 'cv_report_template_scope' and column_name = 'package_name'),
+    'select 1',
+    'alter table cv_report_template_scope add column package_name varchar(64) default null after package_id'
+);
+prepare stmt from @sql; execute stmt; deallocate prepare stmt;
+
+set @sql = if(
+    exists(select 1 from information_schema.columns where table_schema = @schema_name and table_name = 'cv_report_template_scope' and column_name = 'edition'),
+    'select 1',
+    'alter table cv_report_template_scope add column edition varchar(64) default null after license_id'
+);
+prepare stmt from @sql; execute stmt; deallocate prepare stmt;
+
+set @sql = if(
+    exists(select 1 from information_schema.columns where table_schema = @schema_name and table_name = 'cv_report_template_scope' and column_name = 'scope_package_key'),
+    'select 1',
+    'alter table cv_report_template_scope add column scope_package_key bigint generated always as (ifnull(package_id, 0)) stored after scope_customer_key'
+);
+prepare stmt from @sql; execute stmt; deallocate prepare stmt;
+
+set @sql = if(
+    exists(select 1 from information_schema.columns where table_schema = @schema_name and table_name = 'cv_report_template_scope' and column_name = 'scope_edition_key'),
+    'select 1',
+    'alter table cv_report_template_scope add column scope_edition_key varchar(64) generated always as (ifnull(edition, '''')) stored after scope_package_key'
+);
+prepare stmt from @sql; execute stmt; deallocate prepare stmt;
+
+set @sql = if(
+    exists(select 1 from information_schema.statistics where table_schema = @schema_name and table_name = 'cv_report_template_scope' and index_name = 'idx_cv_report_template_scope_package_lookup'),
+    'select 1',
+    'alter table cv_report_template_scope add key idx_cv_report_template_scope_package_lookup (template_id, scope_status, customer_id, package_id, edition, license_id)'
+);
+prepare stmt from @sql; execute stmt; deallocate prepare stmt;
+
+set @sql = if(
+    exists(select 1 from information_schema.columns where table_schema = @schema_name and table_name = 'cv_renewal_order' and column_name = 'requested_package_id'),
+    'select 1',
+    'alter table cv_renewal_order add column requested_package_id bigint default null after install_id'
+);
+prepare stmt from @sql; execute stmt; deallocate prepare stmt;
+
+set @sql = if(
+    exists(select 1 from information_schema.columns where table_schema = @schema_name and table_name = 'cv_renewal_order' and column_name = 'requested_package_name'),
+    'select 1',
+    'alter table cv_renewal_order add column requested_package_name varchar(64) default null after requested_package_id'
+);
+prepare stmt from @sql; execute stmt; deallocate prepare stmt;
+
+set @sql = if(
+    exists(select 1 from information_schema.columns where table_schema = @schema_name and table_name = 'cv_renewal_order' and column_name = 'issue_status'),
+    'select 1',
+    'alter table cv_renewal_order add column issue_status varchar(32) not null default ''pending_issue'' after order_status'
+);
+prepare stmt from @sql; execute stmt; deallocate prepare stmt;
+
+set @sql = if(
+    exists(select 1 from information_schema.statistics where table_schema = @schema_name and table_name = 'cv_renewal_order' and index_name = 'idx_cv_renewal_order_package'),
+    'select 1',
+    'alter table cv_renewal_order add key idx_cv_renewal_order_package (requested_package_id)'
+);
+prepare stmt from @sql; execute stmt; deallocate prepare stmt;
+
+update cv_license_issue issue
+join sys_tenant_package pkg on lower(pkg.package_name) = lower(issue.edition) and pkg.del_flag = '0'
+set issue.package_id = pkg.package_id,
+    issue.package_name = pkg.package_name
+where issue.package_id is null;
+
+update cv_license_issue issue
+join sys_tenant_package pkg on pkg.package_name = case lower(issue.edition)
+    when 'standard' then '标准版'
+    when 'professional' then '专业版'
+    when 'pro' then '专业版'
+    when 'enterprise' then '集团版'
+    when 'group' then '集团版'
+    else null
+end and pkg.del_flag = '0'
+set issue.package_id = pkg.package_id,
+    issue.package_name = pkg.package_name,
+    issue.edition = pkg.package_name
+where issue.package_id is null
+  and issue.edition is not null;
+
+update cv_factor_customer_scope scope
+join sys_tenant_package pkg on lower(pkg.package_name) = lower(scope.edition) and pkg.del_flag = '0'
+set scope.package_id = pkg.package_id,
+    scope.package_name = pkg.package_name
+where scope.package_id is null;
+
+update cv_factor_customer_scope scope
+join sys_tenant_package pkg on pkg.package_name = case lower(scope.edition)
+    when 'standard' then '标准版'
+    when 'professional' then '专业版'
+    when 'pro' then '专业版'
+    when 'enterprise' then '集团版'
+    when 'group' then '集团版'
+    else null
+end and pkg.del_flag = '0'
+set scope.package_id = pkg.package_id,
+    scope.package_name = pkg.package_name,
+    scope.edition = pkg.package_name
+where scope.package_id is null
+  and scope.edition is not null;
+
+update cv_report_template_scope scope
+join sys_tenant_package pkg on lower(pkg.package_name) = lower(scope.edition) and pkg.del_flag = '0'
+set scope.package_id = pkg.package_id,
+    scope.package_name = pkg.package_name
+where scope.package_id is null;
+
+update cv_report_template_scope scope
+join sys_tenant_package pkg on pkg.package_name = case lower(scope.edition)
+    when 'standard' then '标准版'
+    when 'professional' then '专业版'
+    when 'pro' then '专业版'
+    when 'enterprise' then '集团版'
+    when 'group' then '集团版'
+    else null
+end and pkg.del_flag = '0'
+set scope.package_id = pkg.package_id,
+    scope.package_name = pkg.package_name,
+    scope.edition = pkg.package_name
+where scope.package_id is null
+  and scope.edition is not null;
+
+update cv_renewal_order renewal
+join sys_tenant_package pkg on lower(pkg.package_name) = lower(renewal.requested_edition) and pkg.del_flag = '0'
+set renewal.requested_package_id = pkg.package_id,
+    renewal.requested_package_name = pkg.package_name
+where renewal.requested_package_id is null;
+
+update cv_renewal_order renewal
+join sys_tenant_package pkg on pkg.package_name = case lower(renewal.requested_edition)
+    when 'standard' then '标准版'
+    when 'professional' then '专业版'
+    when 'pro' then '专业版'
+    when 'enterprise' then '集团版'
+    when 'group' then '集团版'
+    else null
+end and pkg.del_flag = '0'
+set renewal.requested_package_id = pkg.package_id,
+    renewal.requested_package_name = pkg.package_name,
+    renewal.requested_edition = pkg.package_name
+where renewal.requested_package_id is null
+  and renewal.requested_edition is not null;

@@ -21,6 +21,8 @@ public class CvOpenRenewalOrderRequest implements Serializable {
     @NotBlank(message = "installId cannot be blank")
     private String installId;
 
+    private Long packageId;
+
     private String edition;
 
     private String renewalPeriod;

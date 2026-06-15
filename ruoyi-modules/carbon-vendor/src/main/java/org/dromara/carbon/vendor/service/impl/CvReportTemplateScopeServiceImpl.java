@@ -20,9 +20,12 @@ import org.dromara.common.core.utils.MapstructUtils;
 import org.dromara.common.core.utils.StringUtils;
 import org.dromara.common.mybatis.core.page.PageQuery;
 import org.dromara.common.mybatis.core.page.TableDataInfo;
+import org.dromara.system.domain.SysTenantPackage;
+import org.dromara.system.mapper.SysTenantPackageMapper;
 import org.springframework.stereotype.Service;
 
 import java.util.Arrays;
+import java.util.Locale;
 import java.util.Map;
 
 /**
@@ -36,6 +39,7 @@ public class CvReportTemplateScopeServiceImpl implements ICvReportTemplateScopeS
     private final CvReportTemplateMapper reportTemplateMapper;
     private final CvCustomerMapper customerMapper;
     private final CvLicenseIssueMapper licenseIssueMapper;
+    private final SysTenantPackageMapper tenantPackageMapper;
 
     @Override
     public TableDataInfo<CvReportTemplateScopeVo> selectPageReportTemplateScopeList(CvReportTemplateScopeBo bo, PageQuery pageQuery) {
@@ -53,7 +57,9 @@ public class CvReportTemplateScopeServiceImpl implements ICvReportTemplateScopeS
     public int insertReportTemplateScope(CvReportTemplateScopeBo bo) {
         validateScope(bo);
         CvReportTemplateScope reportTemplateScope = toEntity(bo);
+        applyPackageSnapshot(reportTemplateScope);
         reportTemplateScope.setLicenseId(normalizeLicenseId(reportTemplateScope.getLicenseId()));
+        reportTemplateScope.setEdition(normalizeEdition(reportTemplateScope.getEdition()));
         reportTemplateScope.setScopeStatus(normalizeScopeStatus(reportTemplateScope.getScopeStatus()));
         return baseMapper.insert(reportTemplateScope);
     }
@@ -62,7 +68,9 @@ public class CvReportTemplateScopeServiceImpl implements ICvReportTemplateScopeS
     public int updateReportTemplateScope(CvReportTemplateScopeBo bo) {
         validateScope(bo);
         CvReportTemplateScope reportTemplateScope = toEntity(bo);
+        applyPackageSnapshot(reportTemplateScope);
         reportTemplateScope.setLicenseId(normalizeLicenseId(reportTemplateScope.getLicenseId()));
+        reportTemplateScope.setEdition(normalizeEdition(reportTemplateScope.getEdition()));
         reportTemplateScope.setScopeStatus(normalizeScopeStatus(reportTemplateScope.getScopeStatus()));
         return baseMapper.updateById(reportTemplateScope);
     }
@@ -78,6 +86,9 @@ public class CvReportTemplateScopeServiceImpl implements ICvReportTemplateScopeS
         lqw.eq(bo.getId() != null, CvReportTemplateScope::getId, bo.getId());
         lqw.eq(bo.getTemplateId() != null, CvReportTemplateScope::getTemplateId, bo.getTemplateId());
         lqw.eq(bo.getCustomerId() != null, CvReportTemplateScope::getCustomerId, bo.getCustomerId());
+        lqw.eq(bo.getPackageId() != null, CvReportTemplateScope::getPackageId, bo.getPackageId());
+        lqw.like(StringUtils.isNotBlank(bo.getPackageName()), CvReportTemplateScope::getPackageName, bo.getPackageName());
+        lqw.eq(StringUtils.isNotBlank(bo.getEdition()), CvReportTemplateScope::getEdition, normalizeEdition(bo.getEdition()));
         lqw.like(StringUtils.isNotBlank(bo.getLicenseId()), CvReportTemplateScope::getLicenseId, bo.getLicenseId());
         lqw.eq(StringUtils.isNotBlank(bo.getScopeStatus()), CvReportTemplateScope::getScopeStatus, bo.getScopeStatus());
         lqw.between(params.get("beginTime") != null && params.get("endTime") != null,
@@ -98,12 +109,13 @@ public class CvReportTemplateScopeServiceImpl implements ICvReportTemplateScopeS
         if (CvReportTemplateLifecycleState.fromTemplate(template) != CvReportTemplateLifecycleState.PUBLISHED) {
             throw new ServiceException("Only published report templates can be distributed");
         }
-        if (StringUtils.isBlank(bo.getLicenseId()) && bo.getCustomerId() == null) {
-            throw new ServiceException("Distribution must reference customer or license entitlement metadata");
+        if (StringUtils.isBlank(bo.getLicenseId()) && StringUtils.isBlank(bo.getEdition()) && bo.getPackageId() == null && bo.getCustomerId() == null) {
+            throw new ServiceException("Distribution must reference customer, package, edition, or license entitlement metadata");
         }
         if (bo.getCustomerId() != null && customerMapper.selectById(bo.getCustomerId()) == null) {
             throw new ServiceException("Referenced vendor customer does not exist");
         }
+        requireActivePackage(bo.getPackageId());
         String licenseId = normalizeLicenseId(bo.getLicenseId());
         if (licenseId != null && licenseIssueMapper.selectOne(Wrappers.<CvLicenseIssue>lambdaQuery()
             .eq(CvLicenseIssue::getLicenseId, licenseId), false) == null) {
@@ -111,8 +123,36 @@ public class CvReportTemplateScopeServiceImpl implements ICvReportTemplateScopeS
         }
     }
 
+    private SysTenantPackage requireActivePackage(Long packageId) {
+        if (packageId == null) {
+            return null;
+        }
+        SysTenantPackage tenantPackage = tenantPackageMapper.selectById(packageId);
+        if (tenantPackage == null || "1".equals(tenantPackage.getDelFlag())) {
+            throw new ServiceException("Referenced package does not exist");
+        }
+        if (!"0".equals(tenantPackage.getStatus())) {
+            throw new ServiceException("Referenced package is disabled");
+        }
+        return tenantPackage;
+    }
+
+    private void applyPackageSnapshot(CvReportTemplateScope scope) {
+        SysTenantPackage tenantPackage = requireActivePackage(scope.getPackageId());
+        if (tenantPackage != null) {
+            scope.setPackageName(tenantPackage.getPackageName());
+            scope.setEdition(null);
+        } else {
+            scope.setPackageName(null);
+        }
+    }
+
     private String normalizeLicenseId(String licenseId) {
         return StringUtils.isBlank(licenseId) ? null : licenseId.trim();
+    }
+
+    private String normalizeEdition(String edition) {
+        return StringUtils.isBlank(edition) ? null : edition.trim().toLowerCase(Locale.ROOT);
     }
 
     private String normalizeScopeStatus(String scopeStatus) {

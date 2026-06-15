@@ -50,4 +50,12 @@ public interface ICvFactorVersionService {
      * @param operatedBy operator identifier for audit metadata
      */
     void retireFactorVersion(Long id, String operatedBy);
+
+    /**
+     * Restore a retired factor version back to draft.
+     *
+     * @param id primary key
+     * @param operatedBy operator identifier for audit metadata
+     */
+    void restoreFactorVersion(Long id, String operatedBy);
 }

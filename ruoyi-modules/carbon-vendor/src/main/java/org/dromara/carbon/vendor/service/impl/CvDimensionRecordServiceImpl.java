@@ -91,16 +91,12 @@ public class CvDimensionRecordServiceImpl implements ICvDimensionRecordService {
             .like(StringUtils.isNotBlank(bo.getRecordCode()), CvDimensionRecord::getRecordCode, bo.getRecordCode())
             .like(StringUtils.isNotBlank(bo.getRecordName()), CvDimensionRecord::getRecordName, bo.getRecordName())
             .eq(StringUtils.isNotBlank(bo.getParentCode()), CvDimensionRecord::getParentCode, bo.getParentCode())
-            .eq(StringUtils.isNotBlank(bo.getSourceType()), CvDimensionRecord::getSourceType, bo.getSourceType())
             .eq(StringUtils.isNotBlank(bo.getStatus()), CvDimensionRecord::getStatus, bo.getStatus())
             .orderByAsc(CvDimensionRecord::getSortOrder)
             .orderByAsc(CvDimensionRecord::getId);
     }
 
     private void normalizeDefaults(CvDimensionRecordBo bo) {
-        if (StringUtils.isBlank(bo.getSourceType())) {
-            bo.setSourceType("vendor");
-        }
         if (StringUtils.isBlank(bo.getStatus())) {
             bo.setStatus("0");
         }

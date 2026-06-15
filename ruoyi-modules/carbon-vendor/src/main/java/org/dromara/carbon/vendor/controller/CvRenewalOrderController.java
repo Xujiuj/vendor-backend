@@ -74,10 +74,21 @@ public class CvRenewalOrderController extends BaseController {
     /**
      * Apply vendor payment/authorization callback metadata.
      */
-    @SaCheckPermission("vendor:renewalOrder:edit")
+    @SaCheckPermission("vendor:renewalOrder:callback")
     @PostMapping("/callback")
     public R<Void> callback(@RequestBody CvRenewalCallbackRequest callbackRequest) {
         return toAjax(renewalOrderService.applyRenewalCallback(callbackRequest));
+    }
+
+    /**
+     * Retry renewal license issue status after a failed issue.
+     *
+     * @param id primary key
+     */
+    @SaCheckPermission("vendor:renewalOrder:retryIssue")
+    @PostMapping("/{id}/retry-issue")
+    public R<Void> retryIssue(@PathVariable Long id) {
+        return toAjax(renewalOrderService.retryRenewalIssue(id));
     }
 
     /**

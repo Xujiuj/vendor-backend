@@ -12,6 +12,7 @@ import org.dromara.carbon.vendor.mapper.CvReportTemplateScopeMapper;
 import org.dromara.carbon.vendor.service.impl.CvReportTemplateScopeServiceImpl;
 import org.dromara.common.core.exception.ServiceException;
 import org.dromara.common.core.validate.AddGroup;
+import org.dromara.system.mapper.SysTenantPackageMapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
@@ -39,6 +40,7 @@ class CvReportTemplateScopeValidationTest {
     private CvReportTemplateMapper templateMapper;
     private CvCustomerMapper customerMapper;
     private CvLicenseIssueMapper licenseIssueMapper;
+    private SysTenantPackageMapper tenantPackageMapper;
     private CvReportTemplateScopeServiceImpl service;
 
     @BeforeEach
@@ -47,9 +49,10 @@ class CvReportTemplateScopeValidationTest {
         templateMapper = mock(CvReportTemplateMapper.class);
         customerMapper = mock(CvCustomerMapper.class);
         licenseIssueMapper = mock(CvLicenseIssueMapper.class);
+        tenantPackageMapper = mock(SysTenantPackageMapper.class);
         when(customerMapper.selectById(1001L)).thenReturn(activeCustomer());
         when(licenseIssueMapper.selectOne(any(), any(Boolean.class))).thenReturn(issuedLicense());
-        service = new CvReportTemplateScopeServiceImpl(scopeMapper, templateMapper, customerMapper, licenseIssueMapper) {
+        service = new CvReportTemplateScopeServiceImpl(scopeMapper, templateMapper, customerMapper, licenseIssueMapper, tenantPackageMapper) {
             @Override
             protected CvReportTemplateScope toEntity(CvReportTemplateScopeBo bo) {
                 CvReportTemplateScope scope = new CvReportTemplateScope();
@@ -57,6 +60,7 @@ class CvReportTemplateScopeValidationTest {
                 scope.setTemplateId(bo.getTemplateId());
                 scope.setCustomerId(bo.getCustomerId());
                 scope.setLicenseId(bo.getLicenseId());
+                scope.setEdition(bo.getEdition());
                 scope.setScopeStatus(bo.getScopeStatus());
                 return scope;
             }
@@ -75,6 +79,7 @@ class CvReportTemplateScopeValidationTest {
         assertEquals(301L, inserted.getTemplateId());
         assertEquals(1001L, inserted.getCustomerId());
         assertEquals("LIC-001", inserted.getLicenseId());
+        assertEquals("professional", inserted.getEdition());
         assertEquals("enabled", inserted.getScopeStatus());
     }
 
@@ -94,6 +99,7 @@ class CvReportTemplateScopeValidationTest {
         CvReportTemplateScopeBo bo = validScopeBo();
         bo.setId(55L);
         bo.setLicenseId("   ");
+        bo.setEdition(" GROUP ");
         bo.setScopeStatus(" ENABLED ");
 
         service.updateReportTemplateScope(bo);
@@ -102,6 +108,7 @@ class CvReportTemplateScopeValidationTest {
         verify(scopeMapper).updateById(updateCaptor.capture());
         CvReportTemplateScope updated = updateCaptor.getValue();
         assertNull(updated.getLicenseId());
+        assertEquals("group", updated.getEdition());
         assertEquals("enabled", updated.getScopeStatus());
     }
 
@@ -125,16 +132,38 @@ class CvReportTemplateScopeValidationTest {
     }
 
     @Test
-    void rejectsDistributionWithoutCustomerOrLicenseMetadata() {
+    void allowsEditionOnlyDistributionContractAndPersistsEditionReference() {
         when(templateMapper.selectById(301L)).thenReturn(publishedTemplate());
         CvReportTemplateScopeBo bo = validScopeBo();
         bo.setCustomerId(null);
         bo.setLicenseId(" ");
 
+        Validator validator = Validation.buildDefaultValidatorFactory().getValidator();
+        Set<ConstraintViolation<CvReportTemplateScopeBo>> violations = validator.validate(bo, AddGroup.class);
+        assertTrue(violations.isEmpty());
+
+        service.insertReportTemplateScope(bo);
+
+        ArgumentCaptor<CvReportTemplateScope> insertCaptor = ArgumentCaptor.forClass(CvReportTemplateScope.class);
+        verify(scopeMapper).insert(insertCaptor.capture());
+        CvReportTemplateScope inserted = insertCaptor.getValue();
+        assertNull(inserted.getCustomerId());
+        assertNull(inserted.getLicenseId());
+        assertEquals("professional", inserted.getEdition());
+    }
+
+    @Test
+    void rejectsDistributionWithoutCustomerEditionOrLicenseMetadata() {
+        when(templateMapper.selectById(301L)).thenReturn(publishedTemplate());
+        CvReportTemplateScopeBo bo = validScopeBo();
+        bo.setCustomerId(null);
+        bo.setEdition(" ");
+        bo.setLicenseId(" ");
+
         ServiceException exception = assertThrows(ServiceException.class,
             () -> service.insertReportTemplateScope(bo));
 
-        assertEquals("Distribution must reference customer or license entitlement metadata", exception.getMessage());
+        assertEquals("Distribution must reference customer, package, edition, or license entitlement metadata", exception.getMessage());
     }
 
     @Test
@@ -176,6 +205,7 @@ class CvReportTemplateScopeValidationTest {
         bo.setTemplateId(301L);
         bo.setCustomerId(1001L);
         bo.setLicenseId(" LIC-001 ");
+        bo.setEdition(" Professional ");
         bo.setScopeStatus(null);
         return bo;
     }

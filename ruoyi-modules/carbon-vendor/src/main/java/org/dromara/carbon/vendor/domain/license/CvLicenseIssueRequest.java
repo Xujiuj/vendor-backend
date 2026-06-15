@@ -23,6 +23,10 @@ public class CvLicenseIssueRequest {
 
     private String algorithm;
 
+    private Long packageId;
+
+    private String packageName;
+
     private String edition;
 
     private List<String> features;

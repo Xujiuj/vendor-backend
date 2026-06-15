@@ -86,7 +86,6 @@ public class CvOpenDimensionServiceImpl implements ICvOpenDimensionService {
         vo.setRecordCode(record.getRecordCode());
         vo.setRecordName(record.getRecordName());
         vo.setParentCode(record.getParentCode());
-        vo.setSourceType("vendor");
         vo.setField01(record.getField01());
         vo.setField02(record.getField02());
         vo.setField03(record.getField03());

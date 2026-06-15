@@ -34,6 +34,16 @@ public class CvLicenseIssueVo implements Serializable {
     private Long customerId;
 
     /**
+     * Purchased package identifier.
+     */
+    private Long packageId;
+
+    /**
+     * Purchased package name.
+     */
+    private String packageName;
+
+    /**
      * Key identifier.
      */
     private String keyId;

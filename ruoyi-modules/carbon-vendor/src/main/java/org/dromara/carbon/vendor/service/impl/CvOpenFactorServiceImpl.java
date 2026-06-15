@@ -111,6 +111,7 @@ public class CvOpenFactorServiceImpl implements ICvOpenFactorService {
                 && factorCustomerScopeService.isFactorVersionAuthorized(
                     version.getId(),
                     entitlement.getCustomerId(),
+                    entitlement.getPackageId(),
                     entitlement.getEdition(),
                     entitlement.getLicenseId()))
             .findFirst()
