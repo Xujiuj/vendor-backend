@@ -2,7 +2,7 @@
 -- Frontend routers must not handwrite these business menu entries.
 -- This script replaces the vendor portal menu id range, removes enterprise
 -- portal business menus if they were accidentally seeded into the vendor DB,
--- and keeps RuoYi native system management, logs, and code-generation menus intact.
+-- and keeps only the final vendor operation surface visible.
 
 delete from sys_role_menu where menu_id between 900100 and 900199;
 delete from sys_menu where menu_id between 900100 and 900199;
@@ -110,7 +110,7 @@ values
 (910144, '续费订单重试签发', 910107, 5, '', '', '', 1, 0, 'F', '0', '0', 'vendor:renewalOrder:retryIssue', '#', 103, 1, sysdate(), null, null, '续费订单重试签发权限'),
 (910120, '续费订单删除', 910107, 6, '', '', '', 1, 0, 'F', '0', '0', 'vendor:renewalOrder:remove', '#', 103, 1, sysdate(), null, null, '续费订单删除权限');
 
--- Keep RuoYi native system management, logs, and generator routes available.
+-- Keep selected RuoYi native system management and log routes available.
 -- Some vendor databases are initialized without the native RuoYi menu seed.
 -- Insert the basic operation surface first, then normalize existing rows below.
 insert ignore into sys_menu
@@ -119,17 +119,17 @@ values
 (1, '系统管理', 0, 3, 'system', null, '', 1, 0, 'M', '0', '0', '', 'system', 103, 1, sysdate(), null, null, '厂商端系统管理目录'),
 (100, '用户管理', 1, 1, 'user', 'system/user/index', '', 1, 0, 'C', '0', '0', 'system:user:list', 'user', 103, 1, sysdate(), null, null, '厂商端用户管理菜单'),
 (101, '角色管理', 1, 2, 'role', 'system/role/index', '', 1, 0, 'C', '0', '0', 'system:role:list', 'peoples', 103, 1, sysdate(), null, null, '厂商端角色管理菜单'),
-(102, '菜单管理', 1, 3, 'menu', 'system/menu/index', '', 1, 0, 'C', '0', '0', 'system:menu:list', 'tree-table', 103, 1, sysdate(), null, null, '厂商端菜单管理菜单'),
+(102, '菜单管理', 1, 3, 'menu', 'system/menu/index', '', 1, 0, 'C', '1', '0', 'system:menu:list', 'tree-table', 103, 1, sysdate(), null, null, '厂商端菜单管理菜单'),
 (103, '部门管理', 1, 4, 'dept', 'system/dept/index', '', 1, 0, 'C', '0', '0', 'system:dept:list', 'tree', 103, 1, sysdate(), null, null, '厂商端部门管理菜单'),
 (104, '岗位管理', 1, 5, 'post', 'system/post/index', '', 1, 0, 'C', '0', '0', 'system:post:list', 'post', 103, 1, sysdate(), null, null, '厂商端岗位管理菜单'),
-(105, '字典管理', 1, 6, 'dict', 'system/dict/index', '', 1, 0, 'C', '0', '0', 'system:dict:list', 'dict', 103, 1, sysdate(), null, null, '厂商端字典管理菜单'),
-(106, '参数设置', 1, 7, 'config', 'system/config/index', '', 1, 0, 'C', '0', '0', 'system:config:list', 'edit', 103, 1, sysdate(), null, null, '厂商端参数设置菜单'),
+(105, '字典管理', 1, 6, 'dict', 'system/dict/index', '', 1, 0, 'C', '1', '0', 'system:dict:list', 'dict', 103, 1, sysdate(), null, null, '厂商端字典管理菜单'),
+(106, '参数设置', 1, 7, 'config', 'system/config/index', '', 1, 0, 'C', '1', '0', 'system:config:list', 'edit', 103, 1, sysdate(), null, null, '厂商端参数设置菜单'),
 (122, '套餐管理', 1, 8, 'tenantPackage', 'system/tenantPackage/index', '', 1, 0, 'C', '0', '0', 'system:tenantPackage:list', 'form', 103, 1, sysdate(), null, null, '厂商端系统套餐管理，用于配置角色可用菜单范围'),
 (107, '公告配置', 1, 9, 'notice', 'system/notice/index', '', 1, 0, 'C', '0', '0', 'system:notice:list', 'message', 103, 1, sysdate(), null, null, '厂商端公告配置菜单'),
 (108, '日志管理', 0, 4, 'monitor', 'Layout', '', 1, 0, 'M', '0', '0', '', 'log', 103, 1, sysdate(), null, null, '厂商端日志管理目录'),
 (500, '操作日志', 108, 1, 'operlog', 'monitor/operlog/index', '', 1, 0, 'C', '0', '0', 'monitor:operlog:list', 'form', 103, 1, sysdate(), null, null, '厂商端操作日志菜单'),
 (501, '登录日志', 108, 2, 'logininfor', 'monitor/logininfor/index', '', 1, 0, 'C', '0', '0', 'monitor:logininfor:list', 'logininfor', 103, 1, sysdate(), null, null, '厂商端登录日志菜单'),
-(115, '代码生成', 0, 5, 'gen', 'tool/gen/index', '', 1, 0, 'C', '0', '0', 'tool:gen:list', 'code', 103, 1, sysdate(), null, null, '厂商端代码生成菜单'),
+(115, '代码生成', 0, 5, 'gen', 'tool/gen/index', '', 1, 0, 'C', '1', '0', 'tool:gen:list', 'code', 103, 1, sysdate(), null, null, '厂商端代码生成菜单'),
 (130, '分配用户', 101, 1, '', '', '', 1, 0, 'F', '0', '0', 'system:role:add', '#', 103, 1, sysdate(), null, null, '角色分配用户权限'),
 (131, '分配角色', 100, 1, '', '', '', 1, 0, 'F', '0', '0', 'system:user:edit', '#', 103, 1, sysdate(), null, null, '用户分配角色权限'),
 (132, '字典数据', 105, 1, 'data', 'system/dict/data', '', 1, 0, 'C', '0', '0', 'system:dict:list', '#', 103, 1, sysdate(), null, null, '字典数据菜单'),
@@ -193,11 +193,11 @@ values
 update sys_menu set menu_name = '系统管理', path = 'system', component = null, visible = '0', status = '0', remark = '厂商端系统管理目录' where menu_id = 1;
 update sys_menu set menu_name = '用户管理', parent_id = 1, order_num = 1, path = 'user', component = 'system/user/index', perms = 'system:user:list', icon = 'user', visible = '0', status = '0', remark = '厂商端用户管理菜单' where menu_id = 100;
 update sys_menu set menu_name = '角色管理', parent_id = 1, order_num = 2, path = 'role', component = 'system/role/index', perms = 'system:role:list', icon = 'peoples', visible = '0', status = '0', remark = '厂商端角色管理菜单' where menu_id = 101;
-update sys_menu set menu_name = '菜单管理', parent_id = 1, order_num = 3, path = 'menu', component = 'system/menu/index', perms = 'system:menu:list', icon = 'tree-table', visible = '0', status = '0', remark = '厂商端菜单管理菜单' where menu_id = 102;
+update sys_menu set menu_name = '菜单管理', parent_id = 1, order_num = 3, path = 'menu', component = 'system/menu/index', perms = 'system:menu:list', icon = 'tree-table', visible = '1', status = '0', remark = '厂商端菜单管理菜单' where menu_id = 102;
 update sys_menu set menu_name = '部门管理', parent_id = 1, order_num = 4, path = 'dept', component = 'system/dept/index', perms = 'system:dept:list', icon = 'tree', visible = '0', status = '0', remark = '厂商端部门管理菜单' where menu_id = 103;
 update sys_menu set menu_name = '岗位管理', parent_id = 1, order_num = 5, path = 'post', component = 'system/post/index', perms = 'system:post:list', icon = 'post', visible = '0', status = '0', remark = '厂商端岗位管理菜单' where menu_id = 104;
-update sys_menu set menu_name = '字典管理', parent_id = 1, order_num = 6, path = 'dict', component = 'system/dict/index', perms = 'system:dict:list', icon = 'dict', visible = '0', status = '0', remark = '厂商端字典管理菜单' where menu_id = 105;
-update sys_menu set menu_name = '参数设置', parent_id = 1, order_num = 7, path = 'config', component = 'system/config/index', perms = 'system:config:list', icon = 'edit', visible = '0', status = '0', remark = '厂商端参数设置菜单' where menu_id = 106;
+update sys_menu set menu_name = '字典管理', parent_id = 1, order_num = 6, path = 'dict', component = 'system/dict/index', perms = 'system:dict:list', icon = 'dict', visible = '1', status = '0', remark = '厂商端字典管理菜单' where menu_id = 105;
+update sys_menu set menu_name = '参数设置', parent_id = 1, order_num = 7, path = 'config', component = 'system/config/index', perms = 'system:config:list', icon = 'edit', visible = '1', status = '0', remark = '厂商端参数设置菜单' where menu_id = 106;
 update sys_menu set menu_name = '公告配置', parent_id = 1, order_num = 9, path = 'notice', component = 'system/notice/index', perms = 'system:notice:list', icon = 'message', visible = '0', status = '0', remark = '厂商端公告配置菜单' where menu_id = 107;
 update sys_menu set menu_name = '套餐管理', parent_id = 1, order_num = 8, path = 'tenantPackage', component = 'system/tenantPackage/index', perms = 'system:tenantPackage:list', icon = 'form', visible = '0', status = '0', remark = '厂商端系统套餐管理，用于配置角色可用菜单范围' where menu_id = 122;
 update sys_menu set menu_name = '套餐查询', parent_id = 122, order_num = 1, perms = 'system:tenantPackage:query', visible = '0', status = '0' where menu_id = 1611;
@@ -208,7 +208,30 @@ update sys_menu set menu_name = '套餐导出', parent_id = 122, order_num = 5, 
 update sys_menu set menu_name = '日志管理', parent_id = 0, order_num = 4, path = 'monitor', component = 'Layout', perms = '', icon = 'log', visible = '0', status = '0', remark = '厂商端日志管理目录' where menu_id = 108;
 update sys_menu set menu_name = '操作日志', parent_id = 108, order_num = 1, path = 'operlog', component = 'monitor/operlog/index', perms = 'monitor:operlog:list', icon = 'form', visible = '0', status = '0', remark = '厂商端操作日志菜单' where menu_id = 500;
 update sys_menu set menu_name = '登录日志', parent_id = 108, order_num = 2, path = 'logininfor', component = 'monitor/logininfor/index', perms = 'monitor:logininfor:list', icon = 'logininfor', visible = '0', status = '0', remark = '厂商端登录日志菜单' where menu_id = 501;
-update sys_menu set menu_name = '代码生成', parent_id = 0, order_num = 5, path = 'gen', component = 'tool/gen/index', perms = 'tool:gen:list', icon = 'code', visible = '0', status = '0', remark = '厂商端代码生成菜单' where menu_id = 115;
+update sys_menu set menu_name = '代码生成', parent_id = 0, order_num = 5, path = 'gen', component = 'tool/gen/index', perms = 'tool:gen:list', icon = 'code', visible = '1', status = '0', remark = '厂商端代码生成菜单' where menu_id = 115;
+
+-- Production portal menu policy:
+-- RuoYi uses visible='0' for shown routes and visible='1' for hidden routes.
+update sys_menu
+set visible = '1',
+    update_time = sysdate()
+where menu_id in (
+  102, 105, 106, 115, 116, 132,
+  1013, 1014, 1015, 1016,
+  1026, 1027, 1028, 1029, 1030,
+  1031, 1032, 1033, 1034, 1035,
+  1055, 1056, 1057, 1058, 1059, 1060
+);
+
+delete from sys_role_menu
+where menu_id in (
+  102, 105, 106, 115, 116, 132,
+  1013, 1014, 1015, 1016,
+  1026, 1027, 1028, 1029, 1030,
+  1031, 1032, 1033, 1034, 1035,
+  1055, 1056, 1057, 1058, 1059, 1060
+)
+and role_id <> 1;
 
 -- Vendor business logic no longer exposes RuoYi tenant/customer management as a
 -- customer-facing module. Keep the inherited records for framework
@@ -219,8 +242,7 @@ update sys_menu set visible = '1' where menu_id in (6, 121);
 
 -- Non-super-admin users only receive menus through sys_role_menu.
 -- Seed every enabled vendor role with the vendor-owned business menus and the
--- administrative operation surface needed to manage users, menus, roles,
--- packages, logs, and generated code in the vendor portal.
+-- administrative operation surface needed in the vendor portal.
 insert ignore into sys_role_menu (role_id, menu_id)
 select r.role_id, m.menu_id
 from sys_role r
@@ -229,17 +251,13 @@ where r.status = '0'
   and (
     m.menu_id between 910100 and 910199
     or m.menu_id in (
-      1, 100, 101, 102, 103, 104, 105, 106, 107, 108, 115, 122, 130, 131, 132, 500, 501,
+      1, 100, 101, 103, 104, 107, 108, 122, 130, 131, 500, 501,
       1001, 1002, 1003, 1004, 1005, 1006, 1007,
       1008, 1009, 1010, 1011, 1012,
-      1013, 1014, 1015, 1016,
       1017, 1018, 1019, 1020,
       1021, 1022, 1023, 1024, 1025,
-      1026, 1027, 1028, 1029, 1030,
-      1031, 1032, 1033, 1034, 1035,
       1036, 1037, 1038, 1039,
       1040, 1041, 1042, 1043, 1044, 1045,
-      1055, 1056, 1057, 1058, 1059, 1060,
       1611, 1612, 1613, 1614, 1615
     )
   );

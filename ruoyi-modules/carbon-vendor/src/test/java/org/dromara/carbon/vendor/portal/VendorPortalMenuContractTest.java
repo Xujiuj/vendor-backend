@@ -185,9 +185,26 @@ class VendorPortalMenuContractTest {
             "where menu_id = 108",
             "menu_name = '代码生成', parent_id = 0, order_num = 5, path = 'gen', component = 'tool/gen/index'",
             "where menu_id = 115",
+            "(102,",
+            "'menu', 'system/menu/index', '', 1, 0, 'C', '1', '0'",
+            "'dict', 'system/dict/index', '', 1, 0, 'C', '1', '0'",
+            "'config', 'system/config/index', '', 1, 0, 'C', '1', '0'",
+            "'gen', 'tool/gen/index', '', 1, 0, 'C', '1', '0'",
+            "path = 'menu', component = 'system/menu/index', perms = 'system:menu:list', icon = 'tree-table', visible = '1'",
+            "path = 'dict', component = 'system/dict/index', perms = 'system:dict:list', icon = 'dict', visible = '1'",
+            "path = 'config', component = 'system/config/index', perms = 'system:config:list', icon = 'edit', visible = '1'",
+            "path = 'gen', component = 'tool/gen/index', perms = 'tool:gen:list', icon = 'code', visible = '1'",
             "update sys_menu set visible = '1' where menu_id in (6, 121);"
         ));
         assertContainsNone(sql, List.of(
+            "'menu', 'system/menu/index', '', 1, 0, 'C', '0', '0'",
+            "'dict', 'system/dict/index', '', 1, 0, 'C', '0', '0'",
+            "'config', 'system/config/index', '', 1, 0, 'C', '0', '0'",
+            "'gen', 'tool/gen/index', '', 1, 0, 'C', '0', '0'",
+            "path = 'menu', component = 'system/menu/index', perms = 'system:menu:list', icon = 'tree-table', visible = '0'",
+            "path = 'dict', component = 'system/dict/index', perms = 'system:dict:list', icon = 'dict', visible = '0'",
+            "path = 'config', component = 'system/config/index', perms = 'system:config:list', icon = 'edit', visible = '0'",
+            "path = 'gen', component = 'tool/gen/index', perms = 'tool:gen:list', icon = 'code', visible = '0'",
             "update sys_menu set visible = '1' where menu_id in (6, 121, 122)"
         ));
     }
@@ -207,26 +224,34 @@ class VendorPortalMenuContractTest {
     @Test
     void vendorMenuSqlSeedsEveryEnabledVendorRole() throws Exception {
         String sql = Files.readString(resolveProjectFile(MENU_SQL_RELATIVE_PATH));
+        int enabledRoleSeedStart = sql.indexOf("where r.status = '0'");
+        int enabledRoleSeedEnd = sql.indexOf("-- Keep the built-in superadmin role");
+        assertTrue(enabledRoleSeedStart >= 0, "Expected enabled-role menu seed block");
+        assertTrue(enabledRoleSeedEnd > enabledRoleSeedStart, "Expected superadmin seed block after enabled-role seed block");
+        String enabledRoleSeedSql = sql.substring(enabledRoleSeedStart, enabledRoleSeedEnd);
 
         assertContainsAll(sql, List.of(
             "insert ignore into sys_role_menu (role_id, menu_id)",
-            "where r.status = '0'",
-            "m.menu_id between 910100 and 910199",
-            "1, 100, 101, 102, 103, 104, 105, 106, 107, 108, 115, 122, 130, 131, 132, 500, 501",
-            "1008, 1009, 1010, 1011, 1012",
-            "1013, 1014, 1015, 1016",
-            "1017, 1018, 1019, 1020",
-            "1021, 1022, 1023, 1024, 1025",
-            "1026, 1027, 1028, 1029, 1030",
-            "1031, 1032, 1033, 1034, 1035",
-            "1036, 1037, 1038, 1039",
-            "1040, 1041, 1042, 1043, 1044, 1045",
-            "1055, 1056, 1057, 1058, 1059, 1060",
-            "1611, 1612, 1613, 1614, 1615",
             "select 1, menu_id"
         ));
-        assertContainsNone(sql, List.of(
-            "r.role_key in ('test1', 'test2')"
+
+        assertContainsAll(enabledRoleSeedSql, List.of(
+            "where r.status = '0'",
+            "m.menu_id between 910100 and 910199",
+            "1, 100, 101, 103, 104, 107, 108, 122, 130, 131, 500, 501",
+            "1008, 1009, 1010, 1011, 1012",
+            "1017, 1018, 1019, 1020",
+            "1021, 1022, 1023, 1024, 1025",
+            "1036, 1037, 1038, 1039",
+            "1040, 1041, 1042, 1043, 1044, 1045",
+            "1611, 1612, 1613, 1614, 1615"
+        ));
+        assertContainsNone(enabledRoleSeedSql, List.of(
+            "r.role_key in ('test1', 'test2')",
+            "1, 100, 101, 102, 103",
+            "1013, 1014, 1015, 1016",
+            "1026, 1027, 1028, 1029, 1030",
+            "1031, 1032, 1033, 1034, 1035"
         ));
     }
 
