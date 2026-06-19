@@ -140,7 +140,7 @@ jobs:
           echo "$SUDO_PASSWORD" | sudo -S systemctl enable "$DEPLOY_SERVICE"
           echo "$SUDO_PASSWORD" | sudo -S systemctl restart "$DEPLOY_SERVICE"
           for attempt in $(seq 1 24); do
-            if curl -fsS --max-time 5 "http://127.0.0.1:$APP_PORT/system/config/getConfigKey/sys.index.skinName" >/dev/null; then
+            if curl -fsS --max-time 5 "http://127.0.0.1:$APP_PORT/auth/code" | grep -q '"code":200'; then
               echo "$DEPLOY_SERVICE is healthy on 127.0.0.1:$APP_PORT"
               exit 0
             fi
