@@ -43,6 +43,7 @@ jobs:
         run: mvn -B -Pprod clean package -DskipTests
 
       - name: Deploy over SSH
+        timeout-minutes: 18
         env:
           DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
           DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
@@ -62,8 +63,8 @@ jobs:
           fi
           REMOTE_JAR="$DEPLOY_PATH/$DEPLOY_SERVICE-${GITHUB_RUN_ID}.jar"
           REPORT_TEMPLATE_ROOT="$DEPLOY_PATH/data/vendor/report-templates"
-          sudo apt-get update
-          sudo apt-get install -y sshpass
+          timeout 120 sudo apt-get update
+          timeout 120 sudo apt-get install -y sshpass
           SSH_OPTS=(
             -p "$DEPLOY_PORT"
             -o StrictHostKeyChecking=accept-new
@@ -80,8 +81,8 @@ jobs:
           )
           cat > deploy-backend.sh <<'EOF'
           set -euo pipefail
-          echo "$SUDO_PASSWORD" | sudo -S apt-get update
-          echo "$SUDO_PASSWORD" | sudo -S apt-get install -y openjdk-17-jre-headless redis-server
+          echo "$SUDO_PASSWORD" | sudo -S timeout 180 apt-get update
+          echo "$SUDO_PASSWORD" | sudo -S timeout 180 apt-get install -y openjdk-17-jre-headless redis-server
           echo "$SUDO_PASSWORD" | sudo -S install -d -o "$USER" -g "$USER" "$DEPLOY_PATH/apps/$DEPLOY_SERVICE" "$DEPLOY_PATH/logs/$DEPLOY_SERVICE" "$REPORT_TEMPLATE_ROOT"
           mv "$REMOTE_JAR" "$DEPLOY_PATH/apps/$DEPLOY_SERVICE/app.jar"
           echo "$SUDO_PASSWORD" | sudo -S sed -i "s/^# *requirepass .*/requirepass ruoyi123/; s/^requirepass .*/requirepass ruoyi123/" /etc/redis/redis.conf
