@@ -19,6 +19,10 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class VendorPortalMenuContractTest {
 
     private static final String MENU_SQL_RELATIVE_PATH = "script/sql/portal/vendor_portal_menu.sql";
+    private static final String MENU_SYNC_SQL_RELATIVE_PATH =
+        "ruoyi-modules/ruoyi-system/src/main/resources/sql/vendor_portal_menu_sync.sql";
+    private static final String SYSTEM_RUNNER_RELATIVE_PATH =
+        "ruoyi-modules/ruoyi-system/src/main/java/org/dromara/system/runner/SystemApplicationRunner.java";
     private static final String MYSQL_SCHEMA_RELATIVE_PATH = "script/sql/mysql/carbon_vendor_schema_v1.sql";
     private static final String SQLSERVER_SCHEMA_RELATIVE_PATH = "script/sql/sqlserver/carbon_vendor_schema_v1.sql";
     private static final Pattern CREATE_TABLE_PATTERN = Pattern.compile(
@@ -123,6 +127,21 @@ class VendorPortalMenuContractTest {
             "license-state",
             "activity-data",
             "企业本地业务"
+        ));
+    }
+
+    @Test
+    void vendorStartupMenuSyncUsesTheSameSqlAsPortalScript() throws Exception {
+        String portalSql = Files.readString(resolveProjectFile(MENU_SQL_RELATIVE_PATH));
+        String startupSql = Files.readString(resolveProjectFile(MENU_SYNC_SQL_RELATIVE_PATH));
+        String runner = Files.readString(resolveProjectFile(SYSTEM_RUNNER_RELATIVE_PATH));
+
+        assertEquals(portalSql, startupSql,
+            "Startup menu sync SQL must match the manually executable vendor portal menu SQL");
+        assertContainsAll(runner, List.of(
+            "syncVendorPortalMenu()",
+            "sql/vendor_portal_menu_sync.sql",
+            "setSqlScriptEncoding(\"UTF-8\")"
         ));
     }
 
