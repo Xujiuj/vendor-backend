@@ -13,7 +13,8 @@ public enum CvReportTemplateLifecycleState {
 
     DRAFT("draft"),
     PUBLISHED("published"),
-    DISABLED("disabled");
+    DISABLED("disabled"),
+    DELETED("deleted");
 
     private final String status;
 
@@ -35,6 +36,9 @@ public enum CvReportTemplateLifecycleState {
         }
         if (DRAFT.status.equals(normalizedStatus)) {
             return DRAFT;
+        }
+        if (DELETED.status.equals(normalizedStatus)) {
+            return DELETED;
         }
         throw new ServiceException("Unsupported report template lifecycle status: " + template.getPublishStatus());
     }

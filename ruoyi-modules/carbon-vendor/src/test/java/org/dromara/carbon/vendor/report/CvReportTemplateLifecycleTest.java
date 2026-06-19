@@ -11,12 +11,15 @@ import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 
 import java.util.Date;
+import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -117,6 +120,34 @@ class CvReportTemplateLifecycleTest {
         assertEquals("published", updated.getPublishStatus());
         assertEquals("release-user", updated.getPublishedBy());
         assertNotNull(updated.getPublishedTime());
+    }
+
+    @Test
+    void removeSoftDeletesTemplatesUsingLifecycleStatus() {
+        when(reportTemplateMapper.selectList(any())).thenReturn(List.of(publishedTemplate()));
+        when(reportTemplateMapper.updateBatchById(any())).thenReturn(true);
+
+        int removed = service.deleteReportTemplateByIds(new Long[] {301L});
+
+        assertEquals(1, removed);
+        ArgumentCaptor<List<CvReportTemplate>> updateCaptor = ArgumentCaptor.forClass(List.class);
+        verify(reportTemplateMapper).updateBatchById(updateCaptor.capture());
+        CvReportTemplate deleted = updateCaptor.getValue().get(0);
+        assertEquals("deleted", deleted.getPublishStatus());
+        assertTrue(deleted.getRemark().contains("report-template-delete"));
+        verify(reportTemplateMapper, never()).deleteByIds(any());
+    }
+
+    @Test
+    void rejectsLifecycleOperationsForSoftDeletedTemplate() {
+        CvReportTemplate template = publishedTemplate();
+        template.setPublishStatus("deleted");
+        when(reportTemplateMapper.selectById(301L)).thenReturn(template);
+
+        ServiceException exception = assertThrows(ServiceException.class,
+            () -> service.publishReportTemplate(301L, "vendor-admin"));
+
+        assertEquals("Report template does not exist", exception.getMessage());
     }
 
     private CvReportTemplate draftTemplate() {

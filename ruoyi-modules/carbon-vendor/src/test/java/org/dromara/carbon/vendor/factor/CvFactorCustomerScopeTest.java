@@ -32,6 +32,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -56,6 +57,7 @@ class CvFactorCustomerScopeTest {
         when(customerMapper.selectById(1001L)).thenReturn(activeCustomer());
         when(licenseIssueMapper.selectOne(any(), any(Boolean.class))).thenReturn(issuedLicense());
         when(scopeMapper.selectCount(any())).thenReturn(0L);
+        when(scopeMapper.selectOne(any(), any(Boolean.class))).thenReturn(null);
         service = new CvFactorCustomerScopeServiceImpl(scopeMapper, factorVersionMapper, customerMapper, licenseIssueMapper, tenantPackageMapper) {
             @Override
             protected CvFactorCustomerScope toEntity(CvFactorCustomerScopeBo bo) {
@@ -194,6 +196,50 @@ class CvFactorCustomerScopeTest {
             () -> service.insertFactorCustomerScope(validCustomerScopeBo()));
 
         assertEquals("Factor scope already exists for this version, customer, and package", exception.getMessage());
+    }
+
+    @Test
+    void ignoresSoftDeletedScopeWhenCheckingDuplicates() {
+        when(scopeMapper.selectCount(any())).thenReturn(0L);
+
+        service.insertFactorCustomerScope(validCustomerScopeBo());
+
+        ArgumentCaptor<CvFactorCustomerScope> insertCaptor = ArgumentCaptor.forClass(CvFactorCustomerScope.class);
+        verify(scopeMapper).insert(insertCaptor.capture());
+        assertEquals("enabled", insertCaptor.getValue().getScopeStatus());
+    }
+
+    @Test
+    void removeSoftDeletesFactorScopes() {
+        CvFactorCustomerScope existing = enabledCustomerScope();
+        existing.setId(55L);
+        when(scopeMapper.selectList(any())).thenReturn(List.of(existing));
+        when(scopeMapper.updateBatchById(any())).thenReturn(true);
+
+        int removed = service.deleteFactorCustomerScopeByIds(new Long[] {55L});
+
+        assertEquals(1, removed);
+        ArgumentCaptor<List<CvFactorCustomerScope>> updateCaptor = ArgumentCaptor.forClass(List.class);
+        verify(scopeMapper).updateBatchById(updateCaptor.capture());
+        assertEquals("deleted", updateCaptor.getValue().get(0).getScopeStatus());
+        verify(scopeMapper, never()).deleteByIds(any());
+    }
+
+    @Test
+    void insertRestoresDeletedFactorScopeWithSameEntitlementKey() {
+        CvFactorCustomerScope deletedScope = enabledCustomerScope();
+        deletedScope.setId(55L);
+        deletedScope.setScopeStatus("deleted");
+        when(scopeMapper.selectOne(any(), any(Boolean.class))).thenReturn(deletedScope);
+
+        service.insertFactorCustomerScope(validCustomerScopeBo());
+
+        ArgumentCaptor<CvFactorCustomerScope> updateCaptor = ArgumentCaptor.forClass(CvFactorCustomerScope.class);
+        verify(scopeMapper).updateById(updateCaptor.capture());
+        CvFactorCustomerScope restored = updateCaptor.getValue();
+        assertEquals(55L, restored.getId());
+        assertEquals("enabled", restored.getScopeStatus());
+        verify(scopeMapper, never()).insert(any(CvFactorCustomerScope.class));
     }
 
     @Test

@@ -21,6 +21,7 @@ import org.springframework.stereotype.Service;
 
 import java.util.Arrays;
 import java.util.Date;
+import java.util.List;
 import java.util.Map;
 
 /**
@@ -41,7 +42,9 @@ public class CvReportTemplateServiceImpl implements ICvReportTemplateService {
 
     @Override
     public CvReportTemplateVo selectReportTemplateById(Long id) {
-        return baseMapper.selectVoById(id);
+        return baseMapper.selectVoOne(Wrappers.<CvReportTemplate>lambdaQuery()
+            .eq(CvReportTemplate::getId, id)
+            .ne(CvReportTemplate::getPublishStatus, CvReportTemplateLifecycleState.DELETED.getStatus()), false);
     }
 
     @Override
@@ -62,7 +65,24 @@ public class CvReportTemplateServiceImpl implements ICvReportTemplateService {
 
     @Override
     public int deleteReportTemplateByIds(Long[] ids) {
-        return baseMapper.deleteByIds(Arrays.asList(ids));
+        List<Long> idList = Arrays.stream(ids)
+            .filter(id -> id != null)
+            .toList();
+        if (idList.isEmpty()) {
+            return 0;
+        }
+        Date operationTime = DateUtils.getNowDate();
+        List<CvReportTemplate> templates = baseMapper.selectList(Wrappers.<CvReportTemplate>lambdaQuery()
+            .in(CvReportTemplate::getId, idList)
+            .ne(CvReportTemplate::getPublishStatus, CvReportTemplateLifecycleState.DELETED.getStatus()));
+        if (templates.isEmpty()) {
+            return 0;
+        }
+        templates.forEach(template -> {
+            template.setPublishStatus(CvReportTemplateLifecycleState.DELETED.getStatus());
+            template.setRemark(appendAuditRemark(template.getRemark(), "delete", "system", operationTime));
+        });
+        return baseMapper.updateBatchById(templates) ? templates.size() : 0;
     }
 
     @Override
@@ -102,6 +122,7 @@ public class CvReportTemplateServiceImpl implements ICvReportTemplateService {
         lqw.eq(StringUtils.isNotBlank(bo.getTemplateVersion()), CvReportTemplate::getTemplateVersion, bo.getTemplateVersion());
         lqw.like(StringUtils.isNotBlank(bo.getFileName()), CvReportTemplate::getFileName, bo.getFileName());
         lqw.eq(StringUtils.isNotBlank(bo.getPublishStatus()), CvReportTemplate::getPublishStatus, bo.getPublishStatus());
+        lqw.ne(CvReportTemplate::getPublishStatus, CvReportTemplateLifecycleState.DELETED.getStatus());
         lqw.like(StringUtils.isNotBlank(bo.getPublishedBy()), CvReportTemplate::getPublishedBy, bo.getPublishedBy());
         lqw.between(params.get("beginTime") != null && params.get("endTime") != null,
             CvReportTemplate::getCreateTime, params.get("beginTime"), params.get("endTime"));
@@ -115,7 +136,7 @@ public class CvReportTemplateServiceImpl implements ICvReportTemplateService {
             throw new ServiceException("Report template id cannot be null");
         }
         CvReportTemplate template = baseMapper.selectById(id);
-        if (template == null) {
+        if (template == null || CvReportTemplateLifecycleState.fromTemplate(template) == CvReportTemplateLifecycleState.DELETED) {
             throw new ServiceException("Report template does not exist");
         }
         return template;

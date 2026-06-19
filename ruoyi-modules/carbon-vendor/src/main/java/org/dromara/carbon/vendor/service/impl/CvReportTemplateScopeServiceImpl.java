@@ -2,6 +2,7 @@ package org.dromara.carbon.vendor.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
+import com.baomidou.mybatisplus.core.toolkit.support.SFunction;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import lombok.RequiredArgsConstructor;
 import org.dromara.carbon.vendor.domain.CvLicenseIssue;
@@ -25,6 +26,7 @@ import org.dromara.system.mapper.SysTenantPackageMapper;
 import org.springframework.stereotype.Service;
 
 import java.util.Arrays;
+import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 
@@ -34,6 +36,10 @@ import java.util.Map;
 @RequiredArgsConstructor
 @Service
 public class CvReportTemplateScopeServiceImpl implements ICvReportTemplateScopeService {
+
+    private static final String SCOPE_STATUS_ENABLED = "enabled";
+    private static final String SCOPE_STATUS_DISABLED = "disabled";
+    private static final String SCOPE_STATUS_DELETED = "deleted";
 
     private final CvReportTemplateScopeMapper baseMapper;
     private final CvReportTemplateMapper reportTemplateMapper;
@@ -50,7 +56,9 @@ public class CvReportTemplateScopeServiceImpl implements ICvReportTemplateScopeS
 
     @Override
     public CvReportTemplateScopeVo selectReportTemplateScopeById(Long id) {
-        return baseMapper.selectVoById(id);
+        return baseMapper.selectVoOne(Wrappers.<CvReportTemplateScope>lambdaQuery()
+            .eq(CvReportTemplateScope::getId, id)
+            .ne(CvReportTemplateScope::getScopeStatus, SCOPE_STATUS_DELETED), false);
     }
 
     @Override
@@ -61,6 +69,11 @@ public class CvReportTemplateScopeServiceImpl implements ICvReportTemplateScopeS
         reportTemplateScope.setLicenseId(normalizeLicenseId(reportTemplateScope.getLicenseId()));
         reportTemplateScope.setEdition(normalizeEdition(reportTemplateScope.getEdition()));
         reportTemplateScope.setScopeStatus(normalizeScopeStatus(reportTemplateScope.getScopeStatus()));
+        CvReportTemplateScope deletedScope = findDeletedScope(reportTemplateScope);
+        if (deletedScope != null) {
+            reportTemplateScope.setId(deletedScope.getId());
+            return baseMapper.updateById(reportTemplateScope);
+        }
         return baseMapper.insert(reportTemplateScope);
     }
 
@@ -77,7 +90,20 @@ public class CvReportTemplateScopeServiceImpl implements ICvReportTemplateScopeS
 
     @Override
     public int deleteReportTemplateScopeByIds(Long[] ids) {
-        return baseMapper.deleteByIds(Arrays.asList(ids));
+        List<Long> idList = Arrays.stream(ids)
+            .filter(id -> id != null)
+            .toList();
+        if (idList.isEmpty()) {
+            return 0;
+        }
+        List<CvReportTemplateScope> scopes = baseMapper.selectList(Wrappers.<CvReportTemplateScope>lambdaQuery()
+            .in(CvReportTemplateScope::getId, idList)
+            .ne(CvReportTemplateScope::getScopeStatus, SCOPE_STATUS_DELETED));
+        if (scopes.isEmpty()) {
+            return 0;
+        }
+        scopes.forEach(scope -> scope.setScopeStatus(SCOPE_STATUS_DELETED));
+        return baseMapper.updateBatchById(scopes) ? scopes.size() : 0;
     }
 
     private LambdaQueryWrapper<CvReportTemplateScope> buildQueryWrapper(CvReportTemplateScopeBo bo) {
@@ -91,6 +117,7 @@ public class CvReportTemplateScopeServiceImpl implements ICvReportTemplateScopeS
         lqw.eq(StringUtils.isNotBlank(bo.getEdition()), CvReportTemplateScope::getEdition, normalizeEdition(bo.getEdition()));
         lqw.like(StringUtils.isNotBlank(bo.getLicenseId()), CvReportTemplateScope::getLicenseId, bo.getLicenseId());
         lqw.eq(StringUtils.isNotBlank(bo.getScopeStatus()), CvReportTemplateScope::getScopeStatus, bo.getScopeStatus());
+        lqw.ne(CvReportTemplateScope::getScopeStatus, SCOPE_STATUS_DELETED);
         lqw.between(params.get("beginTime") != null && params.get("endTime") != null,
             CvReportTemplateScope::getCreateTime, params.get("beginTime"), params.get("endTime"));
         lqw.orderByDesc(CvReportTemplateScope::getCreateTime);
@@ -103,7 +130,7 @@ public class CvReportTemplateScopeServiceImpl implements ICvReportTemplateScopeS
             throw new ServiceException("Report template distribution templateId cannot be null");
         }
         CvReportTemplate template = reportTemplateMapper.selectById(bo.getTemplateId());
-        if (template == null) {
+        if (template == null || CvReportTemplateLifecycleState.fromTemplate(template) == CvReportTemplateLifecycleState.DELETED) {
             throw new ServiceException("Referenced report template does not exist");
         }
         if (CvReportTemplateLifecycleState.fromTemplate(template) != CvReportTemplateLifecycleState.PUBLISHED) {
@@ -156,11 +183,32 @@ public class CvReportTemplateScopeServiceImpl implements ICvReportTemplateScopeS
     }
 
     private String normalizeScopeStatus(String scopeStatus) {
-        String normalized = StringUtils.isBlank(scopeStatus) ? "enabled" : scopeStatus.trim().toLowerCase();
-        if (!"enabled".equals(normalized) && !"disabled".equals(normalized)) {
+        String normalized = StringUtils.isBlank(scopeStatus) ? SCOPE_STATUS_ENABLED : scopeStatus.trim().toLowerCase();
+        if (!SCOPE_STATUS_ENABLED.equals(normalized) && !SCOPE_STATUS_DISABLED.equals(normalized)) {
             throw new ServiceException("Unsupported report template distribution status");
         }
         return normalized;
+    }
+
+    private CvReportTemplateScope findDeletedScope(CvReportTemplateScope scope) {
+        LambdaQueryWrapper<CvReportTemplateScope> wrapper = Wrappers.<CvReportTemplateScope>lambdaQuery()
+            .eq(CvReportTemplateScope::getTemplateId, scope.getTemplateId())
+            .eq(CvReportTemplateScope::getScopeStatus, SCOPE_STATUS_DELETED);
+        appendNullableEq(wrapper, CvReportTemplateScope::getCustomerId, scope.getCustomerId());
+        appendNullableEq(wrapper, CvReportTemplateScope::getPackageId, scope.getPackageId());
+        appendNullableEq(wrapper, CvReportTemplateScope::getEdition, scope.getEdition());
+        appendNullableEq(wrapper, CvReportTemplateScope::getLicenseId, scope.getLicenseId());
+        return baseMapper.selectOne(wrapper, false);
+    }
+
+    private <T> void appendNullableEq(LambdaQueryWrapper<CvReportTemplateScope> wrapper,
+                                      SFunction<CvReportTemplateScope, T> column,
+                                      T value) {
+        if (value == null) {
+            wrapper.isNull(column);
+        } else {
+            wrapper.eq(column, value);
+        }
     }
 
     protected CvReportTemplateScope toEntity(CvReportTemplateScopeBo bo) {

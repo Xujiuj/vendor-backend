@@ -22,6 +22,7 @@ import jakarta.validation.ConstraintViolation;
 import jakarta.validation.Validation;
 import jakarta.validation.Validator;
 
+import java.util.List;
 import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -29,6 +30,7 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.mockito.ArgumentMatchers.any;
@@ -70,6 +72,7 @@ class CvReportTemplateScopeValidationTest {
     @Test
     void insertsDistributionForPublishedTemplateUsingVendorMetadataOnly() {
         when(templateMapper.selectById(301L)).thenReturn(publishedTemplate());
+        when(scopeMapper.selectOne(any(), any(Boolean.class))).thenReturn(null);
 
         service.insertReportTemplateScope(validScopeBo());
 
@@ -115,6 +118,7 @@ class CvReportTemplateScopeValidationTest {
     @Test
     void allowsLicenseOnlyDistributionContractAndPersistsLicenseReference() {
         when(templateMapper.selectById(301L)).thenReturn(publishedTemplate());
+        when(scopeMapper.selectOne(any(), any(Boolean.class))).thenReturn(null);
         CvReportTemplateScopeBo bo = validScopeBo();
         bo.setCustomerId(null);
 
@@ -134,6 +138,7 @@ class CvReportTemplateScopeValidationTest {
     @Test
     void allowsEditionOnlyDistributionContractAndPersistsEditionReference() {
         when(templateMapper.selectById(301L)).thenReturn(publishedTemplate());
+        when(scopeMapper.selectOne(any(), any(Boolean.class))).thenReturn(null);
         CvReportTemplateScopeBo bo = validScopeBo();
         bo.setCustomerId(null);
         bo.setLicenseId(" ");
@@ -198,6 +203,41 @@ class CvReportTemplateScopeValidationTest {
             () -> service.insertReportTemplateScope(bo));
 
         assertEquals("Unsupported report template distribution status", exception.getMessage());
+    }
+
+    @Test
+    void removeSoftDeletesDistributionScopes() {
+        CvReportTemplateScope existing = new CvReportTemplateScope();
+        existing.setId(77L);
+        existing.setScopeStatus("enabled");
+        when(scopeMapper.selectList(any())).thenReturn(List.of(existing));
+        when(scopeMapper.updateBatchById(any())).thenReturn(true);
+
+        int removed = service.deleteReportTemplateScopeByIds(new Long[] {77L});
+
+        assertEquals(1, removed);
+        ArgumentCaptor<List<CvReportTemplateScope>> updateCaptor = ArgumentCaptor.forClass(List.class);
+        verify(scopeMapper).updateBatchById(updateCaptor.capture());
+        assertEquals("deleted", updateCaptor.getValue().get(0).getScopeStatus());
+        verify(scopeMapper, never()).deleteByIds(any());
+    }
+
+    @Test
+    void insertRestoresDeletedDistributionScopeWithSameEntitlementKey() {
+        when(templateMapper.selectById(301L)).thenReturn(publishedTemplate());
+        CvReportTemplateScope deletedScope = new CvReportTemplateScope();
+        deletedScope.setId(77L);
+        deletedScope.setScopeStatus("deleted");
+        when(scopeMapper.selectOne(any(), any(Boolean.class))).thenReturn(deletedScope);
+
+        service.insertReportTemplateScope(validScopeBo());
+
+        ArgumentCaptor<CvReportTemplateScope> updateCaptor = ArgumentCaptor.forClass(CvReportTemplateScope.class);
+        verify(scopeMapper).updateById(updateCaptor.capture());
+        CvReportTemplateScope restored = updateCaptor.getValue();
+        assertEquals(77L, restored.getId());
+        assertEquals("enabled", restored.getScopeStatus());
+        verify(scopeMapper, never()).insert(any(CvReportTemplateScope.class));
     }
 
     private CvReportTemplateScopeBo validScopeBo() {

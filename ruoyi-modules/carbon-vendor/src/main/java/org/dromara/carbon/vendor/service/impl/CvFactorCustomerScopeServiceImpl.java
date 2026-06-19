@@ -2,6 +2,7 @@ package org.dromara.carbon.vendor.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
+import com.baomidou.mybatisplus.core.toolkit.support.SFunction;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import lombok.RequiredArgsConstructor;
 import org.dromara.carbon.vendor.domain.CvCustomer;
@@ -38,6 +39,9 @@ import java.util.Map;
 public class CvFactorCustomerScopeServiceImpl implements ICvFactorCustomerScopeService {
 
     private static final String ISSUE_STATUS_REVOKED = "revoked";
+    private static final String SCOPE_STATUS_ENABLED = "enabled";
+    private static final String SCOPE_STATUS_DISABLED = "disabled";
+    private static final String SCOPE_STATUS_DELETED = "deleted";
 
     private final CvFactorCustomerScopeMapper baseMapper;
     private final CvFactorVersionMapper factorVersionMapper;
@@ -54,7 +58,9 @@ public class CvFactorCustomerScopeServiceImpl implements ICvFactorCustomerScopeS
 
     @Override
     public CvFactorCustomerScopeVo selectFactorCustomerScopeById(Long id) {
-        return baseMapper.selectVoById(id);
+        return baseMapper.selectVoOne(Wrappers.<CvFactorCustomerScope>lambdaQuery()
+            .eq(CvFactorCustomerScope::getId, id)
+            .ne(CvFactorCustomerScope::getScopeStatus, SCOPE_STATUS_DELETED), false);
     }
 
     @Override
@@ -65,6 +71,11 @@ public class CvFactorCustomerScopeServiceImpl implements ICvFactorCustomerScopeS
         factorCustomerScope.setEdition(normalizeEdition(factorCustomerScope.getEdition()));
         factorCustomerScope.setLicenseId(null);
         factorCustomerScope.setScopeStatus(normalizeScopeStatus(factorCustomerScope.getScopeStatus()));
+        CvFactorCustomerScope deletedScope = findDeletedScope(factorCustomerScope);
+        if (deletedScope != null) {
+            factorCustomerScope.setId(deletedScope.getId());
+            return baseMapper.updateById(factorCustomerScope);
+        }
         return baseMapper.insert(factorCustomerScope);
     }
 
@@ -104,7 +115,7 @@ public class CvFactorCustomerScopeServiceImpl implements ICvFactorCustomerScopeS
         }
         List<CvFactorCustomerScope> scopes = baseMapper.selectList(Wrappers.<CvFactorCustomerScope>lambdaQuery()
             .eq(CvFactorCustomerScope::getVersionId, version.getId())
-            .eq(CvFactorCustomerScope::getScopeStatus, "enabled"));
+            .eq(CvFactorCustomerScope::getScopeStatus, SCOPE_STATUS_ENABLED));
         if (scopes.isEmpty()) {
             return false;
         }
@@ -113,7 +124,20 @@ public class CvFactorCustomerScopeServiceImpl implements ICvFactorCustomerScopeS
 
     @Override
     public int deleteFactorCustomerScopeByIds(Long[] ids) {
-        return baseMapper.deleteByIds(Arrays.asList(ids));
+        List<Long> idList = Arrays.stream(ids)
+            .filter(id -> id != null)
+            .toList();
+        if (idList.isEmpty()) {
+            return 0;
+        }
+        List<CvFactorCustomerScope> scopes = baseMapper.selectList(Wrappers.<CvFactorCustomerScope>lambdaQuery()
+            .in(CvFactorCustomerScope::getId, idList)
+            .ne(CvFactorCustomerScope::getScopeStatus, SCOPE_STATUS_DELETED));
+        if (scopes.isEmpty()) {
+            return 0;
+        }
+        scopes.forEach(scope -> scope.setScopeStatus(SCOPE_STATUS_DELETED));
+        return baseMapper.updateBatchById(scopes) ? scopes.size() : 0;
     }
 
     private LambdaQueryWrapper<CvFactorCustomerScope> buildQueryWrapper(CvFactorCustomerScopeBo bo) {
@@ -127,6 +151,7 @@ public class CvFactorCustomerScopeServiceImpl implements ICvFactorCustomerScopeS
         lqw.eq(StringUtils.isNotBlank(bo.getEdition()), CvFactorCustomerScope::getEdition, normalizeEdition(bo.getEdition()));
         lqw.eq(StringUtils.isNotBlank(bo.getLicenseId()), CvFactorCustomerScope::getLicenseId, normalizeLicenseId(bo.getLicenseId()));
         lqw.eq(StringUtils.isNotBlank(bo.getScopeStatus()), CvFactorCustomerScope::getScopeStatus, normalizeScopeStatusFilter(bo.getScopeStatus()));
+        lqw.ne(CvFactorCustomerScope::getScopeStatus, SCOPE_STATUS_DELETED);
         lqw.between(params.get("beginTime") != null && params.get("endTime") != null,
             CvFactorCustomerScope::getCreateTime, params.get("beginTime"), params.get("endTime"));
         lqw.orderByDesc(CvFactorCustomerScope::getCreateTime);
@@ -212,6 +237,7 @@ public class CvFactorCustomerScopeServiceImpl implements ICvFactorCustomerScopeS
         query.isNull(bo.getPackageId() == null, CvFactorCustomerScope::getPackageId);
         query.eq(normalizedEdition != null, CvFactorCustomerScope::getEdition, normalizedEdition);
         query.isNull(normalizedEdition == null, CvFactorCustomerScope::getEdition);
+        query.ne(CvFactorCustomerScope::getScopeStatus, SCOPE_STATUS_DELETED);
         query.ne(bo.getId() != null, CvFactorCustomerScope::getId, bo.getId());
         return baseMapper.selectCount(query) > 0;
     }
@@ -261,8 +287,8 @@ public class CvFactorCustomerScopeServiceImpl implements ICvFactorCustomerScopeS
     }
 
     private String normalizeScopeStatus(String scopeStatus) {
-        String normalized = StringUtils.isBlank(scopeStatus) ? "enabled" : scopeStatus.trim().toLowerCase(Locale.ROOT);
-        if (!"enabled".equals(normalized) && !"disabled".equals(normalized)) {
+        String normalized = StringUtils.isBlank(scopeStatus) ? SCOPE_STATUS_ENABLED : scopeStatus.trim().toLowerCase(Locale.ROOT);
+        if (!SCOPE_STATUS_ENABLED.equals(normalized) && !SCOPE_STATUS_DISABLED.equals(normalized)) {
             throw new ServiceException("Unsupported factor scope status");
         }
         return normalized;
@@ -270,10 +296,31 @@ public class CvFactorCustomerScopeServiceImpl implements ICvFactorCustomerScopeS
 
     private String normalizeScopeStatusFilter(String scopeStatus) {
         String normalized = StringUtils.isBlank(scopeStatus) ? null : scopeStatus.trim().toLowerCase(Locale.ROOT);
-        if (normalized == null || "enabled".equals(normalized) || "disabled".equals(normalized)) {
+        if (normalized == null || SCOPE_STATUS_ENABLED.equals(normalized) || SCOPE_STATUS_DISABLED.equals(normalized)) {
             return normalized;
         }
         return "__invalid_scope_status__";
+    }
+
+    private CvFactorCustomerScope findDeletedScope(CvFactorCustomerScope scope) {
+        LambdaQueryWrapper<CvFactorCustomerScope> wrapper = Wrappers.<CvFactorCustomerScope>lambdaQuery()
+            .eq(CvFactorCustomerScope::getVersionId, scope.getVersionId())
+            .eq(CvFactorCustomerScope::getScopeStatus, SCOPE_STATUS_DELETED);
+        appendNullableEq(wrapper, CvFactorCustomerScope::getCustomerId, scope.getCustomerId());
+        appendNullableEq(wrapper, CvFactorCustomerScope::getPackageId, scope.getPackageId());
+        appendNullableEq(wrapper, CvFactorCustomerScope::getEdition, scope.getEdition());
+        appendNullableEq(wrapper, CvFactorCustomerScope::getLicenseId, scope.getLicenseId());
+        return baseMapper.selectOne(wrapper, false);
+    }
+
+    private <T> void appendNullableEq(LambdaQueryWrapper<CvFactorCustomerScope> wrapper,
+                                      SFunction<CvFactorCustomerScope, T> column,
+                                      T value) {
+        if (value == null) {
+            wrapper.isNull(column);
+        } else {
+            wrapper.eq(column, value);
+        }
     }
 
     protected CvFactorCustomerScope toEntity(CvFactorCustomerScopeBo bo) {
