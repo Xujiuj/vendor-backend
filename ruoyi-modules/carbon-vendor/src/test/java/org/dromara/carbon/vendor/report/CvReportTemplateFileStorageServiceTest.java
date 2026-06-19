@@ -58,6 +58,26 @@ class CvReportTemplateFileStorageServiceTest {
     }
 
     @Test
+    void storesFileWhenRootIsConfiguredAsAbsolutePath() throws Exception {
+        Path absoluteRoot = templateRoot.resolve("absolute-root").toAbsolutePath().normalize();
+        Field field = CvReportTemplateFileStorageService.class.getDeclaredField("reportTemplateRoot");
+        field.setAccessible(true);
+        field.set(service, absoluteRoot.toString());
+        MockMultipartFile file = new MockMultipartFile(
+            "file",
+            "acceptance-template.xlsx",
+            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            "xlsx-content".getBytes()
+        );
+
+        CvReportTemplateUploadVo upload = service.store(file);
+
+        Path storedFile = absoluteRoot.resolve(upload.getFileUri().substring("vendor://".length())).normalize();
+        assertTrue(storedFile.startsWith(absoluteRoot));
+        assertTrue(Files.isRegularFile(storedFile));
+    }
+
+    @Test
     void rejectsEmptyTemplateFile() {
         MockMultipartFile file = new MockMultipartFile(
             "file",

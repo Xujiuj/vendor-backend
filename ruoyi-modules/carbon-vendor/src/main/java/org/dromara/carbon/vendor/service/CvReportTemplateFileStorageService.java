@@ -3,6 +3,7 @@ package org.dromara.carbon.vendor.service;
 import org.dromara.carbon.vendor.domain.vo.CvReportTemplateUploadVo;
 import org.dromara.common.core.exception.ServiceException;
 import org.dromara.common.core.utils.StringUtils;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
@@ -23,6 +24,7 @@ import java.util.UUID;
 /**
  * Stores report template files in a vendor-owned local directory.
  */
+@Slf4j
 @Service
 public class CvReportTemplateFileStorageService {
 
@@ -53,6 +55,8 @@ public class CvReportTemplateFileStorageService {
                 Files.copy(inputStream, target, StandardCopyOption.REPLACE_EXISTING);
             }
         } catch (IOException ex) {
+            log.warn("Failed to store vendor report template file. root={}, targetParent={}, fileName={}",
+                root, target.getParent(), safeFileName, ex);
             throw new ServiceException("failed to store report template file");
         }
 
@@ -114,6 +118,7 @@ public class CvReportTemplateFileStorageService {
             }
             return root;
         } catch (InvalidPathException | IOException ex) {
+            log.warn("Invalid vendor report template root. configuredRoot={}", reportTemplateRoot, ex);
             throw new ServiceException("report template root is invalid");
         }
     }
