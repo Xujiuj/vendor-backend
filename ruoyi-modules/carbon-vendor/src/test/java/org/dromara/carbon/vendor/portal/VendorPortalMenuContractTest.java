@@ -213,7 +213,24 @@ class VendorPortalMenuContractTest {
             "path = 'dict', component = 'system/dict/index', perms = 'system:dict:list', icon = 'dict', visible = '1'",
             "path = 'config', component = 'system/config/index', perms = 'system:config:list', icon = 'edit', visible = '1'",
             "path = 'gen', component = 'tool/gen/index', perms = 'tool:gen:list', icon = 'code', visible = '1'",
-            "update sys_menu set visible = '1' where menu_id in (6, 121);"
+            "update sys_menu set visible = '1' where menu_id in (6, 121);",
+            "Superadmin routing uses all enabled M/C menus",
+            "set visible = '1',\n    status = '1'",
+            "menu_id in (2, 3, 4, 5, 6, 115, 116, 121)",
+            "'tenant', 'tool', 'gen', 'gen-edit/index/:tableId', 'demo'",
+            "'workflow', 'task', 'online', 'cache', 'Admin', 'snailjob'",
+            "'oss', 'oss-config/index', 'client'",
+            "path like 'http%'",
+            "'system/oss/index'",
+            "'system/client/index'",
+            "'tool/gen/index'",
+            "'tool/gen/editTable'",
+            "'monitor/online/index'",
+            "'monitor/cache/index'",
+            "'monitor/admin/index'",
+            "'monitor/snailjob/index'",
+            "component like 'workflow/%'",
+            "component like 'demo/%'"
         ));
         assertContainsNone(sql, List.of(
             "'menu', 'system/menu/index', '', 1, 0, 'C', '0', '0'",

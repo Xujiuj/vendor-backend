@@ -223,6 +223,37 @@ where menu_id in (
   1055, 1056, 1057, 1058, 1059, 1060
 );
 
+-- Superadmin routing uses all enabled M/C menus and ignores role grants and
+-- visible flags. Disable legacy framework/demo routes at status level so the
+-- router API matches the production vendor portal directory exactly.
+update sys_menu
+set visible = '1',
+    status = '1',
+    update_time = sysdate()
+where menu_type in ('M', 'C')
+  and (
+    menu_id in (2, 3, 4, 5, 6, 115, 116, 121)
+    or path in (
+      'tenant', 'tool', 'gen', 'gen-edit/index/:tableId', 'demo',
+      'workflow', 'task', 'online', 'cache', 'Admin', 'snailjob',
+      'oss', 'oss-config/index', 'client'
+    )
+    or path like 'http%'
+    or component in (
+      'system/oss/index',
+      'system/oss/config',
+      'system/client/index',
+      'tool/gen/index',
+      'tool/gen/editTable',
+      'monitor/online/index',
+      'monitor/cache/index',
+      'monitor/admin/index',
+      'monitor/snailjob/index'
+    )
+    or component like 'workflow/%'
+    or component like 'demo/%'
+  );
+
 delete from sys_role_menu
 where menu_id in (
   102, 105, 106, 115, 116, 132,
