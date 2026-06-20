@@ -118,6 +118,27 @@ security:
     - /warm-flow-ui/config
     - /open/**
 
+# Open API protection
+open-api:
+  protection:
+    enabled: true
+    path-pattern: /open/*
+    rate-limit:
+      enabled: true
+      time: 60
+      count: 300
+      idle-timeout: 120
+    signature:
+      enabled: false
+      timestamp-window-seconds: 300
+      app-key-header: X-App-Key
+      timestamp-header: X-Timestamp
+      nonce-header: X-Nonce
+      signature-header: X-Signature
+      content-sha256-header: X-Content-SHA256
+      require-content-sha256: false
+      secrets: {}
+
 # 多租户配置
 tenant:
   # 是否开启
