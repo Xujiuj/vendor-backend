@@ -176,6 +176,14 @@ jobs:
           exit 1
           EOF
           timeout 60 sshpass -p "$DEPLOY_PASSWORD" ssh "${SSH_OPTS[@]}" "$DEPLOY_USER@$DEPLOY_HOST" "rm -rf '$REMOTE_UPLOAD_DIR' && mkdir -p '$DEPLOY_PATH' '$REMOTE_UPLOAD_DIR'"
+          timeout 240 sshpass -p "$DEPLOY_PASSWORD" ssh "${SSH_OPTS[@]}" "$DEPLOY_USER@$DEPLOY_HOST" \
+            "SUDO_PASSWORD='$DEPLOY_PASSWORD' bash -s" <<'REMOTE_RSYNC'
+          set -euo pipefail
+          if ! command -v rsync >/dev/null 2>&1; then
+            echo "$SUDO_PASSWORD" | sudo -S timeout 120 apt-get update
+            echo "$SUDO_PASSWORD" | sudo -S timeout 120 apt-get install -y rsync
+          fi
+          REMOTE_RSYNC
           timeout 120 sshpass -p "$DEPLOY_PASSWORD" scp "${SCP_OPTS[@]}" "$MIGRATION_ARCHIVE" "$DEPLOY_USER@$DEPLOY_HOST:$REMOTE_MIGRATION_ARCHIVE"
           upload_archive_with_ssh_stream() {
             for attempt in 1 2; do
@@ -196,7 +204,6 @@ jobs:
                 --append-verify \
                 --info=progress2 \
                 --timeout=180 \
-                --contimeout=20 \
                 -e "$RSYNC_RSH" \
                 "$JAR_ARCHIVE" \
                 "$DEPLOY_USER@$DEPLOY_HOST:$REMOTE_JAR_ARCHIVE_PART"; then
