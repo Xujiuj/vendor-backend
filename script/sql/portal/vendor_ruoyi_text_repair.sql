@@ -186,16 +186,20 @@ update sys_notice set notice_title = '温馨提醒：2018-07-01 新版本发布�
 update sys_notice set notice_title = '维护通知：2018-07-01 系统凌晨维护', notice_content = '维护内容', remark = '管理员' where notice_id = 2;
 
 insert into sys_tenant_package
-(package_id, package_name, menu_ids, remark, menu_check_strictly, status, del_flag, create_dept, create_by, create_time, update_by, update_time)
+(package_id, package_name, menu_ids, remark, menu_check_strictly, price_amount, price_currency, billing_cycle, online_purchase_enabled, status, del_flag, create_dept, create_by, create_time, update_by, update_time)
 values
-(1001, '标准版', '910100,910101,910102,910107,910136,910103,910104,910121,910105,910106,910131,910126', '默认业务套餐：开放基础客户、License、因子、模板与维表同步能力', 1, '0', '0', 103, 1, sysdate(), null, null),
-(1002, '专业版', '910100,910101,910102,910107,910136,910103,910104,910121,910105,910106,910131,910126', '默认业务套餐：在标准版基础上承载更完整的数据开放范围', 1, '0', '0', 103, 1, sysdate(), null, null),
-(1003, '集团版', '910100,910101,910102,910107,910136,910103,910104,910121,910105,910106,910131,910126,1,100,101,102,103,104,105,106,107,122', '默认业务套餐：集团客户使用，开放全部厂商数据管理能力', 1, '0', '0', 103, 1, sysdate(), null, null)
+(1001, '标准版', '910100,910101,910102,910107,910136,910103,910104,910121,910105,910106,910131,910126', '默认业务套餐：开放基础客户、License、因子、模板与维表同步能力', 1, 0.00, 'CNY', 'YEAR', 0, '0', '0', 103, 1, sysdate(), null, null),
+(1002, '专业版', '910100,910101,910102,910107,910136,910103,910104,910121,910105,910106,910131,910126', '默认业务套餐：在标准版基础上承载更完整的数据开放范围', 1, 0.00, 'CNY', 'YEAR', 0, '0', '0', 103, 1, sysdate(), null, null),
+(1003, '集团版', '910100,910101,910102,910107,910136,910103,910104,910121,910105,910106,910131,910126,1,100,101,102,103,104,105,106,107,122', '默认业务套餐：集团客户使用，开放全部厂商数据管理能力', 1, 0.00, 'CNY', 'YEAR', 0, '0', '0', 103, 1, sysdate(), null, null)
 on duplicate key update
     package_name = values(package_name),
     menu_ids = values(menu_ids),
     remark = values(remark),
     menu_check_strictly = values(menu_check_strictly),
+    price_amount = values(price_amount),
+    price_currency = values(price_currency),
+    billing_cycle = values(billing_cycle),
+    online_purchase_enabled = values(online_purchase_enabled),
     status = values(status),
     del_flag = values(del_flag),
     update_by = 1,

@@ -134,6 +134,15 @@ create table if not exists sys_tenant_package
     menu_ids            varchar(3000)   default ''::varchar,
     remark              varchar(200)    default ''::varchar,
     menu_check_strictly bool            default true,
+    price_amount        numeric(12, 2)  default 0.00,
+    price_currency      varchar(3)      default 'CNY'::varchar,
+    billing_cycle       varchar(20)     default 'YEAR'::varchar,
+    online_purchase_enabled bool        default false,
+    license_auto_issue_enabled bool     default false,
+    license_key_id      varchar(64),
+    license_validity_days int4,
+    license_feature_codes varchar(1000),
+    license_template_entitlements text,
     status              char            default '0'::bpchar,
     del_flag            char            default '0'::bpchar,
     create_dept         int8,
@@ -150,6 +159,15 @@ comment on column  sys_tenant_package.package_id         is '租户套餐id';
 comment on column  sys_tenant_package.package_name       is '套餐名称';
 comment on column  sys_tenant_package.menu_ids           is '关联菜单id';
 comment on column  sys_tenant_package.remark             is '备注';
+comment on column  sys_tenant_package.price_amount       is '套餐价格金额';
+comment on column  sys_tenant_package.price_currency     is '价格币种';
+comment on column  sys_tenant_package.billing_cycle      is '计费周期';
+comment on column  sys_tenant_package.online_purchase_enabled is '是否允许在线购买';
+comment on column  sys_tenant_package.license_auto_issue_enabled is '是否支付后自动签发License';
+comment on column  sys_tenant_package.license_key_id     is 'License签名keyId';
+comment on column  sys_tenant_package.license_validity_days is 'License有效天数';
+comment on column  sys_tenant_package.license_feature_codes is 'License功能码，逗号分隔';
+comment on column  sys_tenant_package.license_template_entitlements is 'License报表模板授权JSON';
 comment on column  sys_tenant_package.status             is '状态（0正常 1停用）';
 comment on column  sys_tenant_package.del_flag           is '删除标志（0代表存在 1代表删除）';
 comment on column  sys_tenant_package.create_dept        is '创建部门';

@@ -246,3 +246,23 @@ justauth:
       client-id: 10**********6
       client-secret: 1f7d08**********5b7**********29e
       redirect-uri: ${justauth.address}/social-callback?source=gitea
+
+--- # vendor online payment
+carbon:
+  vendor:
+    payment:
+      cashier-base-url: ${VENDOR_CASHIER_BASE_URL:https://www.carbondata.com/pay}
+      require-signature: ${VENDOR_PAYMENT_REQUIRE_SIGNATURE:true}
+      wechat:
+        enabled: ${VENDOR_WECHAT_PAY_ENABLED:true}
+        app-id: ${VENDOR_WECHAT_APP_ID:}
+        merchant-id: ${VENDOR_WECHAT_MERCHANT_ID:}
+        notify-url: ${VENDOR_WECHAT_NOTIFY_URL:}
+        api-v3-key: ${VENDOR_WECHAT_API_V3_KEY:}
+        platform-certificate: ${VENDOR_WECHAT_PLATFORM_CERTIFICATE:}
+      alipay:
+        enabled: ${VENDOR_ALIPAY_ENABLED:true}
+        app-id: ${VENDOR_ALIPAY_APP_ID:}
+        seller-id: ${VENDOR_ALIPAY_SELLER_ID:}
+        notify-url: ${VENDOR_ALIPAY_NOTIFY_URL:}
+        public-key: ${VENDOR_ALIPAY_PUBLIC_KEY:}

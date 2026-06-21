@@ -69,6 +69,14 @@ jobs:
           REMOTE_JAR_ARCHIVE_PART="$REMOTE_UPLOAD_DIR/app.jar.gz.part"
           REMOTE_JAR="$DEPLOY_PATH/$DEPLOY_SERVICE-${GITHUB_RUN_ID}.jar"
           REPORT_TEMPLATE_ROOT="$DEPLOY_PATH/data/vendor/report-templates"
+          MIGRATION_DIR="$RUNNER_TEMP/$DEPLOY_SERVICE-${GITHUB_RUN_ID}-sql"
+          MIGRATION_ARCHIVE="$RUNNER_TEMP/$DEPLOY_SERVICE-${GITHUB_RUN_ID}-sql.tar.gz"
+          REMOTE_MIGRATION_ARCHIVE="$REMOTE_UPLOAD_DIR/sql.tar.gz"
+          mkdir -p "$MIGRATION_DIR"
+          cp script/sql/update/vendor_tenant_package_purchase_fields.sql "$MIGRATION_DIR/01-vendor_tenant_package_purchase_fields.sql"
+          cp script/sql/update/vendor_online_purchase_payment_fields.sql "$MIGRATION_DIR/02-vendor_online_purchase_payment_fields.sql"
+          cp script/sql/update/vendor_tenant_package_license_fields.sql "$MIGRATION_DIR/03-vendor_tenant_package_license_fields.sql"
+          tar -C "$MIGRATION_DIR" -czf "$MIGRATION_ARCHIVE" .
           timeout 120 sudo apt-get update
           timeout 120 sudo apt-get install -y sshpass gzip coreutils rsync
           gzip -9 -c ruoyi-admin/target/ruoyi-admin.jar > "$JAR_ARCHIVE"
@@ -91,13 +99,28 @@ jobs:
           cat > deploy-backend.sh <<'EOF'
           set -euo pipefail
           echo "$SUDO_PASSWORD" | sudo -S timeout 180 apt-get update
-          echo "$SUDO_PASSWORD" | sudo -S timeout 180 apt-get install -y openjdk-17-jre-headless redis-server gzip curl
+          echo "$SUDO_PASSWORD" | sudo -S timeout 180 apt-get install -y openjdk-17-jre-headless redis-server gzip curl mysql-client
           if [ ! -f "$REMOTE_JAR_ARCHIVE" ]; then
             cat "$REMOTE_UPLOAD_DIR"/part-* > "$REMOTE_JAR_ARCHIVE"
           fi
           printf '%s  %s\n' "$JAR_ARCHIVE_SHA256" "$REMOTE_JAR_ARCHIVE" | sha256sum -c -
           gzip -t "$REMOTE_JAR_ARCHIVE"
           gzip -dc "$REMOTE_JAR_ARCHIVE" > "$REMOTE_JAR"
+          if [ -f "$REMOTE_MIGRATION_ARCHIVE" ]; then
+            MIGRATION_WORK_DIR="$REMOTE_UPLOAD_DIR/sql"
+            mkdir -p "$MIGRATION_WORK_DIR"
+            tar -xzf "$REMOTE_MIGRATION_ARCHIVE" -C "$MIGRATION_WORK_DIR"
+            for sql_file in "$MIGRATION_WORK_DIR"/*.sql; do
+              echo "Executing vendor database migration: $(basename "$sql_file")"
+              mysql \
+                --host="$DB_HOST" \
+                --port="$DB_PORT" \
+                --user="$DB_USERNAME" \
+                --password="$DB_PASSWORD" \
+                --default-character-set=utf8mb4 \
+                "$DB_NAME" < "$sql_file"
+            done
+          fi
           rm -rf "$REMOTE_UPLOAD_DIR"
           echo "$SUDO_PASSWORD" | sudo -S install -d -o "$USER" -g "$USER" "$DEPLOY_PATH/apps/$DEPLOY_SERVICE" "$DEPLOY_PATH/logs/$DEPLOY_SERVICE" "$REPORT_TEMPLATE_ROOT"
           mv "$REMOTE_JAR" "$DEPLOY_PATH/apps/$DEPLOY_SERVICE/app.jar"
@@ -153,6 +176,7 @@ jobs:
           exit 1
           EOF
           timeout 60 sshpass -p "$DEPLOY_PASSWORD" ssh "${SSH_OPTS[@]}" "$DEPLOY_USER@$DEPLOY_HOST" "rm -rf '$REMOTE_UPLOAD_DIR' && mkdir -p '$DEPLOY_PATH' '$REMOTE_UPLOAD_DIR'"
+          timeout 120 sshpass -p "$DEPLOY_PASSWORD" scp "${SCP_OPTS[@]}" "$MIGRATION_ARCHIVE" "$DEPLOY_USER@$DEPLOY_HOST:$REMOTE_MIGRATION_ARCHIVE"
           upload_archive_with_ssh_stream() {
             for attempt in 1 2 3 4; do
               echo "Uploading backend archive via SSH stream (attempt $attempt/4)"
@@ -206,4 +230,4 @@ jobs:
           }
           upload_archive_with_ssh_stream || upload_archive_with_rsync || upload_archive_with_chunks
           timeout 1800 sshpass -p "$DEPLOY_PASSWORD" ssh "${SSH_OPTS[@]}" "$DEPLOY_USER@$DEPLOY_HOST" \
-            "REMOTE_UPLOAD_DIR='$REMOTE_UPLOAD_DIR' REMOTE_JAR_ARCHIVE='$REMOTE_JAR_ARCHIVE' JAR_ARCHIVE_SHA256='$(cat "$JAR_ARCHIVE_SHA256")' DEPLOY_PATH='$DEPLOY_PATH' DEPLOY_SERVICE='$DEPLOY_SERVICE' APP_PORT='$APP_PORT' SNAIL_PORT='$SNAIL_PORT' DB_PREFIX='$DB_PREFIX' DB_NAME='$DB_NAME' DB_HOST='$DB_HOST' DB_PORT='$DB_PORT' DB_USERNAME='$DB_USERNAME' DB_PASSWORD='$DB_PASSWORD' REMOTE_JAR='$REMOTE_JAR' REPORT_TEMPLATE_ROOT='$REPORT_TEMPLATE_ROOT' SUDO_PASSWORD='$DEPLOY_PASSWORD' timeout 1700 bash -s" < deploy-backend.sh
+            "REMOTE_UPLOAD_DIR='$REMOTE_UPLOAD_DIR' REMOTE_JAR_ARCHIVE='$REMOTE_JAR_ARCHIVE' REMOTE_MIGRATION_ARCHIVE='$REMOTE_MIGRATION_ARCHIVE' JAR_ARCHIVE_SHA256='$(cat "$JAR_ARCHIVE_SHA256")' DEPLOY_PATH='$DEPLOY_PATH' DEPLOY_SERVICE='$DEPLOY_SERVICE' APP_PORT='$APP_PORT' SNAIL_PORT='$SNAIL_PORT' DB_PREFIX='$DB_PREFIX' DB_NAME='$DB_NAME' DB_HOST='$DB_HOST' DB_PORT='$DB_PORT' DB_USERNAME='$DB_USERNAME' DB_PASSWORD='$DB_PASSWORD' REMOTE_JAR='$REMOTE_JAR' REPORT_TEMPLATE_ROOT='$REPORT_TEMPLATE_ROOT' SUDO_PASSWORD='$DEPLOY_PASSWORD' timeout 1700 bash -s" < deploy-backend.sh

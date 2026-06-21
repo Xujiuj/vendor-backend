@@ -4,6 +4,7 @@ import org.dromara.common.mybatis.core.page.PageQuery;
 import org.dromara.common.mybatis.core.page.TableDataInfo;
 import org.dromara.system.domain.bo.SysTenantPackageBo;
 import org.dromara.system.domain.vo.SysTenantPackageVo;
+import org.dromara.system.domain.vo.TenantPackagePurchaseVo;
 
 import java.util.Collection;
 import java.util.List;
@@ -29,6 +30,11 @@ public interface ISysTenantPackageService {
      * 查询租户套餐已启用列表
      */
     List<SysTenantPackageVo> selectList();
+
+    /**
+     * 查询可在线购买的租户套餐列表
+     */
+    List<TenantPackagePurchaseVo> selectPurchasableList();
 
     /**
      * 查询租户套餐列表

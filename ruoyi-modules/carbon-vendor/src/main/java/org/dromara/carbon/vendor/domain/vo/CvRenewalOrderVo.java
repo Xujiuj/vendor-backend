@@ -110,6 +110,26 @@ public class CvRenewalOrderVo implements Serializable {
     private BigDecimal amount;
 
     /**
+     * Payment currency.
+     */
+    private String currency;
+
+    /**
+     * Third-party payment trade number.
+     */
+    private String payTradeNo;
+
+    /**
+     * Payment form or QR payload.
+     */
+    private String payForm;
+
+    /**
+     * Vendor cashier URL.
+     */
+    private String payUrl;
+
+    /**
      * Payment timestamp.
      */
     private Date paidTime;

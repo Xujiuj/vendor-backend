@@ -16,12 +16,14 @@ import org.dromara.system.domain.SysTenant;
 import org.dromara.system.domain.SysTenantPackage;
 import org.dromara.system.domain.bo.SysTenantPackageBo;
 import org.dromara.system.domain.vo.SysTenantPackageVo;
+import org.dromara.system.domain.vo.TenantPackagePurchaseVo;
 import org.dromara.system.mapper.SysTenantMapper;
 import org.dromara.system.mapper.SysTenantPackageMapper;
 import org.dromara.system.service.ISysTenantPackageService;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.List;
@@ -34,6 +36,11 @@ import java.util.List;
 @RequiredArgsConstructor
 @Service
 public class SysTenantPackageServiceImpl implements ISysTenantPackageService {
+
+    private static final BigDecimal DEFAULT_PRICE_AMOUNT = BigDecimal.ZERO;
+    private static final String DEFAULT_PRICE_CURRENCY = "CNY";
+    private static final String DEFAULT_BILLING_CYCLE = "YEAR";
+    private static final int DEFAULT_YEAR_VALIDITY_DAYS = 365;
 
     private final SysTenantPackageMapper baseMapper;
     private final SysTenantMapper tenantMapper;
@@ -62,6 +69,14 @@ public class SysTenantPackageServiceImpl implements ISysTenantPackageService {
                 .eq(SysTenantPackage::getStatus, SystemConstants.NORMAL));
     }
 
+    @Override
+    public List<TenantPackagePurchaseVo> selectPurchasableList() {
+        return baseMapper.selectVoList(new LambdaQueryWrapper<SysTenantPackage>()
+                .eq(SysTenantPackage::getStatus, SystemConstants.NORMAL)
+                .eq(SysTenantPackage::getOnlinePurchaseEnabled, Boolean.TRUE)
+                .orderByAsc(SysTenantPackage::getPackageId), TenantPackagePurchaseVo.class);
+    }
+
     /**
      * 查询租户套餐列表
      */
@@ -86,6 +101,7 @@ public class SysTenantPackageServiceImpl implements ISysTenantPackageService {
     @Transactional(rollbackFor = Exception.class)
     public Boolean insertByBo(SysTenantPackageBo bo) {
         SysTenantPackage add = MapstructUtils.convert(bo, SysTenantPackage.class);
+        applyPurchaseDefaults(add);
         // 保存菜单id
         List<Long> menuIds = Arrays.asList(bo.getMenuIds());
         add.setMenuIds(CollUtil.isNotEmpty(menuIds) ? StringUtils.joinComma(menuIds) : "");
@@ -103,6 +119,7 @@ public class SysTenantPackageServiceImpl implements ISysTenantPackageService {
     @Transactional(rollbackFor = Exception.class)
     public Boolean updateByBo(SysTenantPackageBo bo) {
         SysTenantPackage update = MapstructUtils.convert(bo, SysTenantPackage.class);
+        applyPurchaseDefaults(update);
         // 保存菜单id
         List<Long> menuIds = Arrays.asList(bo.getMenuIds());
         update.setMenuIds(CollUtil.isNotEmpty(menuIds) ? StringUtils.joinComma(menuIds) : "");
@@ -145,5 +162,26 @@ public class SysTenantPackageServiceImpl implements ISysTenantPackageService {
             }
         }
         return baseMapper.deleteByIds(ids) > 0;
+    }
+
+    private void applyPurchaseDefaults(SysTenantPackage tenantPackage) {
+        if (tenantPackage.getPriceAmount() == null) {
+            tenantPackage.setPriceAmount(DEFAULT_PRICE_AMOUNT);
+        }
+        if (StringUtils.isBlank(tenantPackage.getPriceCurrency())) {
+            tenantPackage.setPriceCurrency(DEFAULT_PRICE_CURRENCY);
+        }
+        if (StringUtils.isBlank(tenantPackage.getBillingCycle())) {
+            tenantPackage.setBillingCycle(DEFAULT_BILLING_CYCLE);
+        }
+        if (tenantPackage.getOnlinePurchaseEnabled() == null) {
+            tenantPackage.setOnlinePurchaseEnabled(Boolean.FALSE);
+        }
+        if (tenantPackage.getLicenseAutoIssueEnabled() == null) {
+            tenantPackage.setLicenseAutoIssueEnabled(Boolean.FALSE);
+        }
+        if (tenantPackage.getLicenseValidityDays() == null && Boolean.TRUE.equals(tenantPackage.getLicenseAutoIssueEnabled())) {
+            tenantPackage.setLicenseValidityDays(DEFAULT_YEAR_VALIDITY_DAYS);
+        }
     }
 }

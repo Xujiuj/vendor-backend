@@ -382,6 +382,15 @@ CREATE TABLE sys_tenant_package
     menu_ids              nvarchar(3000)                  NULL,
     remark                nvarchar(200)                   NULL,
     menu_check_strictly   tinyint         DEFAULT ((1))   NULL,
+    price_amount          decimal(12, 2)  DEFAULT ((0.00)) NULL,
+    price_currency        nvarchar(3)     DEFAULT ('CNY') NULL,
+    billing_cycle         nvarchar(20)    DEFAULT ('YEAR') NULL,
+    online_purchase_enabled bit           DEFAULT ((0))   NULL,
+    license_auto_issue_enabled bit        DEFAULT ((0))   NULL,
+    license_key_id        nvarchar(64)                    NULL,
+    license_validity_days int                             NULL,
+    license_feature_codes nvarchar(1000)                  NULL,
+    license_template_entitlements nvarchar(max)           NULL,
     status                nchar(1)        DEFAULT ('0')   NULL,
     del_flag              nchar(1)        DEFAULT ('0')   NULL,
     create_dept           bigint                          NULL,
@@ -419,6 +428,60 @@ EXEC sys.sp_addextendedproperty
     'SCHEMA', N'dbo',
     'TABLE', N'sys_tenant_package',
     'COLUMN', N'remark'
+GO
+EXEC sys.sp_addextendedproperty
+    'MS_Description', N'套餐价格金额' ,
+    'SCHEMA', N'dbo',
+    'TABLE', N'sys_tenant_package',
+    'COLUMN', N'price_amount'
+GO
+EXEC sys.sp_addextendedproperty
+    'MS_Description', N'价格币种' ,
+    'SCHEMA', N'dbo',
+    'TABLE', N'sys_tenant_package',
+    'COLUMN', N'price_currency'
+GO
+EXEC sys.sp_addextendedproperty
+    'MS_Description', N'计费周期' ,
+    'SCHEMA', N'dbo',
+    'TABLE', N'sys_tenant_package',
+    'COLUMN', N'billing_cycle'
+GO
+EXEC sys.sp_addextendedproperty
+    'MS_Description', N'是否允许在线购买' ,
+    'SCHEMA', N'dbo',
+    'TABLE', N'sys_tenant_package',
+    'COLUMN', N'online_purchase_enabled'
+GO
+EXEC sys.sp_addextendedproperty
+    'MS_Description', N'是否支付后自动签发License' ,
+    'SCHEMA', N'dbo',
+    'TABLE', N'sys_tenant_package',
+    'COLUMN', N'license_auto_issue_enabled'
+GO
+EXEC sys.sp_addextendedproperty
+    'MS_Description', N'License签名keyId' ,
+    'SCHEMA', N'dbo',
+    'TABLE', N'sys_tenant_package',
+    'COLUMN', N'license_key_id'
+GO
+EXEC sys.sp_addextendedproperty
+    'MS_Description', N'License有效天数' ,
+    'SCHEMA', N'dbo',
+    'TABLE', N'sys_tenant_package',
+    'COLUMN', N'license_validity_days'
+GO
+EXEC sys.sp_addextendedproperty
+    'MS_Description', N'License功能码，逗号分隔' ,
+    'SCHEMA', N'dbo',
+    'TABLE', N'sys_tenant_package',
+    'COLUMN', N'license_feature_codes'
+GO
+EXEC sys.sp_addextendedproperty
+    'MS_Description', N'License报表模板授权JSON' ,
+    'SCHEMA', N'dbo',
+    'TABLE', N'sys_tenant_package',
+    'COLUMN', N'license_template_entitlements'
 GO
 EXEC sys.sp_addextendedproperty
     'MS_Description', N'租户状态（0正常 1停用）' ,
