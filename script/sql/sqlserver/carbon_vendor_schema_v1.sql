@@ -86,18 +86,75 @@ GO
 CREATE TABLE cv_factor_record (
     id BIGINT IDENTITY(1,1) NOT NULL PRIMARY KEY,
     version_id BIGINT NOT NULL,
+    factor_table_code NVARCHAR(64) NOT NULL DEFAULT '201ef',
     factor_code NVARCHAR(128) NOT NULL,
     factor_name NVARCHAR(255) NOT NULL,
     factor_category NVARCHAR(128) NOT NULL,
     factor_value DECIMAL(28, 10) NOT NULL,
     factor_unit NVARCHAR(64) NOT NULL,
+    factor_key NVARCHAR(128) NULL,
+    emission_source_name NVARCHAR(255) NULL,
+    emission_source_name_en NVARCHAR(255) NULL,
+    fuel_material_category NVARCHAR(255) NULL,
+    source_unit NVARCHAR(64) NULL,
+    co2 DECIMAL(28, 10) NULL,
+    ch4 DECIMAL(28, 10) NULL,
+    n2o DECIMAL(28, 10) NULL,
+    hfcs DECIMAL(28, 10) NULL,
+    pfcs DECIMAL(28, 10) NULL,
+    sf6 DECIMAL(28, 10) NULL,
+    nf3 DECIMAL(28, 10) NULL,
+    applicable_scope NVARCHAR(255) NULL,
+    factor_source NVARCHAR(255) NULL,
+    gwp_ch4 DECIMAL(28, 10) NULL,
+    gwp_n2o DECIMAL(28, 10) NULL,
+    gwp_hfcs DECIMAL(28, 10) NULL,
+    gwp_pfcs DECIMAL(28, 10) NULL,
+    gwp_sf6 DECIMAL(28, 10) NULL,
+    gwp_nf3 DECIMAL(28, 10) NULL,
+    factor_gwp DECIMAL(28, 10) NULL,
+    version_province_code NVARCHAR(128) NULL,
+    factor_version NVARCHAR(64) NULL,
+    division_code NVARCHAR(64) NULL,
+    division_name NVARCHAR(255) NULL,
+    region_name NVARCHAR(255) NULL,
+    province_factor DECIMAL(28, 10) NULL,
+    region_factor DECIMAL(28, 10) NULL,
+    national_factor DECIMAL(28, 10) NULL,
+    non_fossil_excluded_factor DECIMAL(28, 10) NULL,
+    national_fossil_power_factor DECIMAL(28, 10) NULL,
+    row_no INT NULL,
+    fuel_level1 NVARCHAR(255) NULL,
+    fuel_level2 NVARCHAR(255) NULL,
+    fuel_level3 NVARCHAR(255) NULL,
+    fuel_level4 NVARCHAR(255) NULL,
+    lower_heat_value DECIMAL(28, 10) NULL,
+    lower_heat_value_cv DECIMAL(18, 10) NULL,
+    co2_factor DECIMAL(28, 10) NULL,
+    co2_factor_cv DECIMAL(18, 10) NULL,
+    gwp_value DECIMAL(28, 10) NULL,
+    converted_factor DECIMAL(28, 10) NULL,
     source_ref NVARCHAR(512) NULL,
     enabled_flag BIT NOT NULL DEFAULT 1,
     create_time DATETIME2 NULL DEFAULT SYSUTCDATETIME(),
-    CONSTRAINT uk_cv_factor_record UNIQUE (version_id, factor_code),
+    update_time DATETIME2 NULL DEFAULT SYSUTCDATETIME(),
+    remark NVARCHAR(500) NULL,
+    CONSTRAINT uk_cv_factor_record UNIQUE (version_id, factor_table_code, factor_code),
     CONSTRAINT fk_cv_factor_record_version
         FOREIGN KEY (version_id) REFERENCES cv_factor_version (id)
 );
+GO
+
+CREATE INDEX idx_cv_factor_record_table
+    ON cv_factor_record (factor_table_code);
+GO
+
+CREATE INDEX idx_cv_factor_record_version
+    ON cv_factor_record (version_id);
+GO
+
+CREATE INDEX idx_cv_factor_record_sample_key
+    ON cv_factor_record (factor_key);
 GO
 
 CREATE TABLE cv_dimension_record (
@@ -112,6 +169,22 @@ CREATE TABLE cv_dimension_record (
     field04 NVARCHAR(255) NULL,
     field05 NVARCHAR(255) NULL,
     field06 NVARCHAR(255) NULL,
+    field07 NVARCHAR(255) NULL,
+    field08 NVARCHAR(255) NULL,
+    field09 NVARCHAR(255) NULL,
+    field10 NVARCHAR(255) NULL,
+    field11 NVARCHAR(255) NULL,
+    field12 NVARCHAR(255) NULL,
+    field13 NVARCHAR(255) NULL,
+    field14 NVARCHAR(255) NULL,
+    field15 NVARCHAR(255) NULL,
+    field16 NVARCHAR(255) NULL,
+    field17 NVARCHAR(255) NULL,
+    field18 NVARCHAR(255) NULL,
+    field19 NVARCHAR(255) NULL,
+    field20 NVARCHAR(255) NULL,
+    field21 NVARCHAR(255) NULL,
+    field22 NVARCHAR(255) NULL,
     sort_order INT NOT NULL DEFAULT 0,
     status NCHAR(1) NOT NULL DEFAULT '0',
     create_time DATETIME2 NULL DEFAULT SYSUTCDATETIME(),

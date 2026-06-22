@@ -51,6 +51,7 @@ public class CvOpenFactorServiceImpl implements ICvOpenFactorService {
             List<CvOpenFactorRecordVo> records = factorRecordMapper.selectList(Wrappers.<CvFactorRecord>lambdaQuery()
                     .eq(CvFactorRecord::getVersionId, version.getId())
                     .eq(CvFactorRecord::getEnabledFlag, Boolean.TRUE)
+                    .orderByAsc(CvFactorRecord::getFactorTableCode)
                     .orderByAsc(CvFactorRecord::getFactorCode)
                     .orderByAsc(CvFactorRecord::getId))
                 .stream()
@@ -126,11 +127,55 @@ public class CvOpenFactorServiceImpl implements ICvOpenFactorService {
     private CvOpenFactorRecordVo toRecordVo(CvFactorRecord record) {
         CvOpenFactorRecordVo vo = new CvOpenFactorRecordVo();
         vo.setFactorCode(record.getFactorCode());
+        vo.setFactorTableCode(record.getFactorTableCode());
         vo.setFactorName(record.getFactorName());
         vo.setFactorCategory(record.getFactorCategory());
         vo.setFactorValue(record.getFactorValue());
         vo.setFactorUnit(record.getFactorUnit());
+        vo.setFactorKey(record.getFactorKey());
+        vo.setEmissionSourceName(record.getEmissionSourceName());
+        vo.setEmissionSourceNameEn(record.getEmissionSourceNameEn());
+        vo.setFuelMaterialCategory(record.getFuelMaterialCategory());
+        vo.setSourceUnit(record.getSourceUnit());
+        vo.setCo2(record.getCo2());
+        vo.setCh4(record.getCh4());
+        vo.setN2o(record.getN2o());
+        vo.setHfcs(record.getHfcs());
+        vo.setPfcs(record.getPfcs());
+        vo.setSf6(record.getSf6());
+        vo.setNf3(record.getNf3());
+        vo.setApplicableScope(record.getApplicableScope());
+        vo.setFactorSource(record.getFactorSource());
+        vo.setGwpCh4(record.getGwpCh4());
+        vo.setGwpN2o(record.getGwpN2o());
+        vo.setGwpHfcs(record.getGwpHfcs());
+        vo.setGwpPfcs(record.getGwpPfcs());
+        vo.setGwpSf6(record.getGwpSf6());
+        vo.setGwpNf3(record.getGwpNf3());
+        vo.setFactorGwp(record.getFactorGwp());
+        vo.setVersionProvinceCode(record.getVersionProvinceCode());
+        vo.setFactorVersion(record.getFactorVersion());
+        vo.setDivisionCode(record.getDivisionCode());
+        vo.setDivisionName(record.getDivisionName());
+        vo.setRegionName(record.getRegionName());
+        vo.setProvinceFactor(record.getProvinceFactor());
+        vo.setRegionFactor(record.getRegionFactor());
+        vo.setNationalFactor(record.getNationalFactor());
+        vo.setNonFossilExcludedFactor(record.getNonFossilExcludedFactor());
+        vo.setNationalFossilPowerFactor(record.getNationalFossilPowerFactor());
+        vo.setRowNo(record.getRowNo());
+        vo.setFuelLevel1(record.getFuelLevel1());
+        vo.setFuelLevel2(record.getFuelLevel2());
+        vo.setFuelLevel3(record.getFuelLevel3());
+        vo.setFuelLevel4(record.getFuelLevel4());
+        vo.setLowerHeatValue(record.getLowerHeatValue());
+        vo.setLowerHeatValueCv(record.getLowerHeatValueCv());
+        vo.setCo2Factor(record.getCo2Factor());
+        vo.setCo2FactorCv(record.getCo2FactorCv());
+        vo.setGwpValue(record.getGwpValue());
+        vo.setConvertedFactor(record.getConvertedFactor());
         vo.setSourceRef(record.getSourceRef());
+        vo.setRemark(record.getRemark());
         return vo;
     }
 

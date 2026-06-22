@@ -47,6 +47,7 @@ public class CvFactorRecordServiceImpl implements ICvFactorRecordService {
     @Override
     public int insertFactorRecord(CvFactorRecordBo bo) {
         assertFactorVersionMutable(bo.getVersionId());
+        normalizeSampleFields(bo);
         CvFactorRecord factorRecord = toEntity(bo);
         return baseMapper.insert(factorRecord);
     }
@@ -58,6 +59,7 @@ public class CvFactorRecordServiceImpl implements ICvFactorRecordService {
         if (!existing.getVersionId().equals(bo.getVersionId())) {
             assertFactorVersionMutable(bo.getVersionId());
         }
+        normalizeSampleFields(bo);
         CvFactorRecord factorRecord = toEntity(bo);
         return baseMapper.updateById(factorRecord);
     }
@@ -79,9 +81,13 @@ public class CvFactorRecordServiceImpl implements ICvFactorRecordService {
         LambdaQueryWrapper<CvFactorRecord> lqw = Wrappers.lambdaQuery();
         lqw.eq(bo.getId() != null, CvFactorRecord::getId, bo.getId());
         lqw.eq(bo.getVersionId() != null, CvFactorRecord::getVersionId, bo.getVersionId());
+        lqw.eq(StringUtils.isNotBlank(bo.getFactorTableCode()), CvFactorRecord::getFactorTableCode, bo.getFactorTableCode());
         lqw.like(StringUtils.isNotBlank(bo.getFactorCode()), CvFactorRecord::getFactorCode, bo.getFactorCode());
         lqw.like(StringUtils.isNotBlank(bo.getFactorName()), CvFactorRecord::getFactorName, bo.getFactorName());
         lqw.eq(StringUtils.isNotBlank(bo.getFactorCategory()), CvFactorRecord::getFactorCategory, bo.getFactorCategory());
+        lqw.like(StringUtils.isNotBlank(bo.getFactorKey()), CvFactorRecord::getFactorKey, bo.getFactorKey());
+        lqw.like(StringUtils.isNotBlank(bo.getEmissionSourceName()), CvFactorRecord::getEmissionSourceName, bo.getEmissionSourceName());
+        lqw.like(StringUtils.isNotBlank(bo.getFactorVersion()), CvFactorRecord::getFactorVersion, bo.getFactorVersion());
         lqw.eq(StringUtils.isNotBlank(bo.getFactorUnit()), CvFactorRecord::getFactorUnit, bo.getFactorUnit());
         lqw.eq(bo.getEnabledFlag() != null, CvFactorRecord::getEnabledFlag, bo.getEnabledFlag());
         lqw.between(params.get("beginTime") != null && params.get("endTime") != null,
@@ -104,6 +110,71 @@ public class CvFactorRecordServiceImpl implements ICvFactorRecordService {
 
     protected CvFactorRecord toEntity(CvFactorRecordBo bo) {
         return MapstructUtils.convert(bo, CvFactorRecord.class);
+    }
+
+    private void normalizeSampleFields(CvFactorRecordBo bo) {
+        if (StringUtils.isBlank(bo.getFactorTableCode())) {
+            bo.setFactorTableCode("201ef");
+        }
+        if (StringUtils.isBlank(bo.getFactorCode())) {
+            bo.setFactorCode(firstText(
+                bo.getFactorKey(),
+                bo.getVersionProvinceCode(),
+                bo.getFactorVersion(),
+                bo.getFuelLevel4(),
+                bo.getFuelLevel3(),
+                bo.getFuelLevel2(),
+                bo.getFuelLevel1()
+            ));
+        }
+        if (StringUtils.isBlank(bo.getFactorName())) {
+            bo.setFactorName(firstText(
+                bo.getEmissionSourceName(),
+                bo.getDivisionName(),
+                bo.getFuelLevel4(),
+                bo.getFuelLevel3(),
+                bo.getFuelLevel2(),
+                bo.getFuelLevel1(),
+                bo.getFactorCode()
+            ));
+        }
+        if (StringUtils.isBlank(bo.getFactorCategory())) {
+            bo.setFactorCategory(firstText(bo.getFactorTableCode(), bo.getFuelMaterialCategory(), bo.getRegionName()));
+        }
+        if (bo.getFactorValue() == null) {
+            bo.setFactorValue(firstNumber(
+                bo.getFactorGwp(),
+                bo.getProvinceFactor(),
+                bo.getRegionFactor(),
+                bo.getNationalFactor(),
+                bo.getConvertedFactor(),
+                bo.getCo2Factor(),
+                bo.getCo2()
+            ));
+        }
+        if (StringUtils.isBlank(bo.getFactorUnit())) {
+            bo.setFactorUnit(firstText(bo.getSourceUnit(), "kgCO2e"));
+        }
+        if (StringUtils.isBlank(bo.getSourceRef())) {
+            bo.setSourceRef(bo.getFactorSource());
+        }
+        if (bo.getEnabledFlag() == null) {
+            bo.setEnabledFlag(Boolean.TRUE);
+        }
+    }
+
+    private String firstText(String... values) {
+        return Arrays.stream(values)
+            .filter(StringUtils::isNotBlank)
+            .findFirst()
+            .orElse("UNKNOWN");
+    }
+
+    private java.math.BigDecimal firstNumber(java.math.BigDecimal... values) {
+        return Arrays.stream(values)
+            .filter(value -> value != null)
+            .findFirst()
+            .orElse(java.math.BigDecimal.ZERO);
     }
 
     private void assertFactorVersionMutable(Long versionId) {

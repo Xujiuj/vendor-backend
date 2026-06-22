@@ -28,12 +28,15 @@ public class CvDimensionRecordServiceImpl implements ICvDimensionRecordService {
 
     private static final Set<String> ALLOWED_DIMENSION_CODES = Set.of(
         "admin-division",
+        "company",
         "emission-source-category",
         "base-year",
-        "ef-electricity-factor",
         "ef-electricity-version",
         "ef-electricity-scope",
         "greenhouse-gas",
+        "intensity-denominator",
+        "intensity-target",
+        "intensity-tolerance",
         "report-template-download"
     );
 
