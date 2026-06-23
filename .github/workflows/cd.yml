@@ -68,6 +68,20 @@ jobs:
             --default-character-set=utf8mb4 \
             "$DB_NAME" \
             < script/sql/mysql/carbon_vendor_schema_v1.sql
+          for sql_file in \
+            script/sql/update/vendor_tenant_package_purchase_fields.sql \
+            script/sql/update/vendor_online_purchase_payment_fields.sql \
+            script/sql/update/vendor_tenant_package_license_fields.sql; do
+            echo "Executing vendor database migration from runner: $(basename "$sql_file")"
+            mysql \
+              --connect-timeout=20 \
+              --host="$DB_HOST" \
+              --port="$DB_PORT" \
+              --user="$DB_USERNAME" \
+              --password="$DB_PASSWORD" \
+              --default-character-set=utf8mb4 \
+              "$DB_NAME" < "$sql_file"
+          done
           mysql \
             --connect-timeout=20 \
             --host="$DB_HOST" \
@@ -100,12 +114,12 @@ jobs:
             echo "Deployment skipped because deploy or database secrets are incomplete."
             exit 0
           fi
-          REMOTE_SOURCE_DIR="$DEPLOY_PATH/releases/$DEPLOY_SERVICE-${GITHUB_RUN_ID}"
-          REMOTE_JAR="$DEPLOY_PATH/$DEPLOY_SERVICE-${GITHUB_RUN_ID}.jar"
-          REPO_URL="https://github.com/${GITHUB_REPOSITORY}.git"
+          JAR_FILE="ruoyi-admin/target/ruoyi-admin.jar"
+          REMOTE_JAR="/tmp/$DEPLOY_SERVICE-${GITHUB_RUN_ID}.jar"
           REPORT_TEMPLATE_ROOT="$DEPLOY_PATH/data/vendor/report-templates"
           VENDOR_SCHEMA_FILE="script/sql/mysql/carbon_vendor_schema_v1.sql"
-          REMOTE_SCHEMA="$DEPLOY_PATH/carbon_vendor_schema_v1-${GITHUB_RUN_ID}.sql"
+          REMOTE_SCHEMA="/tmp/carbon_vendor_schema_v1-${GITHUB_RUN_ID}.sql"
+          REMOTE_UPDATE_DIR="/tmp/vendor-business-updates-${GITHUB_RUN_ID}"
           timeout 120 sudo apt-get update
           timeout 120 sudo apt-get install -y sshpass
           SSH_OPTS=(
@@ -128,27 +142,13 @@ jobs:
             --default-character-set=utf8mb4 \
             "$DB_NAME" \
             < "$REMOTE_SCHEMA"
-          rm -f "$REMOTE_SCHEMA"
-          EOF
-          cat > deploy-backend.sh <<'EOF'
-          set -euo pipefail
-          echo "$SUDO_PASSWORD" | sudo -S timeout 180 apt-get update
-          echo "$SUDO_PASSWORD" | sudo -S timeout 300 apt-get install -y openjdk-17-jdk-headless maven git redis-server curl mysql-client
-          rm -rf "$REMOTE_SOURCE_DIR"
-          mkdir -p "$(dirname "$REMOTE_SOURCE_DIR")"
-          git init "$REMOTE_SOURCE_DIR"
-          cd "$REMOTE_SOURCE_DIR"
-          git remote add origin "$REPO_URL"
-          git fetch --depth 1 origin "$GITHUB_SHA"
-          git checkout --detach FETCH_HEAD
-          mvn -B -Pprod clean package -DskipTests
-          cp ruoyi-admin/target/ruoyi-admin.jar "$REMOTE_JAR"
           for sql_file in \
-            script/sql/update/vendor_tenant_package_purchase_fields.sql \
-            script/sql/update/vendor_online_purchase_payment_fields.sql \
-            script/sql/update/vendor_tenant_package_license_fields.sql; do
-            echo "Executing vendor database migration: $(basename "$sql_file")"
+            "$REMOTE_UPDATE_DIR/vendor_tenant_package_purchase_fields.sql" \
+            "$REMOTE_UPDATE_DIR/vendor_online_purchase_payment_fields.sql" \
+            "$REMOTE_UPDATE_DIR/vendor_tenant_package_license_fields.sql"; do
+            echo "Executing vendor database migration from target host: $(basename "$sql_file")"
             mysql \
+              --connect-timeout=20 \
               --host="$DB_HOST" \
               --port="$DB_PORT" \
               --user="$DB_USERNAME" \
@@ -156,8 +156,16 @@ jobs:
               --default-character-set=utf8mb4 \
               "$DB_NAME" < "$sql_file"
           done
+          rm -f "$REMOTE_SCHEMA"
+          rm -rf "$REMOTE_UPDATE_DIR"
+          EOF
+          cat > deploy-backend.sh <<'EOF'
+          set -euo pipefail
+          echo "$SUDO_PASSWORD" | sudo -S timeout 180 apt-get update
+          echo "$SUDO_PASSWORD" | sudo -S timeout 300 apt-get install -y openjdk-17-jdk-headless redis-server curl
           echo "$SUDO_PASSWORD" | sudo -S install -d -o "$USER" -g "$USER" "$DEPLOY_PATH/apps/$DEPLOY_SERVICE" "$DEPLOY_PATH/logs/$DEPLOY_SERVICE" "$REPORT_TEMPLATE_ROOT"
-          mv "$REMOTE_JAR" "$DEPLOY_PATH/apps/$DEPLOY_SERVICE/app.jar"
+          install -m 0644 "$REMOTE_JAR" "$DEPLOY_PATH/apps/$DEPLOY_SERVICE/app.jar"
+          rm -f "$REMOTE_JAR"
           echo "$SUDO_PASSWORD" | sudo -S sed -i "s/^# *requirepass .*/requirepass ruoyi123/; s/^requirepass .*/requirepass ruoyi123/" /etc/redis/redis.conf
           if ! echo "$SUDO_PASSWORD" | sudo -S grep -q '^requirepass ' /etc/redis/redis.conf; then
             echo "$SUDO_PASSWORD" | sudo -S sh -c "printf '\nrequirepass ruoyi123\n' >> /etc/redis/redis.conf"
@@ -199,7 +207,6 @@ jobs:
           for attempt in $(seq 1 24); do
             if curl -fsS --max-time 5 "http://127.0.0.1:$APP_PORT/auth/code" | grep -q '"code":200'; then
               echo "$DEPLOY_SERVICE is healthy on 127.0.0.1:$APP_PORT"
-              rm -rf "$REMOTE_SOURCE_DIR"
               exit 0
             fi
             sleep 5
@@ -211,9 +218,14 @@ jobs:
           exit 1
           EOF
           if [ "${{ steps.sync_business_runner.outputs.status }}" != "success" ]; then
+            timeout 60 sshpass -p "$DEPLOY_PASSWORD" ssh "${SSH_OPTS[@]}" "$DEPLOY_USER@$DEPLOY_HOST" "rm -rf '$REMOTE_UPDATE_DIR' && mkdir -p '$REMOTE_UPDATE_DIR'"
             timeout 60 sshpass -p "$DEPLOY_PASSWORD" scp -P "$DEPLOY_PORT" -o StrictHostKeyChecking=accept-new "$VENDOR_SCHEMA_FILE" "$DEPLOY_USER@$DEPLOY_HOST:$REMOTE_SCHEMA"
+            timeout 60 sshpass -p "$DEPLOY_PASSWORD" scp -P "$DEPLOY_PORT" -o StrictHostKeyChecking=accept-new script/sql/update/vendor_tenant_package_purchase_fields.sql "$DEPLOY_USER@$DEPLOY_HOST:$REMOTE_UPDATE_DIR/"
+            timeout 60 sshpass -p "$DEPLOY_PASSWORD" scp -P "$DEPLOY_PORT" -o StrictHostKeyChecking=accept-new script/sql/update/vendor_online_purchase_payment_fields.sql "$DEPLOY_USER@$DEPLOY_HOST:$REMOTE_UPDATE_DIR/"
+            timeout 60 sshpass -p "$DEPLOY_PASSWORD" scp -P "$DEPLOY_PORT" -o StrictHostKeyChecking=accept-new script/sql/update/vendor_tenant_package_license_fields.sql "$DEPLOY_USER@$DEPLOY_HOST:$REMOTE_UPDATE_DIR/"
             timeout 300 sshpass -p "$DEPLOY_PASSWORD" ssh "${SSH_OPTS[@]}" "$DEPLOY_USER@$DEPLOY_HOST" \
-              "DB_NAME='$DB_NAME' DB_HOST='$DB_HOST' DB_PORT='$DB_PORT' DB_USERNAME='$DB_USERNAME' DB_PASSWORD='$DB_PASSWORD' REMOTE_SCHEMA='$REMOTE_SCHEMA' SUDO_PASSWORD='$DEPLOY_PASSWORD' timeout 240 bash -s" < sync-business-db.sh
+              "DB_NAME='$DB_NAME' DB_HOST='$DB_HOST' DB_PORT='$DB_PORT' DB_USERNAME='$DB_USERNAME' DB_PASSWORD='$DB_PASSWORD' REMOTE_SCHEMA='$REMOTE_SCHEMA' REMOTE_UPDATE_DIR='$REMOTE_UPDATE_DIR' SUDO_PASSWORD='$DEPLOY_PASSWORD' timeout 240 bash -s" < sync-business-db.sh
           fi
-          timeout 4800 sshpass -p "$DEPLOY_PASSWORD" ssh "${SSH_OPTS[@]}" "$DEPLOY_USER@$DEPLOY_HOST" \
-            "REMOTE_SOURCE_DIR='$REMOTE_SOURCE_DIR' REPO_URL='$REPO_URL' GITHUB_SHA='$GITHUB_SHA' DEPLOY_PATH='$DEPLOY_PATH' DEPLOY_SERVICE='$DEPLOY_SERVICE' APP_PORT='$APP_PORT' SNAIL_PORT='$SNAIL_PORT' DB_PREFIX='$DB_PREFIX' DB_NAME='$DB_NAME' DB_HOST='$DB_HOST' DB_PORT='$DB_PORT' DB_USERNAME='$DB_USERNAME' DB_PASSWORD='$DB_PASSWORD' REMOTE_JAR='$REMOTE_JAR' REPORT_TEMPLATE_ROOT='$REPORT_TEMPLATE_ROOT' SUDO_PASSWORD='$DEPLOY_PASSWORD' timeout 4700 bash -s" < deploy-backend.sh
+          timeout 180 sshpass -p "$DEPLOY_PASSWORD" scp -P "$DEPLOY_PORT" -o StrictHostKeyChecking=accept-new "$JAR_FILE" "$DEPLOY_USER@$DEPLOY_HOST:$REMOTE_JAR"
+          timeout 900 sshpass -p "$DEPLOY_PASSWORD" ssh "${SSH_OPTS[@]}" "$DEPLOY_USER@$DEPLOY_HOST" \
+            "DEPLOY_PATH='$DEPLOY_PATH' DEPLOY_SERVICE='$DEPLOY_SERVICE' APP_PORT='$APP_PORT' SNAIL_PORT='$SNAIL_PORT' DB_PREFIX='$DB_PREFIX' DB_NAME='$DB_NAME' DB_HOST='$DB_HOST' DB_PORT='$DB_PORT' DB_USERNAME='$DB_USERNAME' DB_PASSWORD='$DB_PASSWORD' REMOTE_JAR='$REMOTE_JAR' REPORT_TEMPLATE_ROOT='$REPORT_TEMPLATE_ROOT' SUDO_PASSWORD='$DEPLOY_PASSWORD' timeout 840 bash -s" < deploy-backend.sh
