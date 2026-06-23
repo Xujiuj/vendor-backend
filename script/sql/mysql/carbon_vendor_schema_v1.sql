@@ -199,7 +199,7 @@ CREATE TABLE IF NOT EXISTS cv_vendor_table_field (
     sort_order INT NOT NULL DEFAULT 0,
     status CHAR(1) NOT NULL DEFAULT '0',
     create_time DATETIME DEFAULT CURRENT_TIMESTAMP,
-    update_time DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    update_time DATETIME DEFAULT CURRENT_TIMESTAMP,
     remark VARCHAR(500) DEFAULT NULL,
     PRIMARY KEY (id),
     UNIQUE KEY uk_cv_vendor_table_field (table_group, table_code, field_key),
