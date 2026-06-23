@@ -79,6 +79,9 @@ insert into sys_menu
 values
 (910109, '客户档案详情', 910101, 1, '', '', '', 1, 0, 'F', '0', '0', 'vendor:customer:query', '#', 103, 1, sysdate(), null, null, '客户档案详情权限'),
 (910110, '因子版本详情', 910103, 1, '', '', '', 1, 0, 'F', '0', '0', 'vendor:factorVersion:query', '#', 103, 1, sysdate(), null, null, '因子版本详情权限'),
+(910145, '因子版本新增', 910103, 2, '', '', '', 1, 0, 'F', '0', '0', 'vendor:factorVersion:add', '#', 103, 1, sysdate(), null, null, '因子版本新增权限'),
+(910146, '因子版本编辑', 910103, 3, '', '', '', 1, 0, 'F', '0', '0', 'vendor:factorVersion:edit', '#', 103, 1, sysdate(), null, null, '因子版本编辑权限'),
+(910147, '因子版本删除', 910103, 4, '', '', '', 1, 0, 'F', '0', '0', 'vendor:factorVersion:remove', '#', 103, 1, sysdate(), null, null, '因子版本删除权限'),
 (910111, '因子明细详情', 910104, 1, '', '', '', 1, 0, 'F', '0', '0', 'vendor:factorRecord:query', '#', 103, 1, sysdate(), null, null, '因子明细详情权限'),
 (910112, '因子明细新增', 910104, 2, '', '', '', 1, 0, 'F', '0', '0', 'vendor:factorRecord:add', '#', 103, 1, sysdate(), null, null, '因子明细新增权限'),
 (910122, '因子明细编辑', 910104, 3, '', '', '', 1, 0, 'F', '0', '0', 'vendor:factorRecord:edit', '#', 103, 1, sysdate(), null, null, '因子明细编辑权限'),

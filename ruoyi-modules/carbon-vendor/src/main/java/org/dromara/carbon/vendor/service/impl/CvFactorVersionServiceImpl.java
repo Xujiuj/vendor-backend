@@ -13,11 +13,13 @@ import org.dromara.carbon.vendor.service.ICvFactorVersionService;
 import org.dromara.common.core.enums.FormatsType;
 import org.dromara.common.core.exception.ServiceException;
 import org.dromara.common.core.utils.DateUtils;
+import org.dromara.common.core.utils.MapstructUtils;
 import org.dromara.common.core.utils.StringUtils;
 import org.dromara.common.mybatis.core.page.PageQuery;
 import org.dromara.common.mybatis.core.page.TableDataInfo;
 import org.springframework.stereotype.Service;
 
+import java.util.Arrays;
 import java.util.Date;
 import java.util.Map;
 
@@ -43,11 +45,58 @@ public class CvFactorVersionServiceImpl implements ICvFactorVersionService {
     }
 
     @Override
+    public Boolean insertFactorVersion(CvFactorVersionBo bo) {
+        normalizeEditableFields(bo, true);
+        ensureVersionCodeUnique(bo);
+        CvFactorVersion add = MapstructUtils.convert(bo, CvFactorVersion.class);
+        boolean flag = baseMapper.insert(add) > 0;
+        if (flag) {
+            bo.setId(add.getId());
+        }
+        return flag;
+    }
+
+    @Override
+    public Boolean updateFactorVersion(CvFactorVersionBo bo) {
+        CvFactorVersion existing = requireFactorVersion(bo.getId());
+        CvFactorVersionLifecycleState currentState = CvFactorVersionLifecycleState.fromVersion(existing);
+        if (currentState != CvFactorVersionLifecycleState.DRAFT
+            && currentState != CvFactorVersionLifecycleState.RETIRED) {
+            throw new ServiceException("仅草稿或已退役的因子版本允许编辑");
+        }
+        normalizeEditableFields(bo, false);
+        ensureVersionCodeUnique(bo);
+        CvFactorVersion update = MapstructUtils.convert(bo, CvFactorVersion.class);
+        update.setPublishStatus(existing.getPublishStatus());
+        update.setFrozenFlag(existing.getFrozenFlag());
+        update.setPublishedBy(existing.getPublishedBy());
+        update.setPublishedTime(existing.getPublishedTime());
+        update.setCreateTime(existing.getCreateTime());
+        return baseMapper.updateById(update) > 0;
+    }
+
+    @Override
+    public Boolean deleteFactorVersionByIds(Long[] ids) {
+        if (ids == null || ids.length == 0) {
+            return false;
+        }
+        for (Long id : ids) {
+            CvFactorVersion version = requireFactorVersion(id);
+            CvFactorVersionLifecycleState currentState = CvFactorVersionLifecycleState.fromVersion(version);
+            if (currentState != CvFactorVersionLifecycleState.DRAFT
+                && currentState != CvFactorVersionLifecycleState.RETIRED) {
+                throw new ServiceException("仅草稿或已退役的因子版本允许删除");
+            }
+        }
+        return baseMapper.deleteByIds(Arrays.asList(ids)) > 0;
+    }
+
+    @Override
     public void releaseFactorVersion(Long id, String operatedBy) {
         CvFactorVersion version = requireFactorVersion(id);
         CvFactorVersionLifecycleState currentState = CvFactorVersionLifecycleState.fromVersion(version);
         if (currentState != CvFactorVersionLifecycleState.DRAFT) {
-            throw new ServiceException("Only draft factor versions can be published");
+            throw new ServiceException("仅草稿状态的因子版本允许发布");
         }
         Date operationTime = DateUtils.getNowDate();
         version.setPublishStatus(CvFactorVersionLifecycleState.PUBLISHED.getStatus());
@@ -63,7 +112,7 @@ public class CvFactorVersionServiceImpl implements ICvFactorVersionService {
         CvFactorVersion version = requireFactorVersion(id);
         CvFactorVersionLifecycleState currentState = CvFactorVersionLifecycleState.fromVersion(version);
         if (currentState != CvFactorVersionLifecycleState.PUBLISHED) {
-            throw new ServiceException("Only published factor versions can be frozen");
+            throw new ServiceException("仅已发布的因子版本允许冻结");
         }
         Date operationTime = DateUtils.getNowDate();
         version.setPublishStatus(CvFactorVersionLifecycleState.FROZEN.getStatus());
@@ -78,7 +127,7 @@ public class CvFactorVersionServiceImpl implements ICvFactorVersionService {
         CvFactorVersionLifecycleState currentState = CvFactorVersionLifecycleState.fromVersion(version);
         if (currentState != CvFactorVersionLifecycleState.PUBLISHED
             && currentState != CvFactorVersionLifecycleState.FROZEN) {
-            throw new ServiceException("Only published or frozen factor versions can be retired");
+            throw new ServiceException("仅已发布或已冻结的因子版本允许退役");
         }
         Date operationTime = DateUtils.getNowDate();
         version.setPublishStatus(CvFactorVersionLifecycleState.RETIRED.getStatus());
@@ -93,7 +142,7 @@ public class CvFactorVersionServiceImpl implements ICvFactorVersionService {
         String normalizedStatus = CvFactorVersionLifecycleState.normalizeStatus(version.getPublishStatus());
         boolean frozen = Boolean.TRUE.equals(version.getFrozenFlag());
         if (!CvFactorVersionLifecycleState.RETIRED.getStatus().equals(normalizedStatus) || frozen) {
-            throw new ServiceException("Only retired factor versions can be restored");
+            throw new ServiceException("仅已退役且未冻结的因子版本允许恢复");
         }
         Date operationTime = DateUtils.getNowDate();
         version.setPublishStatus(CvFactorVersionLifecycleState.DRAFT.getStatus());
@@ -103,7 +152,7 @@ public class CvFactorVersionServiceImpl implements ICvFactorVersionService {
     }
 
     private LambdaQueryWrapper<CvFactorVersion> buildQueryWrapper(CvFactorVersionBo bo) {
-        Map<String, Object> params = bo.getParams();
+        Map<String, Object> params = bo.getParams() == null ? Map.of() : bo.getParams();
         LambdaQueryWrapper<CvFactorVersion> lqw = Wrappers.lambdaQuery();
         lqw.eq(bo.getId() != null, CvFactorVersion::getId, bo.getId());
         lqw.like(StringUtils.isNotBlank(bo.getVersionCode()), CvFactorVersion::getVersionCode, bo.getVersionCode());
@@ -120,20 +169,38 @@ public class CvFactorVersionServiceImpl implements ICvFactorVersionService {
 
     private CvFactorVersion requireFactorVersion(Long id) {
         if (id == null) {
-            throw new ServiceException("Factor version id cannot be null");
+            throw new ServiceException("因子版本ID不能为空");
         }
         CvFactorVersion version = baseMapper.selectById(id);
         if (version == null) {
-            throw new ServiceException("Factor version does not exist");
+            throw new ServiceException("因子版本不存在");
         }
         return version;
     }
 
     private String requireOperator(String operatedBy) {
         if (StringUtils.isBlank(operatedBy)) {
-            throw new ServiceException("Factor version lifecycle operator cannot be blank");
+            throw new ServiceException("因子版本操作人不能为空");
         }
         return operatedBy.trim();
+    }
+
+    private void normalizeEditableFields(CvFactorVersionBo bo, boolean create) {
+        bo.setVersionCode(StringUtils.trim(bo.getVersionCode()));
+        bo.setVersionName(StringUtils.trim(bo.getVersionName()));
+        if (create) {
+            bo.setPublishStatus(CvFactorVersionLifecycleState.DRAFT.getStatus());
+            bo.setFrozenFlag(Boolean.FALSE);
+        }
+    }
+
+    private void ensureVersionCodeUnique(CvFactorVersionBo bo) {
+        Long count = baseMapper.selectCount(Wrappers.lambdaQuery(CvFactorVersion.class)
+            .eq(CvFactorVersion::getVersionCode, bo.getVersionCode())
+            .ne(bo.getId() != null, CvFactorVersion::getId, bo.getId()));
+        if (count != null && count > 0) {
+            throw new ServiceException("版本编码不能重复");
+        }
     }
 
     private String appendAuditRemark(String currentRemark, String action, String operatedBy, Date operationTime) {

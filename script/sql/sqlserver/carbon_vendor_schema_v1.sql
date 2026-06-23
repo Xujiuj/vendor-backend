@@ -202,6 +202,28 @@ CREATE INDEX idx_cv_dimension_record_status
     ON cv_dimension_record (dimension_code, status);
 GO
 
+CREATE TABLE cv_vendor_table_field (
+    id BIGINT IDENTITY(1,1) NOT NULL PRIMARY KEY,
+    table_group NVARCHAR(32) NOT NULL,
+    table_code NVARCHAR(64) NOT NULL,
+    field_key NVARCHAR(128) NOT NULL,
+    field_label NVARCHAR(255) NOT NULL,
+    field_type NVARCHAR(32) NOT NULL DEFAULT 'text',
+    field_precision INT NULL,
+    field_width INT NULL,
+    required_flag BIT NOT NULL DEFAULT 0,
+    sort_order INT NOT NULL DEFAULT 0,
+    status NCHAR(1) NOT NULL DEFAULT '0',
+    create_time DATETIME2 DEFAULT SYSDATETIME(),
+    update_time DATETIME2 DEFAULT SYSDATETIME(),
+    remark NVARCHAR(500) NULL,
+    CONSTRAINT uk_cv_vendor_table_field UNIQUE (table_group, table_code, field_key)
+);
+GO
+
+CREATE INDEX idx_cv_vendor_table_field_table ON cv_vendor_table_field (table_group, table_code);
+GO
+
 CREATE TABLE cv_factor_customer_scope (
     id BIGINT IDENTITY(1,1) NOT NULL PRIMARY KEY,
     version_id BIGINT NOT NULL,

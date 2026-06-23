@@ -6,6 +6,8 @@ import org.dromara.carbon.vendor.domain.bo.CvFactorVersionBo;
 import org.dromara.carbon.vendor.domain.vo.CvFactorVersionVo;
 import org.dromara.carbon.vendor.service.ICvFactorVersionService;
 import org.dromara.common.core.domain.R;
+import org.dromara.common.core.validate.AddGroup;
+import org.dromara.common.core.validate.EditGroup;
 import org.dromara.common.core.utils.StringUtils;
 import org.dromara.common.mybatis.core.page.PageQuery;
 import org.dromara.common.mybatis.core.page.TableDataInfo;
@@ -15,6 +17,9 @@ import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
+import org.springframework.web.bind.annotation.DeleteMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -47,6 +52,33 @@ public class CvFactorVersionController extends BaseController {
     @GetMapping("/{id}")
     public R<CvFactorVersionVo> getInfo(@PathVariable Long id) {
         return R.ok(factorVersionService.selectFactorVersionById(id));
+    }
+
+    /**
+     * Add vendor factor version metadata.
+     */
+    @SaCheckPermission("vendor:factorVersion:add")
+    @PostMapping
+    public R<Void> add(@Validated(AddGroup.class) @RequestBody CvFactorVersionBo factorVersion) {
+        return toAjax(factorVersionService.insertFactorVersion(factorVersion));
+    }
+
+    /**
+     * Edit vendor factor version metadata.
+     */
+    @SaCheckPermission("vendor:factorVersion:edit")
+    @PutMapping
+    public R<Void> edit(@Validated(EditGroup.class) @RequestBody CvFactorVersionBo factorVersion) {
+        return toAjax(factorVersionService.updateFactorVersion(factorVersion));
+    }
+
+    /**
+     * Delete vendor factor versions.
+     */
+    @SaCheckPermission("vendor:factorVersion:remove")
+    @DeleteMapping("/{ids}")
+    public R<Void> remove(@PathVariable Long[] ids) {
+        return toAjax(factorVersionService.deleteFactorVersionByIds(ids));
     }
 
     /**

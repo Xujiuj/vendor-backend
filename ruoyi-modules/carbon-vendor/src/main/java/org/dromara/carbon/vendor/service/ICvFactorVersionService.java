@@ -28,6 +28,30 @@ public interface ICvFactorVersionService {
     CvFactorVersionVo selectFactorVersionById(Long id);
 
     /**
+     * Create factor version metadata.
+     *
+     * @param bo factor version form object
+     * @return whether insert succeeded
+     */
+    Boolean insertFactorVersion(CvFactorVersionBo bo);
+
+    /**
+     * Update factor version metadata.
+     *
+     * @param bo factor version form object
+     * @return whether update succeeded
+     */
+    Boolean updateFactorVersion(CvFactorVersionBo bo);
+
+    /**
+     * Delete factor versions.
+     *
+     * @param ids primary keys
+     * @return whether delete succeeded
+     */
+    Boolean deleteFactorVersionByIds(Long[] ids);
+
+    /**
      * Publish a draft factor version.
      *
      * @param id primary key
