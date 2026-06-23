@@ -42,6 +42,45 @@ jobs:
       - name: Package
         run: mvn -B -Pprod clean package -DskipTests
 
+      - name: Sync vendor business database from runner
+        id: sync_business_runner
+        env:
+          DB_HOST: ${{ secrets.DB_HOST }}
+          DB_PORT: ${{ secrets.DB_PORT || 3306 }}
+          DB_USERNAME: ${{ secrets.DB_USERNAME }}
+          DB_PASSWORD: ${{ secrets.DB_PASSWORD }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ -z "$DB_HOST" ] || [ -z "$DB_USERNAME" ] || [ -z "$DB_PASSWORD" ]; then
+            echo "Vendor business database sync skipped because database secrets are incomplete."
+            echo "status=skipped" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          sudo apt-get update
+          sudo apt-get install -y default-mysql-client
+          mysql \
+            --connect-timeout=20 \
+            --host="$DB_HOST" \
+            --port="$DB_PORT" \
+            --user="$DB_USERNAME" \
+            --password="$DB_PASSWORD" \
+            --default-character-set=utf8mb4 \
+            "$DB_NAME" \
+            < script/sql/mysql/carbon_vendor_schema_v1.sql
+          mysql \
+            --connect-timeout=20 \
+            --host="$DB_HOST" \
+            --port="$DB_PORT" \
+            --user="$DB_USERNAME" \
+            --password="$DB_PASSWORD" \
+            --default-character-set=utf8mb4 \
+            --batch \
+            --skip-column-names \
+            "$DB_NAME" \
+            -e "select count(*) from information_schema.tables where table_schema = '$DB_NAME' and table_name like 'cv\\_%';"
+          echo "status=success" >> "$GITHUB_OUTPUT"
+
       - name: Deploy over SSH
         timeout-minutes: 80
         env:
@@ -65,6 +104,8 @@ jobs:
           REMOTE_JAR="$DEPLOY_PATH/$DEPLOY_SERVICE-${GITHUB_RUN_ID}.jar"
           REPO_URL="https://github.com/${GITHUB_REPOSITORY}.git"
           REPORT_TEMPLATE_ROOT="$DEPLOY_PATH/data/vendor/report-templates"
+          VENDOR_SCHEMA_FILE="script/sql/mysql/carbon_vendor_schema_v1.sql"
+          REMOTE_SCHEMA="$DEPLOY_PATH/carbon_vendor_schema_v1-${GITHUB_RUN_ID}.sql"
           timeout 120 sudo apt-get update
           timeout 120 sudo apt-get install -y sshpass
           SSH_OPTS=(
@@ -74,6 +115,21 @@ jobs:
             -o ServerAliveInterval=15
             -o ServerAliveCountMax=4
           )
+          cat > sync-business-db.sh <<'EOF'
+          set -euo pipefail
+          echo "$SUDO_PASSWORD" | sudo -S apt-get update
+          echo "$SUDO_PASSWORD" | sudo -S apt-get install -y default-mysql-client
+          mysql \
+            --connect-timeout=20 \
+            --host="$DB_HOST" \
+            --port="$DB_PORT" \
+            --user="$DB_USERNAME" \
+            --password="$DB_PASSWORD" \
+            --default-character-set=utf8mb4 \
+            "$DB_NAME" \
+            < "$REMOTE_SCHEMA"
+          rm -f "$REMOTE_SCHEMA"
+          EOF
           cat > deploy-backend.sh <<'EOF'
           set -euo pipefail
           echo "$SUDO_PASSWORD" | sudo -S timeout 180 apt-get update
@@ -154,5 +210,10 @@ jobs:
           ss -lntp || true
           exit 1
           EOF
+          if [ "${{ steps.sync_business_runner.outputs.status }}" != "success" ]; then
+            timeout 60 sshpass -p "$DEPLOY_PASSWORD" scp -P "$DEPLOY_PORT" -o StrictHostKeyChecking=accept-new "$VENDOR_SCHEMA_FILE" "$DEPLOY_USER@$DEPLOY_HOST:$REMOTE_SCHEMA"
+            timeout 300 sshpass -p "$DEPLOY_PASSWORD" ssh "${SSH_OPTS[@]}" "$DEPLOY_USER@$DEPLOY_HOST" \
+              "DB_NAME='$DB_NAME' DB_HOST='$DB_HOST' DB_PORT='$DB_PORT' DB_USERNAME='$DB_USERNAME' DB_PASSWORD='$DB_PASSWORD' REMOTE_SCHEMA='$REMOTE_SCHEMA' SUDO_PASSWORD='$DEPLOY_PASSWORD' timeout 240 bash -s" < sync-business-db.sh
+          fi
           timeout 4800 sshpass -p "$DEPLOY_PASSWORD" ssh "${SSH_OPTS[@]}" "$DEPLOY_USER@$DEPLOY_HOST" \
             "REMOTE_SOURCE_DIR='$REMOTE_SOURCE_DIR' REPO_URL='$REPO_URL' GITHUB_SHA='$GITHUB_SHA' DEPLOY_PATH='$DEPLOY_PATH' DEPLOY_SERVICE='$DEPLOY_SERVICE' APP_PORT='$APP_PORT' SNAIL_PORT='$SNAIL_PORT' DB_PREFIX='$DB_PREFIX' DB_NAME='$DB_NAME' DB_HOST='$DB_HOST' DB_PORT='$DB_PORT' DB_USERNAME='$DB_USERNAME' DB_PASSWORD='$DB_PASSWORD' REMOTE_JAR='$REMOTE_JAR' REPORT_TEMPLATE_ROOT='$REPORT_TEMPLATE_ROOT' SUDO_PASSWORD='$DEPLOY_PASSWORD' timeout 4700 bash -s" < deploy-backend.sh
