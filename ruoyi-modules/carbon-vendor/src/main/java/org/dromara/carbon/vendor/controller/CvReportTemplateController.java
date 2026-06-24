@@ -15,6 +15,9 @@ import org.dromara.common.core.validate.EditGroup;
 import org.dromara.common.mybatis.core.page.PageQuery;
 import org.dromara.common.mybatis.core.page.TableDataInfo;
 import org.dromara.common.satoken.utils.LoginHelper;
+import org.dromara.common.idempotent.annotation.RepeatSubmit;
+import org.dromara.common.log.annotation.Log;
+import org.dromara.common.log.enums.BusinessType;
 import org.dromara.common.web.core.BaseController;
 import org.springframework.http.MediaType;
 import org.springframework.validation.annotation.Validated;
@@ -64,6 +67,8 @@ public class CvReportTemplateController extends BaseController {
     /**
      * Add vendor report template.
      */
+    @Log(title = "报告模板", businessType = BusinessType.INSERT)
+    @RepeatSubmit
     @SaCheckPermission("vendor:reportTemplate:add")
     @PostMapping
     public R<Void> add(@Validated(AddGroup.class) @RequestBody CvReportTemplateBo reportTemplate) {
@@ -73,6 +78,8 @@ public class CvReportTemplateController extends BaseController {
     /**
      * Upload a vendor-owned report template file and return local file metadata.
      */
+    @Log(title = "报告模板", businessType = BusinessType.INSERT)
+    @RepeatSubmit
     @SaCheckPermission(value = {
         "vendor:reportTemplate:add",
         "vendor:reportTemplate:edit"
@@ -85,6 +92,8 @@ public class CvReportTemplateController extends BaseController {
     /**
      * Edit vendor report template.
      */
+    @Log(title = "报告模板", businessType = BusinessType.UPDATE)
+    @RepeatSubmit
     @SaCheckPermission("vendor:reportTemplate:edit")
     @PutMapping
     public R<Void> edit(@Validated(EditGroup.class) @RequestBody CvReportTemplateBo reportTemplate) {
@@ -96,6 +105,7 @@ public class CvReportTemplateController extends BaseController {
      *
      * @param ids primary keys
      */
+    @Log(title = "报告模板", businessType = BusinessType.DELETE)
     @SaCheckPermission("vendor:reportTemplate:remove")
     @DeleteMapping("/{ids}")
     public R<Void> remove(@PathVariable Long[] ids) {
@@ -105,6 +115,8 @@ public class CvReportTemplateController extends BaseController {
     /**
      * Publish vendor report template metadata.
      */
+    @Log(title = "报告模板", businessType = BusinessType.UPDATE)
+    @RepeatSubmit
     @SaCheckPermission("vendor:reportTemplate:edit")
     @PostMapping("/{id}/publish")
     public R<Void> publish(@PathVariable Long id) {
@@ -115,6 +127,8 @@ public class CvReportTemplateController extends BaseController {
     /**
      * Disable vendor report template metadata.
      */
+    @Log(title = "报告模板", businessType = BusinessType.UPDATE)
+    @RepeatSubmit
     @SaCheckPermission("vendor:reportTemplate:edit")
     @PostMapping("/{id}/disable")
     public R<Void> disable(@PathVariable Long id) {

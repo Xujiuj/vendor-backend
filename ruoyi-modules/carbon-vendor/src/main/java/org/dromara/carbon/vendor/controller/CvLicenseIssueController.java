@@ -14,6 +14,9 @@ import org.dromara.common.core.utils.StringUtils;
 import org.dromara.common.mybatis.core.page.PageQuery;
 import org.dromara.common.mybatis.core.page.TableDataInfo;
 import org.dromara.common.satoken.utils.LoginHelper;
+import org.dromara.common.idempotent.annotation.RepeatSubmit;
+import org.dromara.common.log.annotation.Log;
+import org.dromara.common.log.enums.BusinessType;
 import org.dromara.common.web.core.BaseController;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -57,6 +60,8 @@ public class CvLicenseIssueController extends BaseController {
     /**
      * Issue a manual license file.
      */
+    @Log(title = "许可证签发", businessType = BusinessType.INSERT)
+    @RepeatSubmit
     @SaCheckPermission("vendor:licenseIssue:issue")
     @PostMapping("/issue")
     public R<CvLicenseIssueResult> issue(@Validated @RequestBody CvLicenseIssueRequest request) {
@@ -71,6 +76,8 @@ public class CvLicenseIssueController extends BaseController {
     /**
      * Reissue a revoked license file using append-only audit history.
      */
+    @Log(title = "许可证签发", businessType = BusinessType.INSERT)
+    @RepeatSubmit
     @SaCheckPermission("vendor:licenseIssue:issue")
     @PostMapping("/reissue")
     public R<CvLicenseIssueResult> reissue(@Validated @RequestBody CvLicenseReissueRequest request) {
@@ -85,6 +92,7 @@ public class CvLicenseIssueController extends BaseController {
     /**
      * Revoke an issued license with vendor-side audit metadata.
      */
+    @Log(title = "许可证签发", businessType = BusinessType.UPDATE)
     @SaCheckPermission("vendor:licenseIssue:revoke")
     @PostMapping("/revoke")
     public R<Void> revoke(@Validated @RequestBody CvLicenseRevokeRequest request) {

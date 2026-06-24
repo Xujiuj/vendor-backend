@@ -21,6 +21,7 @@ import org.springframework.stereotype.Service;
 
 import java.util.Date;
 import java.util.List;
+import java.util.Set;
 
 /**
  * Vendor open factor sync service implementation.
@@ -33,6 +34,12 @@ public class CvOpenFactorServiceImpl implements ICvOpenFactorService {
     private static final String HTTP_METHOD = "GET";
     private static final String FEATURE_FACTOR_SYNC = "factor-sync";
     private static final String ISSUE_STATUS_REVOKED = "revoked";
+    private static final Set<String> ALLOWED_FACTOR_TABLE_CODES = Set.of(
+        "202ef",
+        "203ef",
+        "205ef",
+        "206"
+    );
 
     private final CvLicenseIssueMapper licenseIssueMapper;
     private final CvFactorVersionMapper factorVersionMapper;
@@ -50,6 +57,7 @@ public class CvOpenFactorServiceImpl implements ICvOpenFactorService {
             CvFactorVersion version = findLatestAuthorizedVersion(entitlement);
             List<CvOpenFactorRecordVo> records = factorRecordMapper.selectList(Wrappers.<CvFactorRecord>lambdaQuery()
                     .eq(CvFactorRecord::getVersionId, version.getId())
+                    .in(CvFactorRecord::getFactorTableCode, ALLOWED_FACTOR_TABLE_CODES)
                     .eq(CvFactorRecord::getEnabledFlag, Boolean.TRUE)
                     .orderByAsc(CvFactorRecord::getFactorTableCode)
                     .orderByAsc(CvFactorRecord::getFactorCode)

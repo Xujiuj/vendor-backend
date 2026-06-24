@@ -10,6 +10,9 @@ import org.dromara.common.core.validate.AddGroup;
 import org.dromara.common.core.validate.EditGroup;
 import org.dromara.common.mybatis.core.page.PageQuery;
 import org.dromara.common.mybatis.core.page.TableDataInfo;
+import org.dromara.common.idempotent.annotation.RepeatSubmit;
+import org.dromara.common.log.annotation.Log;
+import org.dromara.common.log.enums.BusinessType;
 import org.dromara.common.web.core.BaseController;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -55,6 +58,8 @@ public class CvFactorCustomerScopeController extends BaseController {
     /**
      * Add vendor factor customer scope.
      */
+    @Log(title = "因子客户范围", businessType = BusinessType.INSERT)
+    @RepeatSubmit
     @SaCheckPermission("vendor:factorCustomerScope:add")
     @PostMapping
     public R<Void> add(@Validated(AddGroup.class) @RequestBody CvFactorCustomerScopeBo factorCustomerScope) {
@@ -64,6 +69,8 @@ public class CvFactorCustomerScopeController extends BaseController {
     /**
      * Edit vendor factor customer scope.
      */
+    @Log(title = "因子客户范围", businessType = BusinessType.UPDATE)
+    @RepeatSubmit
     @SaCheckPermission("vendor:factorCustomerScope:edit")
     @PutMapping
     public R<Void> edit(@Validated(EditGroup.class) @RequestBody CvFactorCustomerScopeBo factorCustomerScope) {
@@ -75,6 +82,7 @@ public class CvFactorCustomerScopeController extends BaseController {
      *
      * @param ids primary keys
      */
+    @Log(title = "因子客户范围", businessType = BusinessType.DELETE)
     @SaCheckPermission("vendor:factorCustomerScope:remove")
     @DeleteMapping("/{ids}")
     public R<Void> remove(@PathVariable Long[] ids) {

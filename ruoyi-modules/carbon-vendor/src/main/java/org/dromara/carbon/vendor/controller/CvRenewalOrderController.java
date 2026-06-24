@@ -11,6 +11,9 @@ import org.dromara.common.core.validate.AddGroup;
 import org.dromara.common.core.validate.EditGroup;
 import org.dromara.common.mybatis.core.page.PageQuery;
 import org.dromara.common.mybatis.core.page.TableDataInfo;
+import org.dromara.common.idempotent.annotation.RepeatSubmit;
+import org.dromara.common.log.annotation.Log;
+import org.dromara.common.log.enums.BusinessType;
 import org.dromara.common.web.core.BaseController;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -56,6 +59,8 @@ public class CvRenewalOrderController extends BaseController {
     /**
      * Add vendor renewal order.
      */
+    @Log(title = "续期订单", businessType = BusinessType.INSERT)
+    @RepeatSubmit
     @SaCheckPermission("vendor:renewalOrder:add")
     @PostMapping
     public R<Void> add(@Validated(AddGroup.class) @RequestBody CvRenewalOrderBo renewalOrder) {
@@ -65,6 +70,8 @@ public class CvRenewalOrderController extends BaseController {
     /**
      * Edit vendor renewal order.
      */
+    @Log(title = "续期订单", businessType = BusinessType.UPDATE)
+    @RepeatSubmit
     @SaCheckPermission("vendor:renewalOrder:edit")
     @PutMapping
     public R<Void> edit(@Validated(EditGroup.class) @RequestBody CvRenewalOrderBo renewalOrder) {
@@ -74,9 +81,11 @@ public class CvRenewalOrderController extends BaseController {
     /**
      * Apply vendor payment/authorization callback metadata.
      */
+    @Log(title = "续期订单", businessType = BusinessType.UPDATE)
+    @RepeatSubmit
     @SaCheckPermission("vendor:renewalOrder:callback")
     @PostMapping("/callback")
-    public R<CvRenewalOrderVo> callback(@RequestBody CvRenewalCallbackRequest callbackRequest) {
+    public R<CvRenewalOrderVo> callback(@Validated @RequestBody CvRenewalCallbackRequest callbackRequest) {
         return R.ok(renewalOrderService.applyRenewalCallback(callbackRequest));
     }
 
@@ -85,6 +94,8 @@ public class CvRenewalOrderController extends BaseController {
      *
      * @param id primary key
      */
+    @Log(title = "续期订单", businessType = BusinessType.UPDATE)
+    @RepeatSubmit
     @SaCheckPermission("vendor:renewalOrder:retryIssue")
     @PostMapping("/{id}/retry-issue")
     public R<CvRenewalOrderVo> retryIssue(@PathVariable Long id) {
@@ -96,6 +107,7 @@ public class CvRenewalOrderController extends BaseController {
      *
      * @param ids primary keys
      */
+    @Log(title = "续期订单", businessType = BusinessType.DELETE)
     @SaCheckPermission("vendor:renewalOrder:remove")
     @DeleteMapping("/{ids}")
     public R<Void> remove(@PathVariable Long[] ids) {

@@ -12,6 +12,9 @@ import org.dromara.common.core.utils.StringUtils;
 import org.dromara.common.mybatis.core.page.PageQuery;
 import org.dromara.common.mybatis.core.page.TableDataInfo;
 import org.dromara.common.satoken.utils.LoginHelper;
+import org.dromara.common.idempotent.annotation.RepeatSubmit;
+import org.dromara.common.log.annotation.Log;
+import org.dromara.common.log.enums.BusinessType;
 import org.dromara.common.web.core.BaseController;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -57,6 +60,8 @@ public class CvFactorVersionController extends BaseController {
     /**
      * Add vendor factor version metadata.
      */
+    @Log(title = "因子版本", businessType = BusinessType.INSERT)
+    @RepeatSubmit
     @SaCheckPermission("vendor:factorVersion:add")
     @PostMapping
     public R<Void> add(@Validated(AddGroup.class) @RequestBody CvFactorVersionBo factorVersion) {
@@ -66,6 +71,8 @@ public class CvFactorVersionController extends BaseController {
     /**
      * Edit vendor factor version metadata.
      */
+    @Log(title = "因子版本", businessType = BusinessType.UPDATE)
+    @RepeatSubmit
     @SaCheckPermission("vendor:factorVersion:edit")
     @PutMapping
     public R<Void> edit(@Validated(EditGroup.class) @RequestBody CvFactorVersionBo factorVersion) {
@@ -75,6 +82,7 @@ public class CvFactorVersionController extends BaseController {
     /**
      * Delete vendor factor versions.
      */
+    @Log(title = "因子版本", businessType = BusinessType.DELETE)
     @SaCheckPermission("vendor:factorVersion:remove")
     @DeleteMapping("/{ids}")
     public R<Void> remove(@PathVariable Long[] ids) {
@@ -84,6 +92,8 @@ public class CvFactorVersionController extends BaseController {
     /**
      * Publish vendor factor version metadata.
      */
+    @Log(title = "因子版本", businessType = BusinessType.UPDATE)
+    @RepeatSubmit
     @SaCheckPermission("vendor:factorVersion:edit")
     @PostMapping("/{id}/publish")
     public R<Void> publish(@PathVariable Long id) {
@@ -94,6 +104,8 @@ public class CvFactorVersionController extends BaseController {
     /**
      * Freeze vendor factor version metadata.
      */
+    @Log(title = "因子版本", businessType = BusinessType.UPDATE)
+    @RepeatSubmit
     @SaCheckPermission("vendor:factorVersion:edit")
     @PostMapping("/{id}/freeze")
     public R<Void> freeze(@PathVariable Long id) {
@@ -104,6 +116,8 @@ public class CvFactorVersionController extends BaseController {
     /**
      * Retire vendor factor version metadata.
      */
+    @Log(title = "因子版本", businessType = BusinessType.UPDATE)
+    @RepeatSubmit
     @SaCheckPermission("vendor:factorVersion:edit")
     @PostMapping("/{id}/retire")
     public R<Void> retire(@PathVariable Long id) {
@@ -114,6 +128,8 @@ public class CvFactorVersionController extends BaseController {
     /**
      * Restore vendor factor version metadata.
      */
+    @Log(title = "因子版本", businessType = BusinessType.UPDATE)
+    @RepeatSubmit
     @SaCheckPermission("vendor:factorVersion:edit")
     @PostMapping("/{id}/restore")
     public R<Void> restore(@PathVariable Long id) {

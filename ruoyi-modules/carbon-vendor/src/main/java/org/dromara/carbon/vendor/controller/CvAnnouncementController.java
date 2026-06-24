@@ -5,6 +5,9 @@ import lombok.RequiredArgsConstructor;
 import org.dromara.common.core.domain.R;
 import org.dromara.common.mybatis.core.page.PageQuery;
 import org.dromara.common.mybatis.core.page.TableDataInfo;
+import org.dromara.common.idempotent.annotation.RepeatSubmit;
+import org.dromara.common.log.annotation.Log;
+import org.dromara.common.log.enums.BusinessType;
 import org.dromara.common.web.core.BaseController;
 import org.dromara.system.domain.bo.SysNoticeBo;
 import org.dromara.system.domain.vo.SysNoticeVo;
@@ -53,6 +56,8 @@ public class CvAnnouncementController extends BaseController {
     /**
      * Add vendor announcement.
      */
+    @Log(title = "公告管理", businessType = BusinessType.INSERT)
+    @RepeatSubmit
     @SaCheckPermission("vendor:announcement:add")
     @PostMapping
     public R<Void> add(@Validated @RequestBody SysNoticeBo notice) {
@@ -62,6 +67,8 @@ public class CvAnnouncementController extends BaseController {
     /**
      * Edit vendor announcement.
      */
+    @Log(title = "公告管理", businessType = BusinessType.UPDATE)
+    @RepeatSubmit
     @SaCheckPermission("vendor:announcement:edit")
     @PutMapping
     public R<Void> edit(@Validated @RequestBody SysNoticeBo notice) {
@@ -73,6 +80,7 @@ public class CvAnnouncementController extends BaseController {
      *
      * @param noticeIds notice ids
      */
+    @Log(title = "公告管理", businessType = BusinessType.DELETE)
     @SaCheckPermission("vendor:announcement:remove")
     @DeleteMapping("/{noticeIds}")
     public R<Void> remove(@PathVariable Long[] noticeIds) {

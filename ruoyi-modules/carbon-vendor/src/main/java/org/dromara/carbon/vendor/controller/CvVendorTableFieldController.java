@@ -13,6 +13,9 @@ import org.dromara.common.core.validate.AddGroup;
 import org.dromara.common.core.validate.EditGroup;
 import org.dromara.common.mybatis.core.page.PageQuery;
 import org.dromara.common.mybatis.core.page.TableDataInfo;
+import org.dromara.common.idempotent.annotation.RepeatSubmit;
+import org.dromara.common.log.annotation.Log;
+import org.dromara.common.log.enums.BusinessType;
 import org.dromara.common.web.core.BaseController;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -53,6 +56,8 @@ public class CvVendorTableFieldController extends BaseController {
         return R.ok(tableFieldService.queryById(id));
     }
 
+    @Log(title = "表字段定义", businessType = BusinessType.INSERT)
+    @RepeatSubmit
     @SaCheckPermission(value = {
         "vendor:factorRecord:add",
         "vendor:dimension:add"
@@ -62,6 +67,8 @@ public class CvVendorTableFieldController extends BaseController {
         return toAjax(tableFieldService.insertByBo(bo));
     }
 
+    @Log(title = "表字段定义", businessType = BusinessType.UPDATE)
+    @RepeatSubmit
     @SaCheckPermission(value = {
         "vendor:factorRecord:edit",
         "vendor:dimension:edit"
@@ -71,6 +78,7 @@ public class CvVendorTableFieldController extends BaseController {
         return toAjax(tableFieldService.updateByBo(bo));
     }
 
+    @Log(title = "表字段定义", businessType = BusinessType.DELETE)
     @SaCheckPermission(value = {
         "vendor:factorRecord:remove",
         "vendor:dimension:remove"

@@ -28,15 +28,12 @@ public class CvDimensionRecordServiceImpl implements ICvDimensionRecordService {
 
     private static final Set<String> ALLOWED_DIMENSION_CODES = Set.of(
         "admin-division",
-        "company",
         "emission-source-category",
         "base-year",
+        "ef-electricity-factor",
         "ef-electricity-version",
         "ef-electricity-scope",
         "greenhouse-gas",
-        "intensity-denominator",
-        "intensity-target",
-        "intensity-tolerance",
         "report-template-download"
     );
 
@@ -90,6 +87,7 @@ public class CvDimensionRecordServiceImpl implements ICvDimensionRecordService {
 
     private LambdaQueryWrapper<CvDimensionRecord> buildQueryWrapper(CvDimensionRecordBo bo) {
         return new LambdaQueryWrapper<CvDimensionRecord>()
+            .in(StringUtils.isBlank(bo.getDimensionCode()), CvDimensionRecord::getDimensionCode, ALLOWED_DIMENSION_CODES)
             .eq(StringUtils.isNotBlank(bo.getDimensionCode()), CvDimensionRecord::getDimensionCode, bo.getDimensionCode())
             .like(StringUtils.isNotBlank(bo.getRecordCode()), CvDimensionRecord::getRecordCode, bo.getRecordCode())
             .like(StringUtils.isNotBlank(bo.getRecordName()), CvDimensionRecord::getRecordName, bo.getRecordName())

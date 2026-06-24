@@ -10,6 +10,9 @@ import org.dromara.common.core.validate.AddGroup;
 import org.dromara.common.core.validate.EditGroup;
 import org.dromara.common.mybatis.core.page.PageQuery;
 import org.dromara.common.mybatis.core.page.TableDataInfo;
+import org.dromara.common.idempotent.annotation.RepeatSubmit;
+import org.dromara.common.log.annotation.Log;
+import org.dromara.common.log.enums.BusinessType;
 import org.dromara.common.web.core.BaseController;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -55,6 +58,8 @@ public class CvReportTemplateScopeController extends BaseController {
     /**
      * Add vendor report template scope.
      */
+    @Log(title = "报告模板范围", businessType = BusinessType.INSERT)
+    @RepeatSubmit
     @SaCheckPermission("vendor:reportTemplateScope:add")
     @PostMapping
     public R<Void> add(@Validated(AddGroup.class) @RequestBody CvReportTemplateScopeBo reportTemplateScope) {
@@ -64,6 +69,8 @@ public class CvReportTemplateScopeController extends BaseController {
     /**
      * Edit vendor report template scope.
      */
+    @Log(title = "报告模板范围", businessType = BusinessType.UPDATE)
+    @RepeatSubmit
     @SaCheckPermission("vendor:reportTemplateScope:edit")
     @PutMapping
     public R<Void> edit(@Validated(EditGroup.class) @RequestBody CvReportTemplateScopeBo reportTemplateScope) {
@@ -75,6 +82,7 @@ public class CvReportTemplateScopeController extends BaseController {
      *
      * @param ids primary keys
      */
+    @Log(title = "报告模板范围", businessType = BusinessType.DELETE)
     @SaCheckPermission("vendor:reportTemplateScope:remove")
     @DeleteMapping("/{ids}")
     public R<Void> remove(@PathVariable Long[] ids) {

@@ -21,6 +21,7 @@ import org.springframework.stereotype.Service;
 
 import java.util.Arrays;
 import java.util.Map;
+import java.util.Set;
 
 /**
  * Vendor factor record service implementation.
@@ -29,11 +30,19 @@ import java.util.Map;
 @Service
 public class CvFactorRecordServiceImpl implements ICvFactorRecordService {
 
+    private static final Set<String> ALLOWED_FACTOR_TABLE_CODES = Set.of(
+        "202ef",
+        "203ef",
+        "205ef",
+        "206"
+    );
+
     private final CvFactorRecordMapper baseMapper;
     private final CvFactorVersionMapper factorVersionMapper;
 
     @Override
     public TableDataInfo<CvFactorRecordVo> selectPageFactorRecordList(CvFactorRecordBo bo, PageQuery pageQuery) {
+        validateFactorTableCode(bo.getFactorTableCode());
         LambdaQueryWrapper<CvFactorRecord> lqw = buildQueryWrapper(bo);
         Page<CvFactorRecordVo> page = baseMapper.selectVoPage(pageQuery.build(), lqw);
         return TableDataInfo.build(page);
@@ -81,6 +90,7 @@ public class CvFactorRecordServiceImpl implements ICvFactorRecordService {
         LambdaQueryWrapper<CvFactorRecord> lqw = Wrappers.lambdaQuery();
         lqw.eq(bo.getId() != null, CvFactorRecord::getId, bo.getId());
         lqw.eq(bo.getVersionId() != null, CvFactorRecord::getVersionId, bo.getVersionId());
+        lqw.in(StringUtils.isBlank(bo.getFactorTableCode()), CvFactorRecord::getFactorTableCode, ALLOWED_FACTOR_TABLE_CODES);
         lqw.eq(StringUtils.isNotBlank(bo.getFactorTableCode()), CvFactorRecord::getFactorTableCode, bo.getFactorTableCode());
         lqw.like(StringUtils.isNotBlank(bo.getFactorCode()), CvFactorRecord::getFactorCode, bo.getFactorCode());
         lqw.like(StringUtils.isNotBlank(bo.getFactorName()), CvFactorRecord::getFactorName, bo.getFactorName());
@@ -114,7 +124,12 @@ public class CvFactorRecordServiceImpl implements ICvFactorRecordService {
 
     private void normalizeSampleFields(CvFactorRecordBo bo) {
         if (StringUtils.isBlank(bo.getFactorTableCode())) {
-            bo.setFactorTableCode("201ef");
+            bo.setFactorTableCode("202ef");
+        } else {
+            bo.setFactorTableCode(StringUtils.trim(bo.getFactorTableCode()));
+        }
+        if (!ALLOWED_FACTOR_TABLE_CODES.contains(bo.getFactorTableCode())) {
+            throw new ServiceException("Unsupported vendor factor table code: " + bo.getFactorTableCode());
         }
         if (StringUtils.isBlank(bo.getFactorCode())) {
             bo.setFactorCode(firstText(
@@ -175,6 +190,15 @@ public class CvFactorRecordServiceImpl implements ICvFactorRecordService {
             .filter(value -> value != null)
             .findFirst()
             .orElse(java.math.BigDecimal.ZERO);
+    }
+
+    private void validateFactorTableCode(String factorTableCode) {
+        if (StringUtils.isBlank(factorTableCode)) {
+            return;
+        }
+        if (!ALLOWED_FACTOR_TABLE_CODES.contains(StringUtils.trim(factorTableCode))) {
+            throw new ServiceException("Unsupported vendor factor table code: " + factorTableCode);
+        }
     }
 
     private void assertFactorVersionMutable(Long versionId) {

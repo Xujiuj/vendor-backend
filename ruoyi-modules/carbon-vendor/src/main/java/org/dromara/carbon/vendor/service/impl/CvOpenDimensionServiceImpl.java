@@ -18,6 +18,7 @@ import org.springframework.stereotype.Service;
 
 import java.util.Date;
 import java.util.List;
+import java.util.Set;
 
 /**
  * Vendor open dimension service implementation.
@@ -32,6 +33,16 @@ public class CvOpenDimensionServiceImpl implements ICvOpenDimensionService {
     private static final int DEFAULT_PAGE_NUM = 1;
     private static final int DEFAULT_PAGE_SIZE = 100;
     private static final int MAX_PAGE_SIZE = 500;
+    private static final Set<String> ALLOWED_DIMENSION_CODES = Set.of(
+        "admin-division",
+        "emission-source-category",
+        "base-year",
+        "ef-electricity-factor",
+        "ef-electricity-version",
+        "ef-electricity-scope",
+        "greenhouse-gas",
+        "report-template-download"
+    );
 
     private final CvLicenseIssueMapper licenseIssueMapper;
     private final CvDimensionRecordMapper dimensionRecordMapper;
@@ -65,8 +76,12 @@ public class CvOpenDimensionServiceImpl implements ICvOpenDimensionService {
     }
 
     private LambdaQueryWrapper<CvDimensionRecord> buildQueryWrapper(CvOpenDimensionRequest request) {
+        String dimensionCode = normalizeRequired(request.getDimensionCode(), "dimensionCode cannot be blank");
+        if (!ALLOWED_DIMENSION_CODES.contains(dimensionCode)) {
+            throw new ServiceException("Unsupported vendor dimension code: " + dimensionCode);
+        }
         return new LambdaQueryWrapper<CvDimensionRecord>()
-            .eq(CvDimensionRecord::getDimensionCode, normalizeRequired(request.getDimensionCode(), "dimensionCode cannot be blank"))
+            .eq(CvDimensionRecord::getDimensionCode, dimensionCode)
             .like(StringUtils.isNotBlank(request.getRecordCode()), CvDimensionRecord::getRecordCode, request.getRecordCode())
             .like(StringUtils.isNotBlank(request.getRecordName()), CvDimensionRecord::getRecordName, request.getRecordName())
             .eq(StringUtils.isNotBlank(request.getParentCode()), CvDimensionRecord::getParentCode, request.getParentCode())

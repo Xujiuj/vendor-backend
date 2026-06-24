@@ -6,6 +6,7 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.dromara.carbon.vendor.domain.bo.OnlinePurchaseCreateBo;
 import org.dromara.carbon.vendor.domain.bo.PaymentNotifyBo;
+import org.dromara.carbon.vendor.domain.vo.OnlinePurchaseOrderStatusVo;
 import org.dromara.carbon.vendor.domain.vo.OnlinePurchaseOrderVo;
 import org.dromara.carbon.vendor.service.IOnlinePurchaseService;
 import org.dromara.carbon.vendor.service.PaymentGatewayNotifyAdapter;
@@ -21,6 +22,8 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.Map;
+
+import org.dromara.common.core.utils.MapstructUtils;
 
 /**
  * Public online purchase endpoints for enterprise-local deployments.
@@ -40,8 +43,9 @@ public class OnlinePurchaseOpenController {
     }
 
     @GetMapping("/{orderNo}")
-    public R<OnlinePurchaseOrderVo> queryOrder(@PathVariable String orderNo) {
-        return R.ok(onlinePurchaseService.queryOrder(orderNo));
+    public R<OnlinePurchaseOrderStatusVo> queryOrder(@PathVariable String orderNo) {
+        OnlinePurchaseOrderVo full = onlinePurchaseService.queryOrder(orderNo);
+        return R.ok(MapstructUtils.convert(full, OnlinePurchaseOrderStatusVo.class));
     }
 
     @PostMapping(value = "/notify/wechat", consumes = MediaType.APPLICATION_JSON_VALUE)

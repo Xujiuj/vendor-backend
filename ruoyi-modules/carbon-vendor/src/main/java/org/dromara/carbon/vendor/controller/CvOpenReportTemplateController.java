@@ -8,6 +8,8 @@ import org.dromara.carbon.vendor.domain.open.CvOpenReportTemplateListResponse;
 import org.dromara.carbon.vendor.domain.open.CvOpenReportTemplateRequest;
 import org.dromara.carbon.vendor.service.ICvOpenReportTemplateService;
 import org.dromara.common.core.domain.R;
+import org.dromara.common.ratelimiter.annotation.RateLimiter;
+import org.dromara.common.ratelimiter.enums.LimitType;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -40,6 +42,7 @@ public class CvOpenReportTemplateController {
         return R.ok(openReportTemplateService.downloadTemplate(id, request));
     }
 
+    @RateLimiter(time = 60, count = 10, limitType = LimitType.IP, message = "下载请求过于频繁，请稍后重试")
     @GetMapping("/download-tokens/{token}")
     public void consumeDownloadToken(
         @PathVariable("token") String token,

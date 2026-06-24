@@ -12,6 +12,9 @@ import org.dromara.common.core.validate.AddGroup;
 import org.dromara.common.core.validate.EditGroup;
 import org.dromara.common.mybatis.core.page.PageQuery;
 import org.dromara.common.mybatis.core.page.TableDataInfo;
+import org.dromara.common.idempotent.annotation.RepeatSubmit;
+import org.dromara.common.log.annotation.Log;
+import org.dromara.common.log.enums.BusinessType;
 import org.dromara.common.web.core.BaseController;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -55,6 +58,8 @@ public class CvDimensionRecordController extends BaseController {
     /**
      * Add vendor dimension record.
      */
+    @Log(title = "维度记录", businessType = BusinessType.INSERT)
+    @RepeatSubmit
     @SaCheckPermission("vendor:dimension:add")
     @PostMapping
     public R<Void> add(@Validated(AddGroup.class) @RequestBody CvDimensionRecordBo bo) {
@@ -64,6 +69,8 @@ public class CvDimensionRecordController extends BaseController {
     /**
      * Edit vendor dimension record.
      */
+    @Log(title = "维度记录", businessType = BusinessType.UPDATE)
+    @RepeatSubmit
     @SaCheckPermission("vendor:dimension:edit")
     @PutMapping
     public R<Void> edit(@Validated(EditGroup.class) @RequestBody CvDimensionRecordBo bo) {
@@ -73,6 +80,7 @@ public class CvDimensionRecordController extends BaseController {
     /**
      * Delete vendor dimension records.
      */
+    @Log(title = "维度记录", businessType = BusinessType.DELETE)
     @SaCheckPermission("vendor:dimension:remove")
     @DeleteMapping("/{ids}")
     public R<Void> remove(@NotEmpty(message = "ids cannot be empty") @PathVariable Long[] ids) {
