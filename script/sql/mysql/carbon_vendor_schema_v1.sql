@@ -134,6 +134,7 @@ CREATE TABLE IF NOT EXISTS cv_factor_record (
     gwp_value DECIMAL(28, 10) DEFAULT NULL,
     converted_factor DECIMAL(28, 10) DEFAULT NULL,
     source_ref VARCHAR(512) DEFAULT NULL,
+    custom_fields TEXT DEFAULT NULL,
     enabled_flag TINYINT(1) NOT NULL DEFAULT 1,
     create_time DATETIME DEFAULT CURRENT_TIMESTAMP,
     update_time DATETIME DEFAULT CURRENT_TIMESTAMP,

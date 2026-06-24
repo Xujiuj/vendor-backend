@@ -5,23 +5,30 @@ import lombok.RequiredArgsConstructor;
 import org.dromara.carbon.vendor.domain.CvFactorRecord;
 import org.dromara.carbon.vendor.domain.CvFactorVersion;
 import org.dromara.carbon.vendor.domain.CvLicenseIssue;
+import org.dromara.carbon.vendor.domain.CvVendorTableField;
 import org.dromara.carbon.vendor.domain.enums.CvFactorVersionLifecycleState;
 import org.dromara.carbon.vendor.domain.open.CvOpenFactorRecordVo;
 import org.dromara.carbon.vendor.domain.open.CvOpenFactorSyncRequest;
 import org.dromara.carbon.vendor.domain.open.CvOpenFactorSyncResponse;
+import org.dromara.carbon.vendor.domain.open.CvOpenTableFieldDefinitionVo;
 import org.dromara.carbon.vendor.mapper.CvFactorRecordMapper;
 import org.dromara.carbon.vendor.mapper.CvFactorVersionMapper;
 import org.dromara.carbon.vendor.mapper.CvLicenseIssueMapper;
+import org.dromara.carbon.vendor.mapper.CvVendorTableFieldMapper;
 import org.dromara.carbon.vendor.service.ICvFactorCustomerScopeService;
 import org.dromara.carbon.vendor.service.ICvOpenApiAuditService;
 import org.dromara.carbon.vendor.service.ICvOpenFactorService;
 import org.dromara.common.core.exception.ServiceException;
 import org.dromara.common.core.utils.StringUtils;
+import org.dromara.common.json.utils.JsonUtils;
 import org.springframework.stereotype.Service;
 
 import java.util.Date;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
+import java.util.stream.Collectors;
 
 /**
  * Vendor open factor sync service implementation.
@@ -44,6 +51,7 @@ public class CvOpenFactorServiceImpl implements ICvOpenFactorService {
     private final CvLicenseIssueMapper licenseIssueMapper;
     private final CvFactorVersionMapper factorVersionMapper;
     private final CvFactorRecordMapper factorRecordMapper;
+    private final CvVendorTableFieldMapper tableFieldMapper;
     private final ICvFactorCustomerScopeService factorCustomerScopeService;
     private final ICvOpenApiAuditService openApiAuditService;
 
@@ -55,6 +63,18 @@ public class CvOpenFactorServiceImpl implements ICvOpenFactorService {
             customerId = entitlement.getCustomerId();
             CvOpenLicenseFeatureSupport.requireFeature(entitlement, FEATURE_FACTOR_SYNC);
             CvFactorVersion version = findLatestAuthorizedVersion(entitlement);
+            List<CvVendorTableField> fieldDefinitions = tableFieldMapper.selectList(Wrappers.<CvVendorTableField>lambdaQuery()
+                .eq(CvVendorTableField::getTableGroup, "factor")
+                .in(CvVendorTableField::getTableCode, ALLOWED_FACTOR_TABLE_CODES)
+                .eq(CvVendorTableField::getStatus, "0")
+                .orderByAsc(CvVendorTableField::getTableCode)
+                .orderByAsc(CvVendorTableField::getSortOrder)
+                .orderByAsc(CvVendorTableField::getId));
+            Map<String, Set<String>> allowedCustomFieldKeys = fieldDefinitions.stream()
+                .filter(field -> !builtInFactorFields().contains(field.getFieldKey()))
+                .collect(Collectors.groupingBy(
+                    CvVendorTableField::getTableCode,
+                    Collectors.mapping(CvVendorTableField::getFieldKey, Collectors.toCollection(java.util.LinkedHashSet::new))));
             List<CvOpenFactorRecordVo> records = factorRecordMapper.selectList(Wrappers.<CvFactorRecord>lambdaQuery()
                     .eq(CvFactorRecord::getVersionId, version.getId())
                     .in(CvFactorRecord::getFactorTableCode, ALLOWED_FACTOR_TABLE_CODES)
@@ -63,7 +83,7 @@ public class CvOpenFactorServiceImpl implements ICvOpenFactorService {
                     .orderByAsc(CvFactorRecord::getFactorCode)
                     .orderByAsc(CvFactorRecord::getId))
                 .stream()
-                .map(this::toRecordVo)
+                .map(record -> toRecordVo(record, allowedCustomFieldKeys.getOrDefault(record.getFactorTableCode(), Set.of())))
                 .toList();
 
             CvOpenFactorSyncResponse response = new CvOpenFactorSyncResponse();
@@ -75,6 +95,7 @@ public class CvOpenFactorServiceImpl implements ICvOpenFactorService {
             response.setFrozenFlag(version.getFrozenFlag());
             response.setPublishedTime(version.getPublishedTime());
             response.setChanged(!version.getVersionCode().equals(request.getCurrentVersionCode()));
+            response.setFieldDefinitions(fieldDefinitions.stream().map(this::toFieldDefinitionVo).toList());
             response.setRecords(records);
             openApiAuditService.recordSuccess(API_PATH, HTTP_METHOD, request.getLicenseId(), request.getInstallId(),
                 customerId, requestSummary(request));
@@ -94,9 +115,7 @@ public class CvOpenFactorServiceImpl implements ICvOpenFactorService {
         if (entitlement == null) {
             throw new ServiceException("license entitlement does not exist");
         }
-        if (!installId.equals(entitlement.getInstallId())) {
-            throw new ServiceException("license installId does not match");
-        }
+        CvLicenseInstallBindingSupport.bindOrReject(licenseIssueMapper, entitlement, installId);
         if (entitlement.getRevokedTime() != null || ISSUE_STATUS_REVOKED.equalsIgnoreCase(entitlement.getIssueStatus())) {
             throw new ServiceException("license entitlement is revoked");
         }
@@ -132,7 +151,7 @@ public class CvOpenFactorServiceImpl implements ICvOpenFactorService {
         return state == CvFactorVersionLifecycleState.PUBLISHED || state == CvFactorVersionLifecycleState.FROZEN;
     }
 
-    private CvOpenFactorRecordVo toRecordVo(CvFactorRecord record) {
+    private CvOpenFactorRecordVo toRecordVo(CvFactorRecord record, Set<String> allowedCustomFieldKeys) {
         CvOpenFactorRecordVo vo = new CvOpenFactorRecordVo();
         vo.setFactorCode(record.getFactorCode());
         vo.setFactorTableCode(record.getFactorTableCode());
@@ -183,8 +202,54 @@ public class CvOpenFactorServiceImpl implements ICvOpenFactorService {
         vo.setGwpValue(record.getGwpValue());
         vo.setConvertedFactor(record.getConvertedFactor());
         vo.setSourceRef(record.getSourceRef());
+        vo.setCustomFields(filterCustomFields(record.getCustomFields(), allowedCustomFieldKeys));
         vo.setRemark(record.getRemark());
         return vo;
+    }
+
+    private CvOpenTableFieldDefinitionVo toFieldDefinitionVo(CvVendorTableField field) {
+        CvOpenTableFieldDefinitionVo vo = new CvOpenTableFieldDefinitionVo();
+        vo.setTableGroup(field.getTableGroup());
+        vo.setTableCode(field.getTableCode());
+        vo.setFieldKey(field.getFieldKey());
+        vo.setFieldLabel(field.getFieldLabel());
+        vo.setFieldType(field.getFieldType());
+        vo.setFieldPrecision(field.getFieldPrecision());
+        vo.setFieldWidth(field.getFieldWidth());
+        vo.setRequiredFlag(field.getRequiredFlag());
+        vo.setSortOrder(field.getSortOrder());
+        return vo;
+    }
+
+    private Map<String, Object> filterCustomFields(String customFields, Set<String> allowedCustomFieldKeys) {
+        if (StringUtils.isBlank(customFields) || allowedCustomFieldKeys.isEmpty()) {
+            return Map.of();
+        }
+        Map<String, Object> values = JsonUtils.parseObject(customFields, new com.fasterxml.jackson.core.type.TypeReference<>() {});
+        if (values == null || values.isEmpty()) {
+            return Map.of();
+        }
+        Map<String, Object> filtered = new LinkedHashMap<>();
+        for (String fieldKey : allowedCustomFieldKeys) {
+            if (values.containsKey(fieldKey)) {
+                filtered.put(fieldKey, values.get(fieldKey));
+            }
+        }
+        return filtered;
+    }
+
+    private Set<String> builtInFactorFields() {
+        return Set.of(
+            "id", "versionId", "factorTableCode", "factorCode", "factorName", "factorCategory", "factorValue",
+            "factorUnit", "factorKey", "emissionSourceName", "emissionSourceNameEn", "fuelMaterialCategory",
+            "sourceUnit", "co2", "ch4", "n2o", "hfcs", "pfcs", "sf6", "nf3", "applicableScope", "factorSource",
+            "gwpCh4", "gwpN2o", "gwpHfcs", "gwpPfcs", "gwpSf6", "gwpNf3", "factorGwp", "versionProvinceCode",
+            "factorVersion", "divisionCode", "divisionName", "regionName", "provinceFactor", "regionFactor",
+            "nationalFactor", "nonFossilExcludedFactor", "nationalFossilPowerFactor", "rowNo", "fuelLevel1",
+            "fuelLevel2", "fuelLevel3", "fuelLevel4", "lowerHeatValue", "lowerHeatValueCv", "co2Factor",
+            "co2FactorCv", "gwpValue", "convertedFactor", "sourceRef", "enabledFlag", "createTime",
+            "updateTime", "remark", "customFields"
+        );
     }
 
     private String normalizeRequired(String value, String message) {

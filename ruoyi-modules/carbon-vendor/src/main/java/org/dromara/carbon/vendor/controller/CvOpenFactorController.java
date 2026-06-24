@@ -24,6 +24,7 @@ public class CvOpenFactorController {
 
     @GetMapping
     public R<CvOpenFactorSyncResponse> sync(@Valid CvOpenFactorSyncRequest request) {
+        request.setLicenseId(CvOpenApiLicenseSupport.resolveLicenseId(request.getLicenseId()));
         return R.ok(openFactorService.syncFactors(request));
     }
 }

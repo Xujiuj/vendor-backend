@@ -76,6 +76,7 @@ public class CvFactorRecordBo extends BaseEntity {
     private BigDecimal gwpValue;
     private BigDecimal convertedFactor;
     private String sourceRef;
+    private String customFields;
     private Boolean enabledFlag;
     private String remark;
 }

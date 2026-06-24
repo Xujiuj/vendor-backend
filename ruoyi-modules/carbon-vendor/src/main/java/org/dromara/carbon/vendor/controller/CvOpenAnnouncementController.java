@@ -24,6 +24,7 @@ public class CvOpenAnnouncementController {
 
     @GetMapping
     public R<CvOpenAnnouncementListResponse> list(@Valid CvOpenAnnouncementRequest request) {
+        request.setLicenseId(CvOpenApiLicenseSupport.resolveLicenseId(request.getLicenseId()));
         return R.ok(openAnnouncementService.listAnnouncements(request));
     }
 }

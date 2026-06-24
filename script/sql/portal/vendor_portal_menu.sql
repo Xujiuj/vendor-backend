@@ -78,6 +78,10 @@ insert into sys_menu
 (menu_id, menu_name, parent_id, order_num, path, component, query_param, is_frame, is_cache, menu_type, visible, status, perms, icon, create_dept, create_by, create_time, update_by, update_time, remark)
 values
 (910109, '客户档案详情', 910101, 1, '', '', '', 1, 0, 'F', '0', '0', 'vendor:customer:query', '#', 103, 1, sysdate(), null, null, '客户档案详情权限'),
+(910148, '客户档案新增', 910101, 2, '', '', '', 1, 0, 'F', '0', '0', 'vendor:customer:add', '#', 103, 1, sysdate(), null, null, '客户档案新增权限'),
+(910149, '客户档案编辑', 910101, 3, '', '', '', 1, 0, 'F', '0', '0', 'vendor:customer:edit', '#', 103, 1, sysdate(), null, null, '客户档案编辑权限'),
+(910150, '客户档案删除', 910101, 4, '', '', '', 1, 0, 'F', '0', '0', 'vendor:customer:remove', '#', 103, 1, sysdate(), null, null, '客户档案删除权限'),
+(910151, '客户档案导出', 910101, 5, '', '', '', 1, 0, 'F', '0', '0', 'vendor:customer:export', '#', 103, 1, sysdate(), null, null, '客户档案导出权限'),
 (910110, '因子版本详情', 910103, 1, '', '', '', 1, 0, 'F', '0', '0', 'vendor:factorVersion:query', '#', 103, 1, sysdate(), null, null, '因子版本详情权限'),
 (910145, '因子版本新增', 910103, 2, '', '', '', 1, 0, 'F', '0', '0', 'vendor:factorVersion:add', '#', 103, 1, sysdate(), null, null, '因子版本新增权限'),
 (910146, '因子版本编辑', 910103, 3, '', '', '', 1, 0, 'F', '0', '0', 'vendor:factorVersion:edit', '#', 103, 1, sysdate(), null, null, '因子版本编辑权限'),

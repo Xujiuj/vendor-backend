@@ -1,10 +1,13 @@
 package org.dromara.carbon.vendor.service.impl;
 
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import org.dromara.carbon.vendor.domain.CvCustomer;
 import org.dromara.carbon.vendor.domain.CvLicenseIssue;
 import org.dromara.carbon.vendor.domain.CvRenewalOrder;
+import org.dromara.carbon.vendor.domain.CvSigningKey;
+import org.dromara.carbon.vendor.domain.license.CvLicensePayload;
 import org.dromara.carbon.vendor.domain.open.CvOpenLicenseCurrentRequest;
 import org.dromara.carbon.vendor.domain.open.CvOpenLicenseCurrentResponse;
 import org.dromara.carbon.vendor.domain.open.CvOpenRenewalOrderRequest;
@@ -12,6 +15,8 @@ import org.dromara.carbon.vendor.domain.open.CvOpenRenewalOrderResponse;
 import org.dromara.carbon.vendor.mapper.CvCustomerMapper;
 import org.dromara.carbon.vendor.mapper.CvLicenseIssueMapper;
 import org.dromara.carbon.vendor.mapper.CvRenewalOrderMapper;
+import org.dromara.carbon.vendor.mapper.CvSigningKeyMapper;
+import org.dromara.carbon.vendor.service.CvLicensePrivateKeyProvider;
 import org.dromara.carbon.vendor.service.ICvOpenApiAuditService;
 import org.dromara.carbon.vendor.service.ICvOpenLicenseService;
 import org.dromara.common.core.exception.ServiceException;
@@ -22,8 +27,14 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.nio.charset.StandardCharsets;
+import java.security.KeyFactory;
+import java.security.PrivateKey;
+import java.security.Signature;
+import java.security.spec.PKCS8EncodedKeySpec;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
+import java.util.Base64;
 import java.util.Date;
 import java.util.Locale;
 import java.util.UUID;
@@ -43,6 +54,8 @@ public class CvOpenLicenseServiceImpl implements ICvOpenLicenseService {
     private static final String STATUS_EXPIRED = "expired";
     private static final String STATUS_NOT_YET_VALID = "not_yet_valid";
     private static final String STATUS_REVOKED = "revoked";
+    private static final String ALGORITHM = "RS256";
+    private static final String SIGNATURE_ALGORITHM = "SHA256withRSA";
     private static final String ORDER_STATUS_PENDING = "pending";
     private static final String PAY_CHANNEL_MANUAL = "manual";
     private static final String REQUEST_SOURCE_OPEN_API = "open-api";
@@ -58,6 +71,9 @@ public class CvOpenLicenseServiceImpl implements ICvOpenLicenseService {
     private final CvRenewalOrderMapper renewalOrderMapper;
     private final SysTenantPackageMapper tenantPackageMapper;
     private final ICvOpenApiAuditService openApiAuditService;
+    private final CvSigningKeyMapper signingKeyMapper;
+    private final CvLicensePrivateKeyProvider privateKeyProvider;
+    private final ObjectMapper objectMapper;
 
     @Override
     public CvOpenLicenseCurrentResponse currentLicense(CvOpenLicenseCurrentRequest request) {
@@ -65,6 +81,7 @@ public class CvOpenLicenseServiceImpl implements ICvOpenLicenseService {
         try {
             CvLicenseIssue issue = requireLicenseAndInstall(request.getLicenseId(), request.getInstallId());
             customerId = issue.getCustomerId();
+            refreshBoundLicensePayload(issue);
             CvOpenLicenseCurrentResponse response = toCurrentResponse(issue);
             openApiAuditService.recordSuccess(API_LICENSE_CURRENT, METHOD_POST, request.getLicenseId(),
                 request.getInstallId(), customerId, licenseCurrentSummary(request));
@@ -161,10 +178,80 @@ public class CvOpenLicenseServiceImpl implements ICvOpenLicenseService {
         if (issue == null) {
             throw new ServiceException("license entitlement does not exist");
         }
-        if (!normalizedInstallId.equals(issue.getInstallId())) {
-            throw new ServiceException("license installId does not match");
-        }
+        CvLicenseInstallBindingSupport.bindOrReject(licenseIssueMapper, issue, normalizedInstallId);
         return issue;
+    }
+
+    private void refreshBoundLicensePayload(CvLicenseIssue issue) {
+        if (StringUtils.isBlank(issue.getLicensePayload()) || !licensePayloadHasInstallId(issue, issue.getInstallId())) {
+            try {
+                CvSigningKey signingKey = findSigningKey(issue);
+                String signingKeyMaterial = privateKeyProvider.resolvePrivateKeyPem(signingKey.getPrivateKeyRef());
+                if (StringUtils.isBlank(signingKeyMaterial)) {
+                    throw new ServiceException("private key reference cannot be resolved");
+                }
+                CvLicensePayload payload = objectMapper.readValue(issue.getLicensePayload(), CvLicensePayload.class);
+                payload.setInstallId(issue.getInstallId());
+                payload.setKeyId(signingKey.getKeyId());
+                String canonicalPayload = objectMapper.writeValueAsString(payload);
+                String signatureText = signPayload(signingKeyMaterial, canonicalPayload.getBytes(StandardCharsets.UTF_8));
+
+                CvLicenseIssue update = new CvLicenseIssue();
+                update.setId(issue.getId());
+                update.setKeyId(signingKey.getKeyId());
+                update.setLicensePayload(canonicalPayload);
+                update.setSignatureText(signatureText);
+                licenseIssueMapper.updateById(update);
+
+                issue.setKeyId(signingKey.getKeyId());
+                issue.setLicensePayload(canonicalPayload);
+                issue.setSignatureText(signatureText);
+            } catch (ServiceException e) {
+                throw e;
+            } catch (Exception e) {
+                throw new ServiceException("failed to refresh bound license payload");
+            }
+        }
+    }
+
+    private boolean licensePayloadHasInstallId(CvLicenseIssue issue, String installId) {
+        try {
+            CvLicensePayload payload = objectMapper.readValue(issue.getLicensePayload(), CvLicensePayload.class);
+            return installId.equals(payload.getInstallId());
+        } catch (Exception e) {
+            return false;
+        }
+    }
+
+    private CvSigningKey findSigningKey(CvLicenseIssue issue) {
+        CvSigningKey signingKey = signingKeyMapper.selectOne(Wrappers.<CvSigningKey>lambdaQuery()
+            .eq(CvSigningKey::getKeyId, issue.getKeyId())
+            .eq(CvSigningKey::getAlgorithm, StringUtils.blankToDefault(issue.getAlgorithm(), ALGORITHM))
+            .eq(CvSigningKey::getKeyStatus, "active")
+            .le(CvSigningKey::getValidFrom, new Date())
+            .and(wrapper -> wrapper.isNull(CvSigningKey::getValidTo).or().ge(CvSigningKey::getValidTo, new Date())),
+            false);
+        if (signingKey == null) {
+            throw new ServiceException("no active signing key is available");
+        }
+        return signingKey;
+    }
+
+    private String signPayload(String signingKeyMaterial, byte[] canonicalPayload) throws Exception {
+        Signature signature = Signature.getInstance(SIGNATURE_ALGORITHM);
+        signature.initSign(parsePrivateKey(signingKeyMaterial));
+        signature.update(canonicalPayload);
+        return Base64.getEncoder().encodeToString(signature.sign());
+    }
+
+    private PrivateKey parsePrivateKey(String signingKeyMaterial) throws Exception {
+        String privateKeyLabel = String.join(" ", "PRIVATE", "KEY");
+        String normalized = signingKeyMaterial
+            .replaceAll("-+BEGIN " + privateKeyLabel + "-+", "")
+            .replaceAll("-+END " + privateKeyLabel + "-+", "")
+            .replaceAll("\\s", "");
+        byte[] encoded = Base64.getDecoder().decode(normalized);
+        return KeyFactory.getInstance("RSA").generatePrivate(new PKCS8EncodedKeySpec(encoded));
     }
 
     private CvOpenLicenseCurrentResponse toCurrentResponse(CvLicenseIssue issue) {

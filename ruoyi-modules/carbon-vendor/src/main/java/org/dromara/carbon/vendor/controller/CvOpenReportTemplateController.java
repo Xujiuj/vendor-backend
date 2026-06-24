@@ -31,6 +31,7 @@ public class CvOpenReportTemplateController {
 
     @GetMapping
     public R<CvOpenReportTemplateListResponse> list(@Valid CvOpenReportTemplateRequest request) {
+        request.setLicenseId(CvOpenApiLicenseSupport.resolveLicenseId(request.getLicenseId()));
         return R.ok(openReportTemplateService.listTemplates(request));
     }
 
@@ -39,6 +40,7 @@ public class CvOpenReportTemplateController {
         @PathVariable("id") Long id,
         @Valid CvOpenReportTemplateRequest request
     ) {
+        request.setLicenseId(CvOpenApiLicenseSupport.resolveLicenseId(request.getLicenseId()));
         return R.ok(openReportTemplateService.downloadTemplate(id, request));
     }
 

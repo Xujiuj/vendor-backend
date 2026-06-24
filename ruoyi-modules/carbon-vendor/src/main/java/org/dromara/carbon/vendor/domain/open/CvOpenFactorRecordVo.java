@@ -5,6 +5,7 @@ import lombok.Data;
 import java.io.Serial;
 import java.io.Serializable;
 import java.math.BigDecimal;
+import java.util.Map;
 
 /**
  * Open factor record returned to enterprise backend.
@@ -112,6 +113,8 @@ public class CvOpenFactorRecordVo implements Serializable {
     private BigDecimal convertedFactor;
 
     private String sourceRef;
+
+    private Map<String, Object> customFields;
 
     private String remark;
 }

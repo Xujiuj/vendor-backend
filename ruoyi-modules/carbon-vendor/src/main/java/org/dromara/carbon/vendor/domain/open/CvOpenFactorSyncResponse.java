@@ -33,5 +33,7 @@ public class CvOpenFactorSyncResponse implements Serializable {
 
     private boolean changed;
 
+    private List<CvOpenTableFieldDefinitionVo> fieldDefinitions = new ArrayList<>();
+
     private List<CvOpenFactorRecordVo> records = new ArrayList<>();
 }

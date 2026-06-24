@@ -61,6 +61,7 @@ public class CvLicenseIssueServiceImpl implements ICvLicenseIssueService {
     private static final String ISSUE_STATUS_REVOKED = "revoked";
     private static final String ISSUE_TYPE_MANUAL = "manual";
     private static final String ISSUE_TYPE_REISSUE = "reissue";
+    private static final String PENDING_INSTALL_ID = CvLicenseInstallBindingSupport.PENDING_INSTALL_ID;
     private static final String CUSTOMER_STATUS_DISABLED = "disabled";
     private static final String CUSTOMER_STATUS_INACTIVE = "inactive";
     private static final String CUSTOMER_STATUS_STOPPED = "stopped";
@@ -178,6 +179,7 @@ public class CvLicenseIssueServiceImpl implements ICvLicenseIssueService {
         request.setPackageId(tenantPackage.getPackageId());
         request.setPackageName(tenantPackage.getPackageName());
         request.setEdition(tenantPackage.getPackageName());
+        applyIssueDefaults(request, tenantPackage);
 
         List<CvLicenseIssue> existingIssues = findIssuesForCustomerInstall(request.getCustomerId(), request.getInstallId());
         if (!allowRevokedHistory && hasRevokedHistory(existingIssues)) {
@@ -261,7 +263,7 @@ public class CvLicenseIssueServiceImpl implements ICvLicenseIssueService {
         }
         if (request.getCustomerId() == null
             || request.getPackageId() == null
-            || StringUtils.isAnyBlank(request.getKeyId(), request.getInstallId(), request.getIssuedBy())
+            || StringUtils.isBlank(request.getIssuedBy())
             || request.getFeatures() == null || request.getFeatures().isEmpty()
             || request.getTemplateEntitlements() == null || request.getTemplateEntitlements().isEmpty()
             || request.getValidFrom() == null || request.getValidTo() == null) {
@@ -295,7 +297,23 @@ public class CvLicenseIssueServiceImpl implements ICvLicenseIssueService {
         return tenantPackage;
     }
 
+    private void applyIssueDefaults(CvLicenseIssueRequest request, SysTenantPackage tenantPackage) {
+        request.setKeyId(StringUtils.blankToDefault(request.getKeyId(), tenantPackage.getLicenseKeyId()));
+        if (StringUtils.isBlank(request.getKeyId())) {
+            CvSigningKey signingKey = findAnyActiveSigningKey(Objects.requireNonNullElseGet(request.getIssuedAt(), Date::new));
+            if (signingKey != null) {
+                request.setKeyId(signingKey.getKeyId());
+            }
+        }
+        if (StringUtils.isBlank(request.getInstallId())) {
+            request.setInstallId(PENDING_INSTALL_ID);
+        }
+    }
+
     private List<CvLicenseIssue> findIssuesForCustomerInstall(Long customerId, String installId) {
+        if (PENDING_INSTALL_ID.equals(installId)) {
+            return List.of();
+        }
         return baseMapper.selectList(new LambdaQueryWrapper<CvLicenseIssue>()
             .eq(CvLicenseIssue::getCustomerId, customerId)
             .eq(CvLicenseIssue::getInstallId, installId)
@@ -356,6 +374,17 @@ public class CvLicenseIssueServiceImpl implements ICvLicenseIssueService {
             .eq(CvSigningKey::getKeyStatus, "active")
             .le(CvSigningKey::getValidFrom, issuedTime)
             .and(wrapper -> wrapper.isNull(CvSigningKey::getValidTo).or().ge(CvSigningKey::getValidTo, issuedTime)),
+            false);
+    }
+
+    private CvSigningKey findAnyActiveSigningKey(Date issuedTime) {
+        return signingKeyMapper.selectOne(new LambdaQueryWrapper<CvSigningKey>()
+            .eq(CvSigningKey::getAlgorithm, ALGORITHM)
+            .eq(CvSigningKey::getKeyStatus, "active")
+            .le(CvSigningKey::getValidFrom, issuedTime)
+            .and(wrapper -> wrapper.isNull(CvSigningKey::getValidTo).or().ge(CvSigningKey::getValidTo, issuedTime))
+            .orderByDesc(CvSigningKey::getValidFrom)
+            .orderByDesc(CvSigningKey::getId),
             false);
     }
 

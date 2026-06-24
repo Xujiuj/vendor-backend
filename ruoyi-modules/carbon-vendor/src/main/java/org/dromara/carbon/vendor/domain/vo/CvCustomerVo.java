@@ -1,5 +1,7 @@
 package org.dromara.carbon.vendor.domain.vo;
 
+import cn.idev.excel.annotation.ExcelIgnoreUnannotated;
+import cn.idev.excel.annotation.ExcelProperty;
 import io.github.linpeilie.annotations.AutoMapper;
 import lombok.Data;
 import org.dromara.carbon.vendor.domain.CvCustomer;
@@ -9,62 +11,43 @@ import java.io.Serializable;
 import java.util.Date;
 
 /**
- * Vendor customer view object.
+ * Vendor customer archive view object.
  */
 @Data
+@ExcelIgnoreUnannotated
 @AutoMapper(target = CvCustomer.class)
 public class CvCustomerVo implements Serializable {
 
     @Serial
     private static final long serialVersionUID = 1L;
 
-    /**
-     * Customer primary key.
-     */
+    @ExcelProperty(value = "客户主键")
     private Long id;
 
-    /**
-     * Stable customer code.
-     */
+    @ExcelProperty(value = "客户编码")
     private String customerCode;
 
-    /**
-     * Customer display name.
-     */
+    @ExcelProperty(value = "客户名称")
     private String customerName;
 
-    /**
-     * Primary contact name.
-     */
+    @ExcelProperty(value = "联系人")
     private String contactName;
 
-    /**
-     * Primary contact email.
-     */
+    @ExcelProperty(value = "联系邮箱")
     private String contactEmail;
 
-    /**
-     * Primary contact phone.
-     */
+    @ExcelProperty(value = "联系电话")
     private String contactPhone;
 
-    /**
-     * Customer lifecycle status.
-     */
+    @ExcelProperty(value = "客户状态")
     private String customerStatus;
 
-    /**
-     * Creation time.
-     */
+    @ExcelProperty(value = "创建时间")
     private Date createTime;
 
-    /**
-     * Last update time.
-     */
+    @ExcelProperty(value = "更新时间")
     private Date updateTime;
 
-    /**
-     * Remark.
-     */
+    @ExcelProperty(value = "备注")
     private String remark;
 }

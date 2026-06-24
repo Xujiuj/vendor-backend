@@ -1,6 +1,8 @@
 package org.dromara.carbon.vendor.controller;
 
 import cn.dev33.satoken.annotation.SaCheckPermission;
+import cn.dev33.satoken.annotation.SaMode;
+import cn.dev33.satoken.stp.StpUtil;
 import jakarta.validation.constraints.NotEmpty;
 import jakarta.validation.constraints.NotNull;
 import lombok.RequiredArgsConstructor;
@@ -33,33 +35,50 @@ public class CvVendorTableFieldController extends BaseController {
 
     private final ICvVendorTableFieldService tableFieldService;
 
-    @SaCheckPermission("vendor:dimension:list")
+    @SaCheckPermission(value = {"vendor:dimension:list", "vendor:factorRecord:list"}, mode = SaMode.OR)
     @GetMapping("/list")
     public TableDataInfo<CvVendorTableField> list(CvVendorTableFieldBo bo, PageQuery pageQuery) {
+        checkPermission(bo == null ? null : bo.getTableGroup(), "list");
         return tableFieldService.queryPageList(bo, pageQuery);
     }
 
-    @SaCheckPermission("vendor:dimension:query")
+    @SaCheckPermission(value = {"vendor:dimension:query", "vendor:factorRecord:query"}, mode = SaMode.OR)
     @GetMapping("/{id}")
     public R<CvVendorTableField> getInfo(@NotNull(message = "id cannot be null") @PathVariable Long id) {
-        return R.ok(tableFieldService.queryById(id));
+        CvVendorTableField field = tableFieldService.queryById(id);
+        checkPermission(field == null ? null : field.getTableGroup(), "query");
+        return R.ok(field);
     }
 
-    @SaCheckPermission("vendor:dimension:add")
+    @SaCheckPermission(value = {"vendor:dimension:add", "vendor:factorRecord:add"}, mode = SaMode.OR)
     @PostMapping
     public R<Void> add(@Validated(AddGroup.class) @RequestBody CvVendorTableFieldBo bo) {
+        checkPermission(bo.getTableGroup(), "add");
         return toAjax(tableFieldService.insertByBo(bo));
     }
 
-    @SaCheckPermission("vendor:dimension:edit")
+    @SaCheckPermission(value = {"vendor:dimension:edit", "vendor:factorRecord:edit"}, mode = SaMode.OR)
     @PutMapping
     public R<Void> edit(@Validated(EditGroup.class) @RequestBody CvVendorTableFieldBo bo) {
+        checkPermission(bo.getTableGroup(), "edit");
         return toAjax(tableFieldService.updateByBo(bo));
     }
 
-    @SaCheckPermission("vendor:dimension:remove")
+    @SaCheckPermission(value = {"vendor:dimension:remove", "vendor:factorRecord:remove"}, mode = SaMode.OR)
     @DeleteMapping("/{ids}")
     public R<Void> remove(@NotEmpty(message = "ids cannot be empty") @PathVariable Long[] ids) {
+        for (Long id : ids) {
+            CvVendorTableField field = tableFieldService.queryById(id);
+            checkPermission(field == null ? null : field.getTableGroup(), "remove");
+        }
         return toAjax(tableFieldService.deleteByIds(List.of(ids)));
+    }
+
+    private void checkPermission(String tableGroup, String action) {
+        if ("factor".equals(tableGroup)) {
+            StpUtil.checkPermission("vendor:factorRecord:" + action);
+            return;
+        }
+        StpUtil.checkPermission("vendor:dimension:" + action);
     }
 }

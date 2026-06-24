@@ -15,6 +15,7 @@ import org.dromara.carbon.vendor.service.ICvFactorRecordService;
 import org.dromara.common.core.exception.ServiceException;
 import org.dromara.common.core.utils.MapstructUtils;
 import org.dromara.common.core.utils.StringUtils;
+import org.dromara.common.json.utils.JsonUtils;
 import org.dromara.common.mybatis.core.page.PageQuery;
 import org.dromara.common.mybatis.core.page.TableDataInfo;
 import org.springframework.stereotype.Service;
@@ -172,6 +173,9 @@ public class CvFactorRecordServiceImpl implements ICvFactorRecordService {
         }
         if (StringUtils.isBlank(bo.getSourceRef())) {
             bo.setSourceRef(bo.getFactorSource());
+        }
+        if (StringUtils.isNotBlank(bo.getCustomFields()) && !JsonUtils.isJsonObject(bo.getCustomFields())) {
+            throw new ServiceException("customFields must be a JSON object");
         }
         if (bo.getEnabledFlag() == null) {
             bo.setEnabledFlag(Boolean.TRUE);

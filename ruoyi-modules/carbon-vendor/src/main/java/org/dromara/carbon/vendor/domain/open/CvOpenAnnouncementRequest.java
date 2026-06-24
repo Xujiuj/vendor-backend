@@ -15,7 +15,6 @@ public class CvOpenAnnouncementRequest implements Serializable {
     @Serial
     private static final long serialVersionUID = 1L;
 
-    @NotBlank(message = "licenseId cannot be blank")
     private String licenseId;
 
     @NotBlank(message = "installId cannot be blank")

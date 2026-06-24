@@ -149,6 +149,11 @@ public class CvFactorRecordVo implements Serializable {
     private String sourceRef;
 
     /**
+     * Vendor-defined custom field values as JSON object.
+     */
+    private String customFields;
+
+    /**
      * Whether this factor is enabled.
      */
     private Boolean enabledFlag;

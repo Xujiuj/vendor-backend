@@ -24,6 +24,7 @@ public class CvOpenDimensionController {
 
     @GetMapping
     public R<CvOpenDimensionListResponse> list(@Valid CvOpenDimensionRequest request) {
+        request.setLicenseId(CvOpenApiLicenseSupport.resolveLicenseId(request.getLicenseId()));
         return R.ok(openDimensionService.listDimensions(request));
     }
 }

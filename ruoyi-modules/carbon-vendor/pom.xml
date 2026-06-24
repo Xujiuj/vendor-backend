@@ -31,6 +31,11 @@
 
         <dependency>
             <groupId>org.dromara</groupId>
+            <artifactId>ruoyi-common-excel</artifactId>
+        </dependency>
+
+        <dependency>
+            <groupId>org.dromara</groupId>
             <artifactId>ruoyi-common-json</artifactId>
         </dependency>
 

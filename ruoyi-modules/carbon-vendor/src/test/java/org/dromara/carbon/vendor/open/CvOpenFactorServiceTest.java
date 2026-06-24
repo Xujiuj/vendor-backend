@@ -8,6 +8,7 @@ import org.dromara.carbon.vendor.domain.open.CvOpenFactorSyncResponse;
 import org.dromara.carbon.vendor.mapper.CvFactorRecordMapper;
 import org.dromara.carbon.vendor.mapper.CvFactorVersionMapper;
 import org.dromara.carbon.vendor.mapper.CvLicenseIssueMapper;
+import org.dromara.carbon.vendor.mapper.CvVendorTableFieldMapper;
 import org.dromara.carbon.vendor.service.ICvFactorCustomerScopeService;
 import org.dromara.carbon.vendor.service.ICvOpenApiAuditService;
 import org.dromara.carbon.vendor.service.impl.CvOpenFactorServiceImpl;
@@ -39,6 +40,7 @@ class CvOpenFactorServiceTest {
     private CvLicenseIssueMapper licenseIssueMapper;
     private CvFactorVersionMapper factorVersionMapper;
     private CvFactorRecordMapper factorRecordMapper;
+    private CvVendorTableFieldMapper tableFieldMapper;
     private ICvFactorCustomerScopeService factorCustomerScopeService;
     private ICvOpenApiAuditService openApiAuditService;
     private CvOpenFactorServiceImpl service;
@@ -48,12 +50,14 @@ class CvOpenFactorServiceTest {
         licenseIssueMapper = mock(CvLicenseIssueMapper.class);
         factorVersionMapper = mock(CvFactorVersionMapper.class);
         factorRecordMapper = mock(CvFactorRecordMapper.class);
+        tableFieldMapper = mock(CvVendorTableFieldMapper.class);
         factorCustomerScopeService = mock(ICvFactorCustomerScopeService.class);
         openApiAuditService = mock(ICvOpenApiAuditService.class);
         service = new CvOpenFactorServiceImpl(
             licenseIssueMapper,
             factorVersionMapper,
             factorRecordMapper,
+            tableFieldMapper,
             factorCustomerScopeService,
             openApiAuditService
         );

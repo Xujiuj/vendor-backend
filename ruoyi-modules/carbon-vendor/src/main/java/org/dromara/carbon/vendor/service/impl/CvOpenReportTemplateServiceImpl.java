@@ -182,9 +182,7 @@ public class CvOpenReportTemplateServiceImpl implements ICvOpenReportTemplateSer
         if (entitlement == null) {
             throw new ServiceException("license entitlement does not exist");
         }
-        if (!installId.equals(entitlement.getInstallId())) {
-            throw new ServiceException("license installId does not match");
-        }
+        CvLicenseInstallBindingSupport.bindOrReject(licenseIssueMapper, entitlement, installId);
         if (entitlement.getRevokedTime() != null || ISSUE_STATUS_REVOKED.equalsIgnoreCase(entitlement.getIssueStatus())) {
             throw new ServiceException("license entitlement is revoked");
         }
