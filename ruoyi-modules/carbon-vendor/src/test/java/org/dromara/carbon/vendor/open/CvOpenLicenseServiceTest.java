@@ -1,5 +1,6 @@
 package org.dromara.carbon.vendor.open;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.dromara.carbon.vendor.domain.CvCustomer;
 import org.dromara.carbon.vendor.domain.CvLicenseIssue;
 import org.dromara.carbon.vendor.domain.CvRenewalOrder;
@@ -10,6 +11,8 @@ import org.dromara.carbon.vendor.domain.open.CvOpenRenewalOrderResponse;
 import org.dromara.carbon.vendor.mapper.CvCustomerMapper;
 import org.dromara.carbon.vendor.mapper.CvLicenseIssueMapper;
 import org.dromara.carbon.vendor.mapper.CvRenewalOrderMapper;
+import org.dromara.carbon.vendor.mapper.CvSigningKeyMapper;
+import org.dromara.carbon.vendor.service.CvLicensePrivateKeyProvider;
 import org.dromara.carbon.vendor.service.ICvOpenApiAuditService;
 import org.dromara.carbon.vendor.service.impl.CvOpenLicenseServiceImpl;
 import org.dromara.common.core.exception.ServiceException;
@@ -57,7 +60,10 @@ class CvOpenLicenseServiceTest {
             customerMapper,
             renewalOrderMapper,
             tenantPackageMapper,
-            openApiAuditService
+            openApiAuditService,
+            mock(CvSigningKeyMapper.class),
+            mock(CvLicensePrivateKeyProvider.class),
+            new ObjectMapper()
         );
     }
 
