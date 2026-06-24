@@ -5,9 +5,6 @@ import org.dromara.carbon.vendor.domain.CvVendorTableField;
 import org.dromara.carbon.vendor.domain.vo.CvVendorTableFieldVo;
 import org.dromara.common.mybatis.core.mapper.BaseMapperPlus;
 
-/**
- * Vendor table field definition mapper.
- */
 @InterceptorIgnore(dataPermission = "true", tenantLine = "true")
 public interface CvVendorTableFieldMapper extends BaseMapperPlus<CvVendorTableField, CvVendorTableFieldVo> {
 }

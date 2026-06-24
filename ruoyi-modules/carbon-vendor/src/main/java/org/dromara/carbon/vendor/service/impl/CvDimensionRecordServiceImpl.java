@@ -2,6 +2,7 @@ package org.dromara.carbon.vendor.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.metadata.IPage;
+import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import lombok.RequiredArgsConstructor;
 import org.dromara.carbon.vendor.domain.CvDimensionRecord;
 import org.dromara.carbon.vendor.domain.bo.CvDimensionRecordBo;
@@ -9,109 +10,126 @@ import org.dromara.carbon.vendor.domain.vo.CvDimensionRecordVo;
 import org.dromara.carbon.vendor.mapper.CvDimensionRecordMapper;
 import org.dromara.carbon.vendor.service.ICvDimensionRecordService;
 import org.dromara.common.core.exception.ServiceException;
-import org.dromara.common.core.utils.MapstructUtils;
 import org.dromara.common.core.utils.StringUtils;
 import org.dromara.common.mybatis.core.page.PageQuery;
 import org.dromara.common.mybatis.core.page.TableDataInfo;
 import org.springframework.stereotype.Service;
 
-import java.util.Arrays;
-import java.util.List;
+import java.util.Date;
 import java.util.Set;
 
-/**
- * Vendor dimension record service implementation.
- */
 @RequiredArgsConstructor
 @Service
 public class CvDimensionRecordServiceImpl implements ICvDimensionRecordService {
 
-    private static final Set<String> ALLOWED_DIMENSION_CODES = Set.of(
+    private static final String ENABLED = "0";
+
+    private static final Set<String> VENDOR_DIMENSION_CODES = Set.of(
         "admin-division",
         "emission-source-category",
         "base-year",
         "ef-electricity-factor",
         "ef-electricity-version",
         "ef-electricity-scope",
-        "greenhouse-gas",
-        "report-template-download"
+        "greenhouse-gas"
     );
 
-    private final CvDimensionRecordMapper dimensionRecordMapper;
+    private final CvDimensionRecordMapper baseMapper;
 
     @Override
     public TableDataInfo<CvDimensionRecordVo> queryPageList(CvDimensionRecordBo bo, PageQuery pageQuery) {
-        validateDimensionCode(bo.getDimensionCode());
-        IPage<CvDimensionRecordVo> page = dimensionRecordMapper.selectVoPage(pageQuery.build(), buildQueryWrapper(bo));
-        return TableDataInfo.build(page);
-    }
-
-    @Override
-    public List<CvDimensionRecordVo> queryList(CvDimensionRecordBo bo) {
-        validateDimensionCode(bo.getDimensionCode());
-        return dimensionRecordMapper.selectVoList(buildQueryWrapper(bo));
+        IPage<CvDimensionRecordVo> result = baseMapper.selectVoPage(pageQuery.build(), buildQueryWrapper(bo));
+        return TableDataInfo.build(result);
     }
 
     @Override
     public CvDimensionRecordVo queryById(Long id) {
-        return dimensionRecordMapper.selectVoById(id);
+        return baseMapper.selectVoById(id);
     }
 
     @Override
-    public Boolean insertByBo(CvDimensionRecordBo bo) {
+    public boolean insertByBo(CvDimensionRecordBo bo) {
         validateDimensionCode(bo.getDimensionCode());
-        normalizeDefaults(bo);
-        CvDimensionRecord add = MapstructUtils.convert(bo, CvDimensionRecord.class);
-        boolean flag = dimensionRecordMapper.insert(add) > 0;
-        if (flag) {
-            bo.setId(add.getId());
-        }
-        return flag;
+        CvDimensionRecord entity = copyToEntity(bo);
+        entity.setId(null);
+        entity.setStatus(StringUtils.isBlank(entity.getStatus()) ? ENABLED : entity.getStatus());
+        entity.setCreateTime(new Date());
+        entity.setUpdateTime(new Date());
+        return baseMapper.insert(entity) > 0;
     }
 
     @Override
-    public Boolean updateByBo(CvDimensionRecordBo bo) {
+    public boolean updateByBo(CvDimensionRecordBo bo) {
         validateDimensionCode(bo.getDimensionCode());
-        normalizeDefaults(bo);
-        CvDimensionRecord update = MapstructUtils.convert(bo, CvDimensionRecord.class);
-        return dimensionRecordMapper.updateById(update) > 0;
+        CvDimensionRecord entity = copyToEntity(bo);
+        entity.setUpdateTime(new Date());
+        return baseMapper.updateById(entity) > 0;
     }
 
     @Override
-    public Boolean deleteByIds(Long[] ids) {
-        if (ids == null || ids.length == 0) {
-            return false;
-        }
-        return dimensionRecordMapper.deleteByIds(Arrays.asList(ids)) > 0;
+    public boolean deleteByIds(Long[] ids) {
+        return baseMapper.deleteByIds(java.util.List.of(ids)) > 0;
     }
 
     private LambdaQueryWrapper<CvDimensionRecord> buildQueryWrapper(CvDimensionRecordBo bo) {
-        return new LambdaQueryWrapper<CvDimensionRecord>()
-            .in(StringUtils.isBlank(bo.getDimensionCode()), CvDimensionRecord::getDimensionCode, ALLOWED_DIMENSION_CODES)
-            .eq(StringUtils.isNotBlank(bo.getDimensionCode()), CvDimensionRecord::getDimensionCode, bo.getDimensionCode())
+        LambdaQueryWrapper<CvDimensionRecord> wrapper = Wrappers.lambdaQuery();
+        if (bo == null) {
+            return wrapper.orderByAsc(CvDimensionRecord::getDimensionCode)
+                .orderByAsc(CvDimensionRecord::getSortOrder)
+                .orderByAsc(CvDimensionRecord::getId);
+        }
+        wrapper.eq(StringUtils.isNotBlank(bo.getDimensionCode()), CvDimensionRecord::getDimensionCode, bo.getDimensionCode())
             .like(StringUtils.isNotBlank(bo.getRecordCode()), CvDimensionRecord::getRecordCode, bo.getRecordCode())
             .like(StringUtils.isNotBlank(bo.getRecordName()), CvDimensionRecord::getRecordName, bo.getRecordName())
             .eq(StringUtils.isNotBlank(bo.getParentCode()), CvDimensionRecord::getParentCode, bo.getParentCode())
             .eq(StringUtils.isNotBlank(bo.getStatus()), CvDimensionRecord::getStatus, bo.getStatus())
+            .orderByAsc(CvDimensionRecord::getDimensionCode)
             .orderByAsc(CvDimensionRecord::getSortOrder)
             .orderByAsc(CvDimensionRecord::getId);
-    }
-
-    private void normalizeDefaults(CvDimensionRecordBo bo) {
-        if (StringUtils.isBlank(bo.getStatus())) {
-            bo.setStatus("0");
-        }
-        if (bo.getSortOrder() == null) {
-            bo.setSortOrder(0);
-        }
+        return wrapper;
     }
 
     private void validateDimensionCode(String dimensionCode) {
         if (StringUtils.isBlank(dimensionCode)) {
-            return;
+            throw new ServiceException("dimensionCode cannot be blank");
         }
-        if (!ALLOWED_DIMENSION_CODES.contains(dimensionCode)) {
-            throw new ServiceException("Unsupported vendor dimension code: " + dimensionCode);
+        if (!VENDOR_DIMENSION_CODES.contains(dimensionCode)) {
+            throw new ServiceException("unsupported vendor dimensionCode: " + dimensionCode);
         }
+    }
+
+    private CvDimensionRecord copyToEntity(CvDimensionRecordBo bo) {
+        CvDimensionRecord entity = new CvDimensionRecord();
+        entity.setId(bo.getId());
+        entity.setDimensionCode(bo.getDimensionCode());
+        entity.setRecordCode(bo.getRecordCode());
+        entity.setRecordName(bo.getRecordName());
+        entity.setParentCode(bo.getParentCode());
+        entity.setField01(bo.getField01());
+        entity.setField02(bo.getField02());
+        entity.setField03(bo.getField03());
+        entity.setField04(bo.getField04());
+        entity.setField05(bo.getField05());
+        entity.setField06(bo.getField06());
+        entity.setField07(bo.getField07());
+        entity.setField08(bo.getField08());
+        entity.setField09(bo.getField09());
+        entity.setField10(bo.getField10());
+        entity.setField11(bo.getField11());
+        entity.setField12(bo.getField12());
+        entity.setField13(bo.getField13());
+        entity.setField14(bo.getField14());
+        entity.setField15(bo.getField15());
+        entity.setField16(bo.getField16());
+        entity.setField17(bo.getField17());
+        entity.setField18(bo.getField18());
+        entity.setField19(bo.getField19());
+        entity.setField20(bo.getField20());
+        entity.setField21(bo.getField21());
+        entity.setField22(bo.getField22());
+        entity.setSortOrder(bo.getSortOrder());
+        entity.setStatus(bo.getStatus());
+        entity.setRemark(bo.getRemark());
+        return entity;
     }
 }
