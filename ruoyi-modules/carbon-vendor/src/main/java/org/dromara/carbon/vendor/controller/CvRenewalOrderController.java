@@ -76,8 +76,8 @@ public class CvRenewalOrderController extends BaseController {
      */
     @SaCheckPermission("vendor:renewalOrder:callback")
     @PostMapping("/callback")
-    public R<Void> callback(@RequestBody CvRenewalCallbackRequest callbackRequest) {
-        return toAjax(renewalOrderService.applyRenewalCallback(callbackRequest));
+    public R<CvRenewalOrderVo> callback(@RequestBody CvRenewalCallbackRequest callbackRequest) {
+        return R.ok(renewalOrderService.applyRenewalCallback(callbackRequest));
     }
 
     /**
@@ -87,8 +87,8 @@ public class CvRenewalOrderController extends BaseController {
      */
     @SaCheckPermission("vendor:renewalOrder:retryIssue")
     @PostMapping("/{id}/retry-issue")
-    public R<Void> retryIssue(@PathVariable Long id) {
-        return toAjax(renewalOrderService.retryRenewalIssue(id));
+    public R<CvRenewalOrderVo> retryIssue(@PathVariable Long id) {
+        return R.ok(renewalOrderService.retryRenewalIssue(id));
     }
 
     /**

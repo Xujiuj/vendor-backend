@@ -19,9 +19,9 @@ public interface ICvRenewalOrderService {
 
     int updateRenewalOrder(CvRenewalOrderBo bo);
 
-    int applyRenewalCallback(CvRenewalCallbackRequest request);
+    CvRenewalOrderVo applyRenewalCallback(CvRenewalCallbackRequest request);
 
-    int retryRenewalIssue(Long id);
+    CvRenewalOrderVo retryRenewalIssue(Long id);
 
     int deleteRenewalOrderByIds(Long[] ids);
 }

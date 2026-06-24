@@ -83,7 +83,7 @@ public class CvRenewalOrderServiceImpl implements ICvRenewalOrderService {
     }
 
     @Override
-    public int applyRenewalCallback(CvRenewalCallbackRequest request) {
+    public CvRenewalOrderVo applyRenewalCallback(CvRenewalCallbackRequest request) {
         CvRenewalOrder existingOrder = findRenewalOrderForCallback(request);
         if (existingOrder == null) {
             throw new ServiceException("Vendor renewal order does not exist");
@@ -112,11 +112,13 @@ public class CvRenewalOrderServiceImpl implements ICvRenewalOrderService {
         }
         update.setUpdateTime(new Date());
         if (ISSUE_STATUS_ISSUING.equals(update.getIssueStatus()) && StringUtils.isBlank(request.getIssuedLicenseId())) {
-            return baseMapper.update(update, new LambdaUpdateWrapper<CvRenewalOrder>()
+            baseMapper.update(update, new LambdaUpdateWrapper<CvRenewalOrder>()
                 .eq(CvRenewalOrder::getId, existingOrder.getId())
                 .set(CvRenewalOrder::getIssuedLicenseId, null));
+            return baseMapper.selectVoById(existingOrder.getId());
         }
-        return baseMapper.updateById(update);
+        baseMapper.updateById(update);
+        return baseMapper.selectVoById(existingOrder.getId());
     }
 
     @Override
@@ -125,7 +127,7 @@ public class CvRenewalOrderServiceImpl implements ICvRenewalOrderService {
     }
 
     @Override
-    public int retryRenewalIssue(Long id) {
+    public CvRenewalOrderVo retryRenewalIssue(Long id) {
         if (id == null) {
             throw new ServiceException("Renewal order id cannot be null");
         }
@@ -150,11 +152,12 @@ public class CvRenewalOrderServiceImpl implements ICvRenewalOrderService {
         update.setId(existingOrder.getId());
         update.setIssueStatus(resolveRetryIssueStatus(existingOrder));
         update.setUpdateTime(new Date());
-        return baseMapper.updateById(update);
+        baseMapper.updateById(update);
+        return baseMapper.selectVoById(existingOrder.getId());
     }
 
     private LambdaQueryWrapper<CvRenewalOrder> buildQueryWrapper(CvRenewalOrderBo bo) {
-        Map<String, Object> params = bo.getParams();
+        Map<String, Object> params = bo.getParams() == null ? Map.of() : bo.getParams();
         LambdaQueryWrapper<CvRenewalOrder> lqw = Wrappers.lambdaQuery();
         lqw.eq(bo.getId() != null, CvRenewalOrder::getId, bo.getId());
         lqw.like(StringUtils.isNotBlank(bo.getOrderNo()), CvRenewalOrder::getOrderNo, bo.getOrderNo());
