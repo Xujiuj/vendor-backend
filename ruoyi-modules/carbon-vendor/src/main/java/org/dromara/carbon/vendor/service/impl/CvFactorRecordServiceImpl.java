@@ -77,7 +77,7 @@ public class CvFactorRecordServiceImpl implements ICvFactorRecordService {
     }
 
     private LambdaQueryWrapper<CvFactorRecord> buildQueryWrapper(CvFactorRecordBo bo) {
-        Map<String, Object> params = bo.getParams();
+        Map<String, Object> params = bo.getParams() == null ? Map.of() : bo.getParams();
         LambdaQueryWrapper<CvFactorRecord> lqw = Wrappers.lambdaQuery();
         lqw.eq(bo.getId() != null, CvFactorRecord::getId, bo.getId());
         lqw.eq(bo.getVersionId() != null, CvFactorRecord::getVersionId, bo.getVersionId());

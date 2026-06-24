@@ -141,7 +141,7 @@ public class CvFactorCustomerScopeServiceImpl implements ICvFactorCustomerScopeS
     }
 
     private LambdaQueryWrapper<CvFactorCustomerScope> buildQueryWrapper(CvFactorCustomerScopeBo bo) {
-        Map<String, Object> params = bo.getParams();
+        Map<String, Object> params = bo.getParams() == null ? Map.of() : bo.getParams();
         LambdaQueryWrapper<CvFactorCustomerScope> lqw = Wrappers.lambdaQuery();
         lqw.eq(bo.getId() != null, CvFactorCustomerScope::getId, bo.getId());
         lqw.eq(bo.getVersionId() != null, CvFactorCustomerScope::getVersionId, bo.getVersionId());

@@ -57,7 +57,7 @@ public class CvSigningKeyServiceImpl implements ICvSigningKeyService {
     }
 
     private LambdaQueryWrapper<CvSigningKey> buildQueryWrapper(CvSigningKeyBo bo) {
-        Map<String, Object> params = bo.getParams();
+        Map<String, Object> params = bo.getParams() == null ? Map.of() : bo.getParams();
         LambdaQueryWrapper<CvSigningKey> lqw = Wrappers.lambdaQuery();
         lqw.eq(bo.getId() != null, CvSigningKey::getId, bo.getId());
         lqw.like(StringUtils.isNotBlank(bo.getKeyId()), CvSigningKey::getKeyId, bo.getKeyId());

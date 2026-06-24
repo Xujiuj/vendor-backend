@@ -114,7 +114,7 @@ public class CvReportTemplateServiceImpl implements ICvReportTemplateService {
     }
 
     private LambdaQueryWrapper<CvReportTemplate> buildQueryWrapper(CvReportTemplateBo bo) {
-        Map<String, Object> params = bo.getParams();
+        Map<String, Object> params = bo.getParams() == null ? Map.of() : bo.getParams();
         LambdaQueryWrapper<CvReportTemplate> lqw = Wrappers.lambdaQuery();
         lqw.eq(bo.getId() != null, CvReportTemplate::getId, bo.getId());
         lqw.like(StringUtils.isNotBlank(bo.getTemplateCode()), CvReportTemplate::getTemplateCode, bo.getTemplateCode());

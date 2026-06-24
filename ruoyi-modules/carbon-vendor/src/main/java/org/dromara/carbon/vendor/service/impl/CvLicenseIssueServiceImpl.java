@@ -231,7 +231,7 @@ public class CvLicenseIssueServiceImpl implements ICvLicenseIssueService {
     }
 
     private LambdaQueryWrapper<CvLicenseIssue> buildQueryWrapper(CvLicenseIssueBo bo) {
-        Map<String, Object> params = bo.getParams();
+        Map<String, Object> params = bo.getParams() == null ? Map.of() : bo.getParams();
         LambdaQueryWrapper<CvLicenseIssue> lqw = Wrappers.lambdaQuery();
         lqw.eq(bo.getId() != null, CvLicenseIssue::getId, bo.getId());
         lqw.like(StringUtils.isNotBlank(bo.getLicenseId()), CvLicenseIssue::getLicenseId, bo.getLicenseId());

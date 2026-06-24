@@ -38,7 +38,7 @@ public class CvCustomerServiceImpl implements ICvCustomerService {
     }
 
     private LambdaQueryWrapper<CvCustomer> buildQueryWrapper(CvCustomerBo bo) {
-        Map<String, Object> params = bo.getParams();
+        Map<String, Object> params = bo.getParams() == null ? Map.of() : bo.getParams();
         LambdaQueryWrapper<CvCustomer> lqw = Wrappers.lambdaQuery();
         lqw.eq(bo.getId() != null, CvCustomer::getId, bo.getId());
         lqw.like(StringUtils.isNotBlank(bo.getCustomerCode()), CvCustomer::getCustomerCode, bo.getCustomerCode());
