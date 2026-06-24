@@ -71,7 +71,8 @@ jobs:
           for sql_file in \
             script/sql/update/vendor_tenant_package_purchase_fields.sql \
             script/sql/update/vendor_online_purchase_payment_fields.sql \
-            script/sql/update/vendor_tenant_package_license_fields.sql; do
+            script/sql/update/vendor_tenant_package_license_fields.sql \
+            script/sql/update/vendor_tenant_package_permission_seed.sql; do
             echo "Executing vendor database migration from runner: $(basename "$sql_file")"
             mysql \
               --connect-timeout=20 \
@@ -153,7 +154,8 @@ jobs:
           for sql_file in \
             "$REMOTE_UPDATE_DIR/vendor_tenant_package_purchase_fields.sql" \
             "$REMOTE_UPDATE_DIR/vendor_online_purchase_payment_fields.sql" \
-            "$REMOTE_UPDATE_DIR/vendor_tenant_package_license_fields.sql"; do
+            "$REMOTE_UPDATE_DIR/vendor_tenant_package_license_fields.sql" \
+            "$REMOTE_UPDATE_DIR/vendor_tenant_package_permission_seed.sql"; do
             echo "Executing vendor database migration from target host: $(basename "$sql_file")"
             mysql \
               --connect-timeout=20 \
@@ -236,6 +238,7 @@ jobs:
             timeout 60 sshpass -p "$DEPLOY_PASSWORD" scp -P "$DEPLOY_PORT" -o StrictHostKeyChecking=accept-new script/sql/update/vendor_tenant_package_purchase_fields.sql "$DEPLOY_USER@$DEPLOY_HOST:$REMOTE_UPDATE_DIR/"
             timeout 60 sshpass -p "$DEPLOY_PASSWORD" scp -P "$DEPLOY_PORT" -o StrictHostKeyChecking=accept-new script/sql/update/vendor_online_purchase_payment_fields.sql "$DEPLOY_USER@$DEPLOY_HOST:$REMOTE_UPDATE_DIR/"
             timeout 60 sshpass -p "$DEPLOY_PASSWORD" scp -P "$DEPLOY_PORT" -o StrictHostKeyChecking=accept-new script/sql/update/vendor_tenant_package_license_fields.sql "$DEPLOY_USER@$DEPLOY_HOST:$REMOTE_UPDATE_DIR/"
+            timeout 60 sshpass -p "$DEPLOY_PASSWORD" scp -P "$DEPLOY_PORT" -o StrictHostKeyChecking=accept-new script/sql/update/vendor_tenant_package_permission_seed.sql "$DEPLOY_USER@$DEPLOY_HOST:$REMOTE_UPDATE_DIR/"
             timeout 300 sshpass -p "$DEPLOY_PASSWORD" ssh "${SSH_OPTS[@]}" "$DEPLOY_USER@$DEPLOY_HOST" \
               "DB_NAME='$DB_NAME' DB_HOST='$DB_HOST' DB_PORT='$DB_PORT' DB_USERNAME='$DB_USERNAME' DB_PASSWORD='$DB_PASSWORD' REMOTE_SCHEMA='$REMOTE_SCHEMA' REMOTE_UPDATE_DIR='$REMOTE_UPDATE_DIR' SUDO_PASSWORD='$DEPLOY_PASSWORD' timeout 240 bash -s" < sync-business-db.sh
           fi

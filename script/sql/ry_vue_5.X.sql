@@ -79,7 +79,7 @@ create table sys_tenant_package (
     package_id              bigint(20)     not null    comment '租户套餐id',
     package_name            varchar(20)                comment '套餐名称',
     menu_ids                varchar(3000)              comment '关联菜单id',
-    remark                  varchar(200)               comment '备注',
+    remark                  varchar(1000)              comment '备注',
     menu_check_strictly     tinyint(1)     default 1   comment '菜单树选择项是否关联显示',
     price_amount            decimal(12,2)  default 0.00 comment '套餐价格金额',
     price_currency          varchar(3)     default 'CNY' comment '价格币种',

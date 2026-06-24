@@ -185,12 +185,27 @@ update sys_dict_data set dict_label = 'APP' where dict_type = 'sys_device_type' 
 update sys_notice set notice_title = '温馨提醒：2018-07-01 新版本发布啦', notice_content = '新版本内容', remark = '管理员' where notice_id = 1;
 update sys_notice set notice_title = '维护通知：2018-07-01 系统凌晨维护', notice_content = '维护内容', remark = '管理员' where notice_id = 2;
 
+set @schema_name = database();
+
+alter table sys_tenant_package
+    modify column remark varchar(1000) comment '备注';
+
+set @sql = if(
+    exists(select 1 from information_schema.columns where table_schema = @schema_name and table_name = 'sys_tenant_package' and column_name = 'license_feature_codes'),
+    'select 1',
+    'alter table sys_tenant_package add column license_feature_codes varchar(1000) default null comment ''License功能码，逗号分隔'''
+);
+prepare stmt from @sql; execute stmt; deallocate prepare stmt;
+
 insert into sys_tenant_package
-(package_id, package_name, menu_ids, remark, menu_check_strictly, price_amount, price_currency, billing_cycle, online_purchase_enabled, status, del_flag, create_dept, create_by, create_time, update_by, update_time)
+(package_id, package_name, menu_ids, remark, menu_check_strictly, price_amount, price_currency, billing_cycle, online_purchase_enabled, license_feature_codes, status, del_flag, create_dept, create_by, create_time, update_by, update_time)
 values
-(1001, '标准版', '910100,910101,910102,910107,910136,910103,910104,910121,910105,910106,910131,910126', '默认业务套餐：开放基础客户、License、因子、模板与维表同步能力', 1, 0.00, 'CNY', 'YEAR', 0, '0', '0', 103, 1, sysdate(), null, null),
-(1002, '专业版', '910100,910101,910102,910107,910136,910103,910104,910121,910105,910106,910131,910126', '默认业务套餐：在标准版基础上承载更完整的数据开放范围', 1, 0.00, 'CNY', 'YEAR', 0, '0', '0', 103, 1, sysdate(), null, null),
-(1003, '集团版', '910100,910101,910102,910107,910136,910103,910104,910121,910105,910106,910131,910126,1,100,101,102,103,104,105,106,107,122', '默认业务套餐：集团客户使用，开放全部厂商数据管理能力', 1, 0.00, 'CNY', 'YEAR', 0, '0', '0', 103, 1, sysdate(), null, null)
+(1001, '标准版', '910100,910101,910102,910107,910136,910103,910104,910121,910105,910106,910131,910126', '默认业务套餐：开放基础客户、License与数据填报能力
+[PACKAGE_POLICY]{"editionLevel":"standard","directFeatures":[],"effectiveFeatures":["capture"]}', 1, 0.00, 'CNY', 'YEAR', 0, 'capture', '0', '0', 103, 1, sysdate(), null, null),
+(1002, '专业版', '910100,910101,910102,910107,910136,910103,910104,910121,910105,910106,910131,910126', '默认业务套餐：包含标准版全部能力，并开放因子同步与模板同步
+[PACKAGE_POLICY]{"editionLevel":"professional","directFeatures":[],"effectiveFeatures":["capture","factor-sync","template-sync"]}', 1, 0.00, 'CNY', 'YEAR', 0, 'capture,factor-sync,template-sync', '0', '0', 103, 1, sysdate(), null, null),
+(1003, '集团版', '910100,910101,910102,910107,910136,910103,910104,910121,910105,910106,910131,910126,1,100,101,102,103,104,105,106,107,122', '默认业务套餐：包含专业版全部能力，并开放报表门禁与高级服务
+[PACKAGE_POLICY]{"editionLevel":"group","directFeatures":[],"effectiveFeatures":["capture","factor-sync","template-sync","report-gate","premium-support"]}', 1, 0.00, 'CNY', 'YEAR', 0, 'capture,factor-sync,template-sync,report-gate,premium-support', '0', '0', 103, 1, sysdate(), null, null)
 on duplicate key update
     package_name = values(package_name),
     menu_ids = values(menu_ids),
@@ -200,12 +215,11 @@ on duplicate key update
     price_currency = values(price_currency),
     billing_cycle = values(billing_cycle),
     online_purchase_enabled = values(online_purchase_enabled),
+    license_feature_codes = values(license_feature_codes),
     status = values(status),
     del_flag = values(del_flag),
     update_by = 1,
     update_time = sysdate();
-
-set @schema_name = database();
 
 set @sql = if(
     exists(select 1 from information_schema.columns where table_schema = @schema_name and table_name = 'cv_license_issue' and column_name = 'package_id'),
