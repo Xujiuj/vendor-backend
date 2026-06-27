@@ -233,15 +233,22 @@ public class CvSourceAFactorImportServiceImpl implements ICvSourceAFactorImportS
             INSERT INTO cv_electricity_factor_version
             (factor_version, effective_year, sort_order, status, remark, create_time, update_time)
             VALUES (?, ?, 0, '0', ?, NOW(), NOW())
+            ON DUPLICATE KEY UPDATE
+                effective_year = LEAST(effective_year, VALUES(effective_year)),
+                remark = VALUES(remark),
+                update_time = NOW()
             """;
-        List<Object[]> batchArgs = mapRows(rows, row -> {
+        Map<String, Integer> versionYears = new LinkedHashMap<>();
+        for (Map<String, Object> row : rows) {
             Integer year = integer(row.get("年份"));
             String version = text(row.get("对应因子版本"));
-            if (year == null || StringUtils.isBlank(version)) {
-                return null;
+            if (year != null && StringUtils.isNotBlank(version)) {
+                versionYears.merge(version, year, Math::min);
             }
-            return new Object[]{version, year, MARK};
-        });
+        }
+        List<Object[]> batchArgs = versionYears.entrySet().stream()
+            .map(entry -> new Object[]{entry.getKey(), entry.getValue(), MARK})
+            .toList();
         jdbcTemplate.batchUpdate(sql, batchArgs);
         return batchArgs.size();
     }

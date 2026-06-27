@@ -23,6 +23,7 @@ import java.util.Map;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -69,6 +70,35 @@ class CvDimensionDataServiceImplTest {
 
         assertEquals("BY-2026", record.get("recordCode"));
         assertEquals(2026, record.get("recordName"));
+    }
+
+    @Test
+    void electricityVersionUsesSingleVersionFieldForCodeAndName() throws Exception {
+        Map<String, Object> bo = new LinkedHashMap<>();
+        bo.put("recordCode", "2023");
+        bo.put("recordName", "should-not-overwrite");
+
+        applyRecordFields("ef-electricity-version", bo);
+
+        assertEquals("2023", bo.get("factorVersion"));
+    }
+
+    @Test
+    void electricityVersionInsertRejectsDuplicateVersionNumber() {
+        JdbcTemplate jdbcTemplate = mock(JdbcTemplate.class);
+        when(jdbcTemplate.queryForObject(
+            eq("SELECT COUNT(*) FROM `cv_electricity_factor_version` WHERE factor_version = ?"),
+            eq(Long.class),
+            any(Object[].class)
+        )).thenReturn(1L);
+        Map<String, Object> bo = new LinkedHashMap<>();
+        bo.put("recordCode", "2023");
+
+        ServiceException exception = assertThrows(ServiceException.class, () ->
+            service(mock(CvAdminDivisionMapper.class), mock(CvBaseYearMapper.class), mock(CvElectricityMapper.class), jdbcTemplate)
+                .insertByBo("ef-electricity-version", bo));
+
+        assertEquals("版本号已存在", exception.getMessage());
     }
 
     @Test
@@ -121,10 +151,14 @@ class CvDimensionDataServiceImplTest {
     }
 
     private void applyRecordFields(Map<String, Object> bo) throws Exception {
+        applyRecordFields("base-year", bo);
+    }
+
+    private void applyRecordFields(String dimensionCode, Map<String, Object> bo) throws Exception {
         Method method = CvDimensionDataServiceImpl.class.getDeclaredMethod("applyRecordFields", String.class, Map.class);
         method.setAccessible(true);
         try {
-            method.invoke(service(mock(CvBaseYearMapper.class)), "base-year", bo);
+            method.invoke(service(mock(CvBaseYearMapper.class)), dimensionCode, bo);
         } catch (InvocationTargetException e) {
             if (e.getCause() instanceof ServiceException serviceException) {
                 throw serviceException;
@@ -147,6 +181,13 @@ class CvDimensionDataServiceImplTest {
     private CvDimensionDataServiceImpl service(CvAdminDivisionMapper adminDivisionMapper,
                                                CvBaseYearMapper baseYearMapper,
                                                CvElectricityMapper electricityMapper) {
+        return service(adminDivisionMapper, baseYearMapper, electricityMapper, mock(JdbcTemplate.class));
+    }
+
+    private CvDimensionDataServiceImpl service(CvAdminDivisionMapper adminDivisionMapper,
+                                               CvBaseYearMapper baseYearMapper,
+                                               CvElectricityMapper electricityMapper,
+                                               JdbcTemplate jdbcTemplate) {
         return new CvDimensionDataServiceImpl(
             adminDivisionMapper,
             mock(CvEmissionSourceCategoryMapper.class),
@@ -155,7 +196,7 @@ class CvDimensionDataServiceImplTest {
             mock(CvElectricityFactorVersionMapper.class),
             mock(CvElectricityFactorScopeMapper.class),
             mock(CvGreenhouseGasMapper.class),
-            mock(JdbcTemplate.class)
+            jdbcTemplate
         );
     }
 

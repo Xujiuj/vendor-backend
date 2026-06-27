@@ -84,6 +84,7 @@ public class CvDimensionDataServiceImpl implements ICvDimensionDataService {
     public int insertByBo(String dimensionCode, Map<String, Object> bo) {
         ManagedDimension dimension = managedDimension(dimensionCode);
         applyRecordFields(dimensionCode, bo);
+        validateUniqueBusinessKeys(dimensionCode, dimension.tableName(), bo, null);
         Map<String, Object> values = writableValues(dimension.tableName(), bo, false);
         return insertRow(dimension.tableName(), values);
     }
@@ -98,6 +99,7 @@ public class CvDimensionDataServiceImpl implements ICvDimensionDataService {
         if (id == null) {
             throw new ServiceException("id不能为空");
         }
+        validateUniqueBusinessKeys(dimensionCode, dimension.tableName(), bo, id);
         return updateRow(dimension.tableName(), values, id);
     }
 
@@ -188,8 +190,29 @@ public class CvDimensionDataServiceImpl implements ICvDimensionDataService {
         if (recordCode != null) {
             bo.put(codeField, recordCode);
         }
-        if (recordName != null) {
+        if (!codeField.equals(nameField) && recordName != null) {
             bo.put(nameField, recordName);
+        }
+    }
+
+    private void validateUniqueBusinessKeys(String dimensionCode, String tableName, Map<String, Object> bo, Object currentId) {
+        if (!"ef-electricity-version".equals(dimensionCode)) {
+            return;
+        }
+        Object factorVersion = firstNonNull(bo.get("factorVersion"), bo.get("factor_version"), bo.get("recordCode"));
+        if (factorVersion == null || StringUtils.isBlank(String.valueOf(factorVersion))) {
+            throw new ServiceException("版本号不能为空");
+        }
+        String sql = "SELECT COUNT(*) FROM `" + tableName + "` WHERE factor_version = ?";
+        List<Object> args = new ArrayList<>();
+        args.add(String.valueOf(factorVersion).trim());
+        if (currentId != null) {
+            sql += " AND id <> ?";
+            args.add(currentId);
+        }
+        Long count = jdbcTemplate.queryForObject(sql, Long.class, args.toArray());
+        if (count != null && count > 0) {
+            throw new ServiceException("版本号已存在");
         }
     }
 

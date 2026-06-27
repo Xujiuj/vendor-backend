@@ -125,12 +125,10 @@ INSERT INTO cv_electricity_factor_version
 (factor_version, effective_year, sort_order, status, remark)
 VALUES
 ('2022', 2023, 10, '0', 'source(A)'),
-('2022', 2024, 20, '0', 'source(A)'),
-('2023', 2025, 30, '0', 'source(A)'),
-('2023', 2026, 40, '0', 'source(A)'),
-('2023', 2027, 50, '0', 'source(A)')
+('2023', 2025, 20, '0', 'source(A)')
 ON DUPLICATE KEY UPDATE
     factor_version = VALUES(factor_version),
+    effective_year = VALUES(effective_year),
     sort_order = VALUES(sort_order),
     status = VALUES(status),
     remark = VALUES(remark);

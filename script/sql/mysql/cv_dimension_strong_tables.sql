@@ -104,9 +104,8 @@ CREATE TABLE IF NOT EXISTS cv_electricity_factor_version (
     update_time DATETIME DEFAULT CURRENT_TIMESTAMP,
     remark VARCHAR(500) DEFAULT NULL,
     PRIMARY KEY (id),
-    UNIQUE KEY uk_cv_electricity_factor_version (factor_version, effective_year),
+    UNIQUE KEY uk_cv_electricity_factor_version (factor_version),
     UNIQUE KEY uk_cv_electricity_factor_effective_year (effective_year),
-    KEY idx_cv_electricity_factor_version_code (factor_version),
     CONSTRAINT chk_cv_electricity_factor_version_year
         CHECK (effective_year BETWEEN 1900 AND 9999)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='203 electricity factor version map';

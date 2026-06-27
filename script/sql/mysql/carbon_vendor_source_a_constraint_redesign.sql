@@ -371,6 +371,17 @@ FROM (
     HAVING COUNT(*) > 1
 ) d;
 
+SELECT 'electricity_factor_version.factor_version.duplicate' AS check_code,
+       COUNT(*) AS problem_count
+FROM (
+    SELECT factor_version
+    FROM cv_electricity_factor_version
+    WHERE factor_version IS NOT NULL
+      AND factor_version <> ''
+    GROUP BY factor_version
+    HAVING COUNT(*) > 1
+) d;
+
 CALL cv_assert_zero('admin_division.code.duplicate', (
     SELECT COUNT(*)
     FROM (
@@ -491,12 +502,25 @@ CALL cv_assert_zero('electricity_factor_version.effective_year.duplicate', (
         HAVING COUNT(*) > 1
     ) d
 ));
+CALL cv_assert_zero('electricity_factor_version.factor_version.duplicate', (
+    SELECT COUNT(*)
+    FROM (
+        SELECT factor_version
+        FROM cv_electricity_factor_version
+        WHERE factor_version IS NOT NULL
+          AND factor_version <> ''
+        GROUP BY factor_version
+        HAVING COUNT(*) > 1
+    ) d
+));
 CALL cv_drop_fk_if_exists('cv_electricity_factor', 'fk_cv_electricity_factor_version');
 CALL cv_drop_index_if_exists('cv_emission_source_category', 'uk_cv_emission_source_category_code');
 CALL cv_drop_index_if_exists('cv_base_year', 'uk_cv_base_year');
 CALL cv_drop_index_if_exists('cv_base_year', 'uk_cv_base_year_current');
 CALL cv_drop_column_if_exists('cv_base_year', 'current_base_year_key');
+CALL cv_drop_index_if_exists('cv_electricity_factor_version', 'uk_cv_electricity_factor_version');
 CALL cv_drop_index_if_exists('cv_electricity_factor_version', 'uk_cv_electricity_factor_version_code');
+CALL cv_drop_index_if_exists('cv_electricity_factor_version', 'idx_cv_electricity_factor_version_code');
 CALL cv_drop_column_if_exists('cv_base_year', 'current_factory_key');
 CALL cv_drop_column_if_exists('cv_base_year', 'factory_code');
 CALL cv_drop_column_if_exists('cv_base_year', 'factory_name');
@@ -518,8 +542,8 @@ CALL cv_add_index_if_missing('cv_base_year', 'idx_cv_base_year_current',
     'KEY idx_cv_base_year_current (is_current, base_year)');
 CALL cv_add_index_if_missing('cv_electricity_factor_version', 'uk_cv_electricity_factor_effective_year',
     'UNIQUE KEY uk_cv_electricity_factor_effective_year (effective_year)');
-CALL cv_add_index_if_missing('cv_electricity_factor_version', 'idx_cv_electricity_factor_version_code',
-    'KEY idx_cv_electricity_factor_version_code (factor_version)');
+CALL cv_add_index_if_missing('cv_electricity_factor_version', 'uk_cv_electricity_factor_version',
+    'UNIQUE KEY uk_cv_electricity_factor_version (factor_version)');
 CALL cv_add_index_if_missing('cv_electricity_factor', 'idx_cv_electricity_factor_division',
     'KEY idx_cv_electricity_factor_division (division_code)');
 CALL cv_add_index_if_missing('cv_electricity_factor', 'idx_cv_electricity_factor_version',
