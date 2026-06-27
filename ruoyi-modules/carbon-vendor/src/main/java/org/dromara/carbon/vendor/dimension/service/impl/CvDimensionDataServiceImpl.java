@@ -1,15 +1,10 @@
 package org.dromara.carbon.vendor.dimension.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
-import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import lombok.RequiredArgsConstructor;
 import org.dromara.carbon.vendor.dimension.domain.CvAdminDivision;
-import org.dromara.carbon.vendor.dimension.domain.CvBaseYear;
 import org.dromara.carbon.vendor.dimension.domain.CvElectricityFactor;
-import org.dromara.carbon.vendor.dimension.domain.CvElectricityFactorScope;
-import org.dromara.carbon.vendor.dimension.domain.CvElectricityFactorVersion;
 import org.dromara.carbon.vendor.dimension.domain.CvEmissionSourceCategory;
-import org.dromara.carbon.vendor.dimension.domain.CvGreenhouseGas;
 import org.dromara.carbon.vendor.dimension.mapper.CvAdminDivisionMapper;
 import org.dromara.carbon.vendor.dimension.mapper.CvBaseYearMapper;
 import org.dromara.carbon.vendor.dimension.mapper.CvElectricityMapper;
@@ -18,16 +13,25 @@ import org.dromara.carbon.vendor.dimension.mapper.CvElectricityFactorVersionMapp
 import org.dromara.carbon.vendor.dimension.mapper.CvEmissionSourceCategoryMapper;
 import org.dromara.carbon.vendor.dimension.mapper.CvGreenhouseGasMapper;
 import org.dromara.carbon.vendor.dimension.service.ICvDimensionDataService;
+import org.dromara.carbon.vendor.shared.VendorManagedTableCatalog;
 import org.dromara.common.core.exception.ServiceException;
-import org.dromara.common.core.utils.MapstructUtils;
+import org.dromara.common.core.utils.StringUtils;
 import org.dromara.common.mybatis.core.page.PageQuery;
 import org.dromara.common.mybatis.core.page.TableDataInfo;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
+import java.sql.Timestamp;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
+import java.util.regex.Pattern;
 
 /**
  * 统一维度数据 Service 实现
@@ -39,6 +43,9 @@ import java.util.Map;
 @Service
 public class CvDimensionDataServiceImpl implements ICvDimensionDataService {
 
+    private static final Pattern COLUMN_NAME_PATTERN = Pattern.compile("^[a-z][a-z0-9_]{1,62}$");
+    private static final Set<String> READONLY_COLUMNS = Set.of("id", "create_dept", "create_by", "create_time", "update_by", "update_time");
+
     private final CvAdminDivisionMapper adminDivisionMapper;
     private final CvEmissionSourceCategoryMapper emissionSourceCategoryMapper;
     private final CvBaseYearMapper baseYearMapper;
@@ -46,125 +53,52 @@ public class CvDimensionDataServiceImpl implements ICvDimensionDataService {
     private final CvElectricityFactorVersionMapper electricityFactorVersionMapper;
     private final CvElectricityFactorScopeMapper electricityFactorScopeMapper;
     private final CvGreenhouseGasMapper greenhouseGasMapper;
+    private final JdbcTemplate jdbcTemplate;
 
     @Override
     public TableDataInfo<?> queryPageList(String dimensionCode, PageQuery pageQuery) {
-        return switch (dimensionCode) {
-            case "admin-division" -> buildMappedPage(dimensionCode, adminDivisionMapper.selectPage(
-                pageQuery.build(), defaultWrapper(CvAdminDivision.class)));
-            case "emission-source-category" -> buildMappedPage(dimensionCode, emissionSourceCategoryMapper.selectPage(
-                pageQuery.build(), defaultWrapper(CvEmissionSourceCategory.class)));
-            case "base-year" -> buildMappedPage(dimensionCode, baseYearMapper.selectPage(
-                pageQuery.build(), defaultWrapper(CvBaseYear.class)));
-            case "ef-electricity-factor" -> buildMappedPage(dimensionCode, electricityMapper.selectPage(
-                pageQuery.build(), defaultWrapper(CvElectricityFactor.class)));
-            case "ef-electricity-version" -> buildMappedPage(dimensionCode, electricityFactorVersionMapper.selectPage(
-                pageQuery.build(), defaultWrapper(CvElectricityFactorVersion.class)));
-            case "ef-electricity-scope" -> buildMappedPage(dimensionCode, electricityFactorScopeMapper.selectPage(
-                pageQuery.build(), defaultWrapper(CvElectricityFactorScope.class)));
-            case "greenhouse-gas" -> buildMappedPage(dimensionCode, greenhouseGasMapper.selectPage(
-                pageQuery.build(), defaultWrapper(CvGreenhouseGas.class)));
-            default -> throw new ServiceException("不支持的维度编码: " + dimensionCode);
-        };
+        ManagedDimension dimension = managedDimension(dimensionCode);
+        int pageNum = pageQuery.getPageNum() == null || pageQuery.getPageNum() <= 0 ? PageQuery.DEFAULT_PAGE_NUM : pageQuery.getPageNum();
+        int pageSize = pageQuery.getPageSize() == null || pageQuery.getPageSize() <= 0 ? PageQuery.DEFAULT_PAGE_SIZE : pageQuery.getPageSize();
+        long offset = (long) (pageNum - 1) * pageSize;
+        String tableName = dimension.tableName();
+        Long total = jdbcTemplate.queryForObject("SELECT COUNT(*) FROM `" + tableName + "` WHERE status = '0'", Long.class);
+        List<Map<String, Object>> rows = jdbcTemplate.queryForList("SELECT * FROM `" + tableName + "` WHERE status = '0' ORDER BY sort_order ASC, id ASC LIMIT ? OFFSET ?", pageSize, offset);
+        TableDataInfo<Map<String, Object>> dataInfo = new TableDataInfo<>();
+        dataInfo.setCode(200);
+        dataInfo.setMsg("查询成功");
+        dataInfo.setRows(rows.stream().map(row -> toRecordMap(dimensionCode, row)).toList());
+        dataInfo.setTotal(total == null ? 0L : total);
+        return dataInfo;
     }
 
     @Override
     public Map<String, Object> queryById(String dimensionCode, Long id) {
-        Object entity = switch (dimensionCode) {
-            case "admin-division" -> adminDivisionMapper.selectById(id);
-            case "emission-source-category" -> emissionSourceCategoryMapper.selectById(id);
-            case "base-year" -> baseYearMapper.selectById(id);
-            case "ef-electricity-factor" -> electricityMapper.selectById(id);
-            case "ef-electricity-version" -> electricityFactorVersionMapper.selectById(id);
-            case "ef-electricity-scope" -> electricityFactorScopeMapper.selectById(id);
-            case "greenhouse-gas" -> greenhouseGasMapper.selectById(id);
-            default -> throw new ServiceException("不支持的维度编码: " + dimensionCode);
-        };
-        return entity == null ? null : toRecordMap(dimensionCode, entity);
+        ManagedDimension dimension = managedDimension(dimensionCode);
+        List<Map<String, Object>> rows = jdbcTemplate.queryForList("SELECT * FROM `" + dimension.tableName() + "` WHERE id = ?", id);
+        return rows.isEmpty() ? null : toRecordMap(dimensionCode, rows.get(0));
     }
 
     @Override
+    @Transactional(rollbackFor = Exception.class)
     public int insertByBo(String dimensionCode, Map<String, Object> bo) {
-        return switch (dimensionCode) {
-            case "admin-division" -> {
-                applyRecordFields(dimensionCode, bo);
-                CvAdminDivision entity = MapstructUtils.convert(bo, CvAdminDivision.class);
-                yield adminDivisionMapper.insert(entity);
-            }
-            case "emission-source-category" -> {
-                applyRecordFields(dimensionCode, bo);
-                CvEmissionSourceCategory entity = MapstructUtils.convert(bo, CvEmissionSourceCategory.class);
-                yield emissionSourceCategoryMapper.insert(entity);
-            }
-            case "base-year" -> {
-                applyRecordFields(dimensionCode, bo);
-                CvBaseYear entity = MapstructUtils.convert(bo, CvBaseYear.class);
-                yield baseYearMapper.insert(entity);
-            }
-            case "ef-electricity-factor" -> {
-                applyRecordFields(dimensionCode, bo);
-                CvElectricityFactor entity = MapstructUtils.convert(bo, CvElectricityFactor.class);
-                yield electricityMapper.insert(entity);
-            }
-            case "ef-electricity-version" -> {
-                applyRecordFields(dimensionCode, bo);
-                CvElectricityFactorVersion entity = MapstructUtils.convert(bo, CvElectricityFactorVersion.class);
-                yield electricityFactorVersionMapper.insert(entity);
-            }
-            case "ef-electricity-scope" -> {
-                applyRecordFields(dimensionCode, bo);
-                CvElectricityFactorScope entity = MapstructUtils.convert(bo, CvElectricityFactorScope.class);
-                yield electricityFactorScopeMapper.insert(entity);
-            }
-            case "greenhouse-gas" -> {
-                applyRecordFields(dimensionCode, bo);
-                CvGreenhouseGas entity = MapstructUtils.convert(bo, CvGreenhouseGas.class);
-                yield greenhouseGasMapper.insert(entity);
-            }
-            default -> throw new ServiceException("不支持的维度编码: " + dimensionCode);
-        };
+        ManagedDimension dimension = managedDimension(dimensionCode);
+        applyRecordFields(dimensionCode, bo);
+        Map<String, Object> values = writableValues(dimension.tableName(), bo, false);
+        return insertRow(dimension.tableName(), values);
     }
 
     @Override
+    @Transactional(rollbackFor = Exception.class)
     public int updateByBo(String dimensionCode, Map<String, Object> bo) {
-        return switch (dimensionCode) {
-            case "admin-division" -> {
-                applyRecordFields(dimensionCode, bo);
-                CvAdminDivision entity = MapstructUtils.convert(bo, CvAdminDivision.class);
-                yield adminDivisionMapper.updateById(entity);
-            }
-            case "emission-source-category" -> {
-                applyRecordFields(dimensionCode, bo);
-                CvEmissionSourceCategory entity = MapstructUtils.convert(bo, CvEmissionSourceCategory.class);
-                yield emissionSourceCategoryMapper.updateById(entity);
-            }
-            case "base-year" -> {
-                applyRecordFields(dimensionCode, bo);
-                CvBaseYear entity = MapstructUtils.convert(bo, CvBaseYear.class);
-                yield baseYearMapper.updateById(entity);
-            }
-            case "ef-electricity-factor" -> {
-                applyRecordFields(dimensionCode, bo);
-                CvElectricityFactor entity = MapstructUtils.convert(bo, CvElectricityFactor.class);
-                yield electricityMapper.updateById(entity);
-            }
-            case "ef-electricity-version" -> {
-                applyRecordFields(dimensionCode, bo);
-                CvElectricityFactorVersion entity = MapstructUtils.convert(bo, CvElectricityFactorVersion.class);
-                yield electricityFactorVersionMapper.updateById(entity);
-            }
-            case "ef-electricity-scope" -> {
-                applyRecordFields(dimensionCode, bo);
-                CvElectricityFactorScope entity = MapstructUtils.convert(bo, CvElectricityFactorScope.class);
-                yield electricityFactorScopeMapper.updateById(entity);
-            }
-            case "greenhouse-gas" -> {
-                applyRecordFields(dimensionCode, bo);
-                CvGreenhouseGas entity = MapstructUtils.convert(bo, CvGreenhouseGas.class);
-                yield greenhouseGasMapper.updateById(entity);
-            }
-            default -> throw new ServiceException("不支持的维度编码: " + dimensionCode);
-        };
+        ManagedDimension dimension = managedDimension(dimensionCode);
+        applyRecordFields(dimensionCode, bo);
+        Map<String, Object> values = writableValues(dimension.tableName(), bo, true);
+        Object id = bo.get("id");
+        if (id == null) {
+            throw new ServiceException("id不能为空");
+        }
+        return updateRow(dimension.tableName(), values, id);
     }
 
     @Override
@@ -189,38 +123,14 @@ public class CvDimensionDataServiceImpl implements ICvDimensionDataService {
 
     @Override
     public List<Map<String, Object>> queryList(String dimensionCode) {
-        List<?> list = switch (dimensionCode) {
-            case "admin-division" -> adminDivisionMapper.selectList(defaultWrapper(CvAdminDivision.class));
-            case "emission-source-category" -> emissionSourceCategoryMapper.selectList(defaultWrapper(CvEmissionSourceCategory.class));
-            case "base-year" -> baseYearMapper.selectList(defaultWrapper(CvBaseYear.class));
-            case "ef-electricity-factor" -> electricityMapper.selectList(defaultWrapper(CvElectricityFactor.class));
-            case "ef-electricity-version" -> electricityFactorVersionMapper.selectList(defaultWrapper(CvElectricityFactorVersion.class));
-            case "ef-electricity-scope" -> electricityFactorScopeMapper.selectList(defaultWrapper(CvElectricityFactorScope.class));
-            case "greenhouse-gas" -> greenhouseGasMapper.selectList(defaultWrapper(CvGreenhouseGas.class));
-            default -> throw new ServiceException("不支持的维度编码: " + dimensionCode);
-        };
-        return list.stream().map(entity -> toRecordMap(dimensionCode, entity)).toList();
+        ManagedDimension dimension = managedDimension(dimensionCode);
+        return jdbcTemplate.queryForList("SELECT * FROM `" + dimension.tableName() + "` WHERE status = '0' ORDER BY sort_order ASC, id ASC")
+            .stream()
+            .map(row -> toRecordMap(dimensionCode, row))
+            .toList();
     }
 
     // ==================== helpers ====================
-
-    private TableDataInfo<Map<String, Object>> buildMappedPage(String dimensionCode, Page<?> page) {
-        TableDataInfo<Map<String, Object>> dataInfo = new TableDataInfo<>();
-        dataInfo.setCode(200);
-        dataInfo.setMsg("查询成功");
-        dataInfo.setRows(page.getRecords().stream()
-            .map(entity -> toRecordMap(dimensionCode, entity))
-            .toList());
-        dataInfo.setTotal(page.getTotal());
-        return dataInfo;
-    }
-
-    private <T> QueryWrapper<T> defaultWrapper(Class<T> entityClass) {
-        return new QueryWrapper<T>()
-            .eq("status", "0")
-            .orderByAsc("sort_order")
-            .orderByAsc("id");
-    }
 
     private void validateAdminDivisionDelete(Collection<Long> ids) {
         List<CvAdminDivision> records = adminDivisionMapper.selectList(new QueryWrapper<CvAdminDivision>().in("id", ids));
@@ -255,20 +165,10 @@ public class CvDimensionDataServiceImpl implements ICvDimensionDataService {
         }
     }
 
-    private Map<String, Object> toRecordMap(String dimensionCode, Object entity) {
+    private Map<String, Object> toRecordMap(String dimensionCode, Map<String, Object> entity) {
         Map<String, Object> map = new LinkedHashMap<>();
-        try {
-            for (var field : entity.getClass().getDeclaredFields()) {
-                field.setAccessible(true);
-                map.put(field.getName(), field.get(entity));
-            }
-            // Include inherited fields
-            for (var field : entity.getClass().getSuperclass().getDeclaredFields()) {
-                field.setAccessible(true);
-                map.put(field.getName(), field.get(entity));
-            }
-        } catch (IllegalAccessException e) {
-            throw new ServiceException("实体转换失败");
+        for (Map.Entry<String, Object> entry : entity.entrySet()) {
+            map.put(StringUtils.toCamelCase(entry.getKey()), normalizeValue(entry.getValue()));
         }
         map.put("dimensionCode", dimensionCode);
         map.put("recordCode", firstValue(map, codeField(dimensionCode)));
@@ -362,5 +262,89 @@ public class CvDimensionDataServiceImpl implements ICvDimensionDataService {
             case "greenhouse-gas" -> "gasName";
             default -> throw new ServiceException("不支持的维度编码: " + dimensionCode);
         };
+    }
+
+    private ManagedDimension managedDimension(String dimensionCode) {
+        if (!VendorManagedTableCatalog.isManagedTable("dimension", dimensionCode)
+            && !VendorManagedTableCatalog.isManagedTable("factor", dimensionCode)) {
+            throw new ServiceException("不支持的维度编码: " + dimensionCode);
+        }
+        String tableName = VendorManagedTableCatalog.physicalTableName("dimension", dimensionCode);
+        if (StringUtils.isBlank(tableName)) {
+            tableName = VendorManagedTableCatalog.physicalTableName("factor", dimensionCode);
+        }
+        if (StringUtils.isBlank(tableName)) {
+            throw new ServiceException("缺少维度表映射: " + dimensionCode);
+        }
+        return new ManagedDimension(dimensionCode, tableName);
+    }
+
+    private List<String> physicalColumns(String tableName) {
+        return jdbcTemplate.queryForList("""
+            SELECT column_name
+            FROM information_schema.columns
+            WHERE table_schema = DATABASE() AND table_name = ? AND extra NOT LIKE '%GENERATED%'
+            ORDER BY ordinal_position
+            """, String.class, tableName);
+    }
+
+    private Map<String, Object> writableValues(String tableName, Map<String, Object> bo, boolean update) {
+        List<String> columns = physicalColumns(tableName);
+        Map<String, Object> values = new LinkedHashMap<>();
+        for (String column : columns) {
+            if (READONLY_COLUMNS.contains(column) || !COLUMN_NAME_PATTERN.matcher(column).matches()) {
+                continue;
+            }
+            String camelKey = StringUtils.toCamelCase(column);
+            if (bo.containsKey(camelKey)) {
+                values.put(column, bo.get(camelKey));
+            } else if (bo.containsKey(column)) {
+                values.put(column, bo.get(column));
+            }
+        }
+        values.put("update_time", new Timestamp(System.currentTimeMillis()));
+        if (!update) {
+            values.putIfAbsent("status", "0");
+            values.put("create_time", new Timestamp(System.currentTimeMillis()));
+        }
+        return values;
+    }
+
+    private int insertRow(String tableName, Map<String, Object> values) {
+        if (values.isEmpty()) {
+            throw new ServiceException("没有可写入字段");
+        }
+        List<String> columns = new ArrayList<>(values.keySet());
+        String columnSql = columns.stream().map(column -> "`" + column + "`").reduce((left, right) -> left + ", " + right).orElse("");
+        String placeholderSql = String.join(", ", columns.stream().map(column -> "?").toList());
+        return jdbcTemplate.update("INSERT INTO `" + tableName + "` (" + columnSql + ") VALUES (" + placeholderSql + ")",
+            columns.stream().map(values::get).toArray());
+    }
+
+    private int updateRow(String tableName, Map<String, Object> values, Object id) {
+        if (values.isEmpty()) {
+            throw new ServiceException("没有可更新字段");
+        }
+        List<String> columns = new ArrayList<>(values.keySet());
+        String setSql = columns.stream().map(column -> "`" + column + "` = ?").reduce((left, right) -> left + ", " + right).orElse("");
+        List<Object> args = new ArrayList<>(columns.stream().map(values::get).toList());
+        args.add(id);
+        return jdbcTemplate.update("UPDATE `" + tableName + "` SET " + setSql + " WHERE id = ?", args.toArray());
+    }
+
+    private Object normalizeValue(Object value) {
+        if (value instanceof Timestamp timestamp) {
+            return timestamp.toLocalDateTime();
+        }
+        if (value instanceof java.sql.Date date) {
+            return date.toLocalDate();
+        }
+        if (value instanceof LocalDate || value instanceof LocalDateTime) {
+            return value;
+        }
+        return value;
+    }
+
+    private record ManagedDimension(String dimensionCode, String tableName) {
     }
 }

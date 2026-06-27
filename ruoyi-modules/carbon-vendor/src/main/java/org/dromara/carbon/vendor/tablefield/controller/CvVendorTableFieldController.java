@@ -4,8 +4,8 @@ import cn.dev33.satoken.annotation.SaCheckPermission;
 import jakarta.validation.constraints.NotEmpty;
 import jakarta.validation.constraints.NotNull;
 import lombok.RequiredArgsConstructor;
-import org.dromara.carbon.vendor.tablefield.domain.CvVendorTableField;
 import org.dromara.carbon.vendor.tablefield.domain.bo.CvVendorTableFieldBo;
+import org.dromara.carbon.vendor.tablefield.domain.vo.CvVendorTableFieldVo;
 import org.dromara.carbon.vendor.tablefield.service.ICvVendorTableFieldService;
 import org.dromara.common.core.domain.R;
 import org.dromara.common.core.validate.AddGroup;
@@ -35,13 +35,13 @@ public class CvVendorTableFieldController extends BaseController {
 
     @SaCheckPermission("vendor:dimension:list")
     @GetMapping("/list")
-    public TableDataInfo<CvVendorTableField> list(CvVendorTableFieldBo bo, PageQuery pageQuery) {
+    public TableDataInfo<CvVendorTableFieldVo> list(CvVendorTableFieldBo bo, PageQuery pageQuery) {
         return tableFieldService.queryPageList(bo, pageQuery);
     }
 
     @SaCheckPermission("vendor:dimension:query")
     @GetMapping("/{id}")
-    public R<CvVendorTableField> getInfo(@NotNull(message = "id cannot be null") @PathVariable Long id) {
+    public R<CvVendorTableFieldVo> getInfo(@NotNull(message = "id cannot be null") @PathVariable Long id) {
         return R.ok(tableFieldService.queryById(id));
     }
 

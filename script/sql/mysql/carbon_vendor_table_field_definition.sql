@@ -7,6 +7,7 @@ CREATE TABLE IF NOT EXISTS cv_vendor_table_field (
     field_type VARCHAR(32) NOT NULL DEFAULT 'text',
     field_precision INT DEFAULT NULL,
     field_width INT DEFAULT NULL,
+    field_options TEXT DEFAULT NULL,
     required_flag TINYINT(1) NOT NULL DEFAULT 0,
     sort_order INT NOT NULL DEFAULT 0,
     status CHAR(1) NOT NULL DEFAULT '0',

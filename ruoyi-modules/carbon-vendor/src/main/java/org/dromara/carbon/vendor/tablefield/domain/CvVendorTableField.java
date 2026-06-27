@@ -25,6 +25,7 @@ public class CvVendorTableField implements Serializable {
     private String fieldType;
     private Integer fieldPrecision;
     private Integer fieldWidth;
+    private String fieldOptions;
     private Boolean requiredFlag;
     private Integer sortOrder;
     private String status;

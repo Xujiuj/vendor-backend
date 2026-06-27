@@ -1,6 +1,5 @@
 package org.dromara.carbon.vendor.dimension;
 
-import org.dromara.carbon.vendor.dimension.domain.CvBaseYear;
 import org.dromara.carbon.vendor.dimension.domain.CvAdminDivision;
 import org.dromara.carbon.vendor.dimension.mapper.CvElectricityMapper;
 import org.dromara.carbon.vendor.dimension.mapper.CvAdminDivisionMapper;
@@ -13,6 +12,7 @@ import org.dromara.carbon.vendor.dimension.service.impl.CvDimensionDataServiceIm
 import org.dromara.common.core.exception.ServiceException;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
+import org.springframework.jdbc.core.JdbcTemplate;
 
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
@@ -59,11 +59,11 @@ class CvDimensionDataServiceImplTest {
 
     @Test
     void baseYearRecordMapExposesBaseYearAsGenericRecordName() throws Exception {
-        CvBaseYear baseYear = new CvBaseYear();
-        baseYear.setId(8L);
-        baseYear.setBaseYearKey("BY-2026");
-        baseYear.setBaseYear(2026);
-        baseYear.setStatus("0");
+        Map<String, Object> baseYear = new LinkedHashMap<>();
+        baseYear.put("id", 8L);
+        baseYear.put("base_year_key", "BY-2026");
+        baseYear.put("base_year", 2026);
+        baseYear.put("status", "0");
 
         Map<String, Object> record = toRecordMap(baseYear);
 
@@ -134,8 +134,8 @@ class CvDimensionDataServiceImplTest {
     }
 
     @SuppressWarnings("unchecked")
-    private Map<String, Object> toRecordMap(CvBaseYear baseYear) throws Exception {
-        Method method = CvDimensionDataServiceImpl.class.getDeclaredMethod("toRecordMap", String.class, Object.class);
+    private Map<String, Object> toRecordMap(Map<String, Object> baseYear) throws Exception {
+        Method method = CvDimensionDataServiceImpl.class.getDeclaredMethod("toRecordMap", String.class, Map.class);
         method.setAccessible(true);
         return (Map<String, Object>) method.invoke(service(mock(CvBaseYearMapper.class)), "base-year", baseYear);
     }
@@ -154,7 +154,8 @@ class CvDimensionDataServiceImplTest {
             electricityMapper,
             mock(CvElectricityFactorVersionMapper.class),
             mock(CvElectricityFactorScopeMapper.class),
-            mock(CvGreenhouseGasMapper.class)
+            mock(CvGreenhouseGasMapper.class),
+            mock(JdbcTemplate.class)
         );
     }
 

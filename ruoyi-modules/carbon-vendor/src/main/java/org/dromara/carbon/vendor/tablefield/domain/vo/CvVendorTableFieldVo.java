@@ -34,6 +34,8 @@ public class CvVendorTableFieldVo implements Serializable {
 
     private Integer fieldWidth;
 
+    private String fieldOptions;
+
     private Boolean requiredFlag;
 
     private Integer sortOrder;
@@ -45,4 +47,18 @@ public class CvVendorTableFieldVo implements Serializable {
     private Date updateTime;
 
     private String remark;
+
+    private String physicalTableName;
+
+    private String columnName;
+
+    private String columnType;
+
+    private String dataType;
+
+    private String columnComment;
+
+    private Boolean nullable;
+
+    private Boolean generatedColumn;
 }

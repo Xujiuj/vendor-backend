@@ -30,6 +30,7 @@ public class CvVendorTableFieldBo extends BaseEntity {
     private String fieldType;
     private Integer fieldPrecision;
     private Integer fieldWidth;
+    private String fieldOptions;
     private Boolean requiredFlag;
     private Integer sortOrder;
     private String status;

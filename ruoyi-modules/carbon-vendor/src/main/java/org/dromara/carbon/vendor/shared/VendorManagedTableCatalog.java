@@ -7,6 +7,9 @@ import java.util.Set;
  */
 public final class VendorManagedTableCatalog {
 
+    private static final String TABLE_GROUP_DIMENSION = "dimension";
+    private static final String TABLE_GROUP_FACTOR = "factor";
+
     private static final Set<String> STRONG_DIMENSION_CODES = Set.of(
         "admin-division",
         "emission-source-category",
@@ -48,9 +51,25 @@ public final class VendorManagedTableCatalog {
 
     public static boolean isManagedTable(String tableGroup, String tableCode) {
         return switch (tableGroup) {
-            case "dimension" -> isStrongDimensionCode(tableCode);
-            case "factor" -> FACTOR_TABLE_CODES.contains(tableCode);
+            case TABLE_GROUP_DIMENSION -> isStrongDimensionCode(tableCode);
+            case TABLE_GROUP_FACTOR -> FACTOR_TABLE_CODES.contains(tableCode);
             default -> false;
+        };
+    }
+
+    public static String physicalTableName(String tableGroup, String tableCode) {
+        if (!isManagedTable(tableGroup, tableCode)) {
+            return null;
+        }
+        return switch (tableCode) {
+            case "admin-division" -> "cv_admin_division";
+            case "emission-source-category" -> "cv_emission_source_category";
+            case "base-year" -> "cv_base_year";
+            case "ef-electricity-factor" -> "cv_electricity_factor";
+            case "ef-electricity-version" -> "cv_electricity_factor_version";
+            case "ef-electricity-scope" -> "cv_electricity_factor_scope";
+            case "greenhouse-gas" -> "cv_greenhouse_gas";
+            default -> null;
         };
     }
 }

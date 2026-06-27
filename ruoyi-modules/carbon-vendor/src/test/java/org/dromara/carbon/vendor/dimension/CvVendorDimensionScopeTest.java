@@ -22,6 +22,7 @@ import org.dromara.carbon.vendor.tablefield.service.impl.CvVendorTableFieldServi
 import org.dromara.common.core.exception.ServiceException;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
+import org.springframework.jdbc.core.JdbcTemplate;
 
 import java.time.Instant;
 import java.util.Date;
@@ -50,7 +51,7 @@ class CvVendorDimensionScopeTest {
     @Test
     void tableFieldDefinitionsRejectEnterpriseFilledDimensionTables() {
         CvVendorTableFieldMapper mapper = mock(CvVendorTableFieldMapper.class);
-        CvVendorTableFieldServiceImpl service = new CvVendorTableFieldServiceImpl(mapper);
+        CvVendorTableFieldServiceImpl service = new CvVendorTableFieldServiceImpl(mapper, mock(JdbcTemplate.class));
 
         assertThrows(ServiceException.class, () -> service.insertByBo(tableField("company")));
         assertThrows(ServiceException.class, () -> service.insertByBo(tableField("intensity-denominator")));
@@ -61,7 +62,7 @@ class CvVendorDimensionScopeTest {
     @Test
     void tableFieldDefinitionsRejectEnterpriseFilledFactorTables() {
         CvVendorTableFieldMapper mapper = mock(CvVendorTableFieldMapper.class);
-        CvVendorTableFieldServiceImpl service = new CvVendorTableFieldServiceImpl(mapper);
+        CvVendorTableFieldServiceImpl service = new CvVendorTableFieldServiceImpl(mapper, mock(JdbcTemplate.class));
 
         assertThrows(ServiceException.class, () -> service.insertByBo(tableField("factor", "201ef")));
         assertThrows(ServiceException.class, () -> service.insertByBo(tableField("factor", "204ef")));
