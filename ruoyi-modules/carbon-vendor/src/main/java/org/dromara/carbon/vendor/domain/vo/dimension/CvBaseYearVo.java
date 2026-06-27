@@ -26,14 +26,9 @@ public class CvBaseYearVo implements Serializable {
     private Long id;
 
     /**
-     * 工厂编码
+     * 基准年Key
      */
-    private String factoryCode;
-
-    /**
-     * 工厂名称
-     */
-    private String factoryName;
+    private String baseYearKey;
 
     /**
      * 基准年份
@@ -44,6 +39,11 @@ public class CvBaseYearVo implements Serializable {
      * 是否当前基准年（0否 1是）
      */
     private Integer isCurrent;
+
+    /**
+     * 说明
+     */
+    private String description;
 
     /**
      * 排序号

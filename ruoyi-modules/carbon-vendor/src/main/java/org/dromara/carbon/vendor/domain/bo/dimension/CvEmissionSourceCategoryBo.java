@@ -36,6 +36,11 @@ public class CvEmissionSourceCategoryBo implements Serializable {
     private String categoryCode;
 
     /**
+     * Source(A)业务键
+     */
+    private String businessKey;
+
+    /**
      * 分类名称（中文）
      */
     @NotBlank(message = "分类名称不能为空", groups = { AddGroup.class, EditGroup.class })
@@ -85,6 +90,31 @@ public class CvEmissionSourceCategoryBo implements Serializable {
      * 父级编码
      */
     private String parentCode;
+
+    /**
+     * 生效日期
+     */
+    private java.time.LocalDate effectiveDate;
+
+    /**
+     * 失效日期
+     */
+    private java.time.LocalDate expireDate;
+
+    /**
+     * 是否当前（Y/N）
+     */
+    private String currentFlag;
+
+    /**
+     * 版本号
+     */
+    private String versionNo;
+
+    /**
+     * 统一标准分类
+     */
+    private String standardCategory;
 
     /**
      * 排序号

@@ -73,10 +73,22 @@ public class CvOpenDimensionRecordVo implements Serializable {
     private String gbScopeCategory;
     /** 103 排放源分类: gb_subcategory */
     private String gbSubcategory;
-    /** 106 基准年: factory_code */
-    private String factoryCode;
-    /** 106 基准年: factory_name */
-    private String factoryName;
+    /** 103 排放源分类: business_key */
+    private String businessKey;
+    /** 103 排放源分类: effective_date */
+    private java.time.LocalDate effectiveDate;
+    /** 103 排放源分类: expire_date */
+    private java.time.LocalDate expireDate;
+    /** 103 排放源分类: current_flag */
+    private String currentFlag;
+    /** 103 排放源分类: version_no */
+    private String versionNo;
+    /** 103 排放源分类: standard_category */
+    private String standardCategory;
+    /** 106 基准年: base_year_key */
+    private String baseYearKey;
+    /** 106 基准年: description */
+    private String description;
     /** 106 基准年: base_year */
     private Integer baseYear;
     /** 106 基准年: is_current */

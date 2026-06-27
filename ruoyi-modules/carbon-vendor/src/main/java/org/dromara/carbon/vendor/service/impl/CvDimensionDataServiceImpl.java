@@ -1,16 +1,8 @@
 package org.dromara.carbon.vendor.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
-import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import lombok.RequiredArgsConstructor;
-import org.dromara.carbon.vendor.domain.bo.dimension.CvAdminDivisionBo;
-import org.dromara.carbon.vendor.domain.bo.dimension.CvBaseYearBo;
-import org.dromara.carbon.vendor.domain.bo.dimension.CvElectricityFactorBo;
-import org.dromara.carbon.vendor.domain.bo.dimension.CvElectricityFactorScopeBo;
-import org.dromara.carbon.vendor.domain.bo.dimension.CvElectricityFactorVersionBo;
-import org.dromara.carbon.vendor.domain.bo.dimension.CvEmissionSourceCategoryBo;
-import org.dromara.carbon.vendor.domain.bo.dimension.CvGreenhouseGasBo;
 import org.dromara.carbon.vendor.domain.dimension.CvAdminDivision;
 import org.dromara.carbon.vendor.domain.dimension.CvBaseYear;
 import org.dromara.carbon.vendor.domain.dimension.CvElectricityFactor;
@@ -250,14 +242,52 @@ public class CvDimensionDataServiceImpl implements ICvDimensionDataService {
         String nameField = nameField(dimensionCode);
         Object recordCode = bo.get("recordCode");
         Object recordName = bo.get("recordName");
+        if ("base-year".equals(dimensionCode)) {
+            applyBaseYearRecordFields(bo, recordCode, recordName);
+            return;
+        }
         if (recordCode != null) {
             bo.put(codeField, recordCode);
         }
         if (recordName != null) {
             bo.put(nameField, recordName);
         }
-        if ("base-year".equals(dimensionCode) && bo.get("factoryName") == null && recordName != null) {
-            bo.put("factoryName", recordName);
+    }
+
+    private void applyBaseYearRecordFields(Map<String, Object> bo, Object recordCode, Object recordName) {
+        Object baseYearKey = firstNonNull(recordCode, bo.get("baseYearKey"));
+        Object baseYear = firstNonNull(recordName, bo.get("baseYear"));
+        if (baseYearKey != null) {
+            bo.put("baseYearKey", baseYearKey);
+            bo.put("recordCode", baseYearKey);
+        }
+        if (baseYear != null) {
+            Integer normalizedBaseYear = normalizeBaseYear(baseYear);
+            bo.put("baseYear", normalizedBaseYear);
+            bo.put("recordName", normalizedBaseYear);
+        }
+        if (bo.get("isCurrent") == null) {
+            bo.put("isCurrent", 1);
+        }
+    }
+
+    private Object firstNonNull(Object... values) {
+        for (Object value : values) {
+            if (value != null) {
+                return value;
+            }
+        }
+        return null;
+    }
+
+    private Integer normalizeBaseYear(Object value) {
+        if (value instanceof Number number) {
+            return number.intValue();
+        }
+        try {
+            return Integer.valueOf(String.valueOf(value));
+        } catch (NumberFormatException e) {
+            throw new ServiceException("基准年份必须为数字");
         }
     }
 
@@ -275,7 +305,7 @@ public class CvDimensionDataServiceImpl implements ICvDimensionDataService {
         return switch (dimensionCode) {
             case "admin-division", "ef-electricity-factor" -> "divisionCode";
             case "emission-source-category" -> "categoryCode";
-            case "base-year" -> "factoryCode";
+            case "base-year" -> "baseYearKey";
             case "ef-electricity-version" -> "factorVersion";
             case "ef-electricity-scope" -> "scopeKey";
             case "greenhouse-gas" -> "gasCode";
@@ -287,7 +317,7 @@ public class CvDimensionDataServiceImpl implements ICvDimensionDataService {
         return switch (dimensionCode) {
             case "admin-division", "ef-electricity-factor" -> "divisionName";
             case "emission-source-category" -> "categoryName";
-            case "base-year" -> "factoryName";
+            case "base-year" -> "baseYear";
             case "ef-electricity-version" -> "factorVersion";
             case "ef-electricity-scope" -> "scopeName";
             case "greenhouse-gas" -> "gasName";

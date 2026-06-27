@@ -166,6 +166,7 @@ public class CvOpenDimensionServiceImpl implements ICvOpenDimensionService {
         Page<CvEmissionSourceCategory> page = emissionSourceCategoryMapper.selectPage(new Page<>(pageNum, pageSize), qw);
         List<CvOpenDimensionRecordVo> records = page.getRecords().stream().map(e -> {
             CvOpenDimensionRecordVo vo = baseVo(e.getId(), "emission-source-category", e.getCategoryCode(), e.getCategoryName(), e.getParentCode());
+            vo.setBusinessKey(e.getBusinessKey());
             vo.setCategoryNameEn(e.getCategoryNameEn());
             vo.setGhgScope(e.getGhgScope());
             vo.setGhgScopeCategory(e.getGhgScopeCategory());
@@ -174,6 +175,11 @@ public class CvOpenDimensionServiceImpl implements ICvOpenDimensionService {
             vo.setIsoCategoryDescription(e.getIsoCategoryDescription());
             vo.setGbScopeCategory(e.getGbScopeCategory());
             vo.setGbSubcategory(e.getGbSubcategory());
+            vo.setEffectiveDate(e.getEffectiveDate());
+            vo.setExpireDate(e.getExpireDate());
+            vo.setCurrentFlag(e.getCurrentFlag());
+            vo.setVersionNo(e.getVersionNo());
+            vo.setStandardCategory(e.getStandardCategory());
             vo.setSortOrder(e.getSortOrder());
             vo.setStatus(e.getStatus());
             vo.setCreateTime(e.getCreateTime());
@@ -187,14 +193,17 @@ public class CvOpenDimensionServiceImpl implements ICvOpenDimensionService {
     private QueryResult queryBaseYear(CvOpenDimensionRequest req, long pageNum, long pageSize) {
         QueryWrapper<CvBaseYear> qw = new QueryWrapper<CvBaseYear>()
             .eq("status", "0")
-            .like(StringUtils.isNotBlank(req.getRecordCode()), "factory_code", req.getRecordCode())
-            .like(StringUtils.isNotBlank(req.getRecordName()), "factory_name", req.getRecordName())
+            .like(StringUtils.isNotBlank(req.getRecordCode()), "base_year_key", req.getRecordCode())
+            .and(StringUtils.isNotBlank(req.getRecordName()), wrapper -> wrapper
+                .like("base_year", req.getRecordName())
+                .or()
+                .like("description", req.getRecordName()))
             .orderByAsc("sort_order").orderByAsc("id");
         Page<CvBaseYear> page = baseYearMapper.selectPage(new Page<>(pageNum, pageSize), qw);
         List<CvOpenDimensionRecordVo> records = page.getRecords().stream().map(e -> {
-            CvOpenDimensionRecordVo vo = baseVo(e.getId(), "base-year", e.getFactoryCode(), e.getFactoryName(), null);
-            vo.setFactoryCode(e.getFactoryCode());
-            vo.setFactoryName(e.getFactoryName());
+            CvOpenDimensionRecordVo vo = baseVo(e.getId(), "base-year", e.getBaseYearKey(), String.valueOf(e.getBaseYear()), null);
+            vo.setBaseYearKey(e.getBaseYearKey());
+            vo.setDescription(e.getDescription());
             vo.setBaseYear(e.getBaseYear());
             vo.setIsCurrent(e.getIsCurrent());
             vo.setSortOrder(e.getSortOrder());
