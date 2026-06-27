@@ -202,6 +202,7 @@ public class CvOpenFactorServiceImpl implements ICvOpenFactorService {
         vo.setFactorCode(record.getScopeKey());
         vo.setFactorName(record.getScopeName());
         vo.setFactorCategory("ef-electricity-scope");
+        vo.setFactorValue(BigDecimal.ZERO);
         vo.setFactorUnit("scope");
         vo.setFactorKey(record.getScopeKey());
         vo.setApplicableScope(record.getScopeName());
@@ -216,7 +217,7 @@ public class CvOpenFactorServiceImpl implements ICvOpenFactorService {
         vo.setFactorCode(record.getGasCode());
         vo.setFactorName(record.getGasName());
         vo.setFactorCategory("greenhouse-gas");
-        vo.setFactorValue(record.getGwpValue());
+        vo.setFactorValue(record.getGwpValue() == null ? BigDecimal.ZERO : record.getGwpValue());
         vo.setFactorUnit("GWP");
         vo.setFactorKey(record.getGasCode());
         vo.setEmissionSourceName(record.getGasName());

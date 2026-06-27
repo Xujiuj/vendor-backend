@@ -95,7 +95,9 @@ class CvOpenFactorServiceTest {
         assertEquals("202ef", response.getRecords().get(0).getFactorTableCode());
         assertEquals("203ef", response.getRecords().get(1).getFactorTableCode());
         assertEquals("205ef", response.getRecords().get(2).getFactorTableCode());
+        assertEquals(BigDecimal.ZERO, response.getRecords().get(2).getFactorValue());
         assertEquals("206", response.getRecords().get(3).getFactorTableCode());
+        assertEquals(BigDecimal.ONE, response.getRecords().get(3).getFactorValue());
         verify(openApiAuditService).recordSuccess(
             eq("/open/factors"), eq("GET"), eq("LIC-001"), eq("INSTALL-001"), eq(1001L), eq("currentVersionCode=OLD"));
     }
