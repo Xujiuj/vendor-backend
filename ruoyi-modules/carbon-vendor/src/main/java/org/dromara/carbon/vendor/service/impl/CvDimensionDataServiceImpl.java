@@ -170,8 +170,14 @@ public class CvDimensionDataServiceImpl implements ICvDimensionDataService {
     @Override
     public int deleteByIds(String dimensionCode, Collection<Long> ids) {
         return switch (dimensionCode) {
-            case "admin-division" -> adminDivisionMapper.deleteByIds(ids);
-            case "emission-source-category" -> emissionSourceCategoryMapper.deleteByIds(ids);
+            case "admin-division" -> {
+                validateAdminDivisionDelete(ids);
+                yield adminDivisionMapper.deleteByIds(ids);
+            }
+            case "emission-source-category" -> {
+                validateEmissionSourceCategoryDelete(ids);
+                yield emissionSourceCategoryMapper.deleteByIds(ids);
+            }
             case "base-year" -> baseYearMapper.deleteByIds(ids);
             case "ef-electricity-factor" -> electricityMapper.deleteByIds(ids);
             case "ef-electricity-version" -> electricityFactorVersionMapper.deleteByIds(ids);
@@ -214,6 +220,39 @@ public class CvDimensionDataServiceImpl implements ICvDimensionDataService {
             .eq("status", "0")
             .orderByAsc("sort_order")
             .orderByAsc("id");
+    }
+
+    private void validateAdminDivisionDelete(Collection<Long> ids) {
+        List<CvAdminDivision> records = adminDivisionMapper.selectList(new QueryWrapper<CvAdminDivision>().in("id", ids));
+        if (records.isEmpty()) {
+            return;
+        }
+        List<String> divisionCodes = records.stream().map(CvAdminDivision::getDivisionCode).toList();
+        Long childCount = adminDivisionMapper.selectCount(new QueryWrapper<CvAdminDivision>()
+            .in("parent_code", divisionCodes)
+            .notIn("division_code", divisionCodes));
+        if (childCount != null && childCount > 0) {
+            throw new ServiceException("行政区划存在下级区划引用，请先删除下级区划");
+        }
+        Long factorCount = electricityMapper.selectCount(new QueryWrapper<CvElectricityFactor>()
+            .in("division_code", divisionCodes));
+        if (factorCount != null && factorCount > 0) {
+            throw new ServiceException("行政区划已被电力因子引用，不能删除");
+        }
+    }
+
+    private void validateEmissionSourceCategoryDelete(Collection<Long> ids) {
+        List<CvEmissionSourceCategory> records = emissionSourceCategoryMapper.selectList(new QueryWrapper<CvEmissionSourceCategory>().in("id", ids));
+        if (records.isEmpty()) {
+            return;
+        }
+        List<String> categoryCodes = records.stream().map(CvEmissionSourceCategory::getCategoryCode).toList();
+        Long childCount = emissionSourceCategoryMapper.selectCount(new QueryWrapper<CvEmissionSourceCategory>()
+            .in("parent_code", categoryCodes)
+            .notIn("category_code", categoryCodes));
+        if (childCount != null && childCount > 0) {
+            throw new ServiceException("排放源分类存在下级分类引用，请先删除下级分类");
+        }
     }
 
     private Map<String, Object> toRecordMap(String dimensionCode, Object entity) {
