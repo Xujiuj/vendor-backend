@@ -128,7 +128,7 @@ This plan decomposes the vendor backend missing features into small, reviewable 
 After VB-1, VB-2, VB-3:
 
 - [ ] `rtk mvn -pl ruoyi-modules/carbon-vendor -am "-DskipTests=false" test`
-- [ ] `rtk mvn -pl ruoyi-admin -am package -DskipTests`
+- [ ] `rtk mvn -Pprod -pl ruoyi-admin -am package -DskipTests`
 - [ ] Parent boundary scripts pass when parent workspace is available.
 
 ## Risks and Mitigations

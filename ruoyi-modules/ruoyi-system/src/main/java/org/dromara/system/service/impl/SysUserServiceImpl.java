@@ -102,9 +102,6 @@ public class SysUserServiceImpl implements ISysUserService, UserService {
                 List<Long> ids = deptMapper.selectDeptAndChildById(user.getDeptId());
                 w.in(SysUser::getDeptId, ids);
             }).orderByAsc(SysUser::getUserId);
-        if (StringUtils.isNotBlank(user.getExcludeUserIds())) {
-            wrapper.notIn(SysUser::getUserId, StringUtils.splitTo(user.getExcludeUserIds(), Convert::toLong));
-        }
         return wrapper;
     }
 

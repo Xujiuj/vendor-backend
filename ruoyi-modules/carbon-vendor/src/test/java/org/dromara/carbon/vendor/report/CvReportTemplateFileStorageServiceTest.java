@@ -1,7 +1,7 @@
 package org.dromara.carbon.vendor.report;
 
-import org.dromara.carbon.vendor.domain.vo.CvReportTemplateUploadVo;
-import org.dromara.carbon.vendor.service.CvReportTemplateFileStorageService;
+import org.dromara.carbon.vendor.template.domain.vo.CvReportTemplateUploadVo;
+import org.dromara.carbon.vendor.template.service.CvReportTemplateFileStorageService;
 import org.dromara.common.core.exception.ServiceException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Tag;

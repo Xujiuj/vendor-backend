@@ -1,15 +1,15 @@
 package org.dromara.carbon.vendor.dimension;
 
-import org.dromara.carbon.vendor.domain.dimension.CvBaseYear;
-import org.dromara.carbon.vendor.domain.dimension.CvAdminDivision;
-import org.dromara.carbon.vendor.mapper.dimension.CvElectricityMapper;
-import org.dromara.carbon.vendor.mapper.dimension.CvAdminDivisionMapper;
-import org.dromara.carbon.vendor.mapper.dimension.CvBaseYearMapper;
-import org.dromara.carbon.vendor.mapper.dimension.CvElectricityFactorScopeMapper;
-import org.dromara.carbon.vendor.mapper.dimension.CvElectricityFactorVersionMapper;
-import org.dromara.carbon.vendor.mapper.dimension.CvEmissionSourceCategoryMapper;
-import org.dromara.carbon.vendor.mapper.dimension.CvGreenhouseGasMapper;
-import org.dromara.carbon.vendor.service.impl.CvDimensionDataServiceImpl;
+import org.dromara.carbon.vendor.dimension.domain.CvBaseYear;
+import org.dromara.carbon.vendor.dimension.domain.CvAdminDivision;
+import org.dromara.carbon.vendor.dimension.mapper.CvElectricityMapper;
+import org.dromara.carbon.vendor.dimension.mapper.CvAdminDivisionMapper;
+import org.dromara.carbon.vendor.dimension.mapper.CvBaseYearMapper;
+import org.dromara.carbon.vendor.dimension.mapper.CvElectricityFactorScopeMapper;
+import org.dromara.carbon.vendor.dimension.mapper.CvElectricityFactorVersionMapper;
+import org.dromara.carbon.vendor.dimension.mapper.CvEmissionSourceCategoryMapper;
+import org.dromara.carbon.vendor.dimension.mapper.CvGreenhouseGasMapper;
+import org.dromara.carbon.vendor.dimension.service.impl.CvDimensionDataServiceImpl;
 import org.dromara.common.core.exception.ServiceException;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;

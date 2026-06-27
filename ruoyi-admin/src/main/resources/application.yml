@@ -115,7 +115,6 @@ security:
     - /error
     - /*/api-docs
     - /*/api-docs/**
-    - /warm-flow-ui/config
     - /open/**
 
 # Open API protection
@@ -223,8 +222,6 @@ springdoc:
       packages-to-scan: org.dromara.web
     - group: 2.系统模块
       packages-to-scan: org.dromara.system
-    - group: 3.代码生成模块
-      packages-to-scan: org.dromara.generator
 
 # 防止XSS攻击
 xss:
@@ -257,25 +254,3 @@ management:
 sse:
   enabled: true
   path: /resource/sse
-
---- # websocket
-websocket:
-  # 如果关闭 需要和前端开关一起关闭
-  enabled: false
-  # 路径
-  path: /resource/websocket
-  # 设置访问源地址
-  allowedOrigins: '*'
-
---- # warm-flow工作流配置
-warm-flow:
-  # 是否开启工作流，默认true
-  enabled: true
-  # 是否开启设计器ui
-  ui: true
-  # 是否显示流程图顶部文字
-  top-text-show: true
-  # 是否渲染节点悬浮提示，默认true
-  node-tooltip: true
-  # 默认Authorization，如果有多个token，用逗号分隔
-  token-name: ${sa-token.token-name},clientid

@@ -14,23 +14,6 @@ spring.boot.admin.client:
   username: @monitor.username@
   password: @monitor.password@
 
---- # snail-job 配置
-snail-job:
-  enabled: ${VENDOR_SNAIL_JOB_ENABLED:false}
-  # 需要在 SnailJob 后台组管理创建对应名称的组,然后创建任务的时候选择对应的组,才能正确分派任务
-  group: ${VENDOR_SNAIL_JOB_GROUP:ruoyi_group}
-  # SnailJob 接入验证令牌 详见 script/sql/ry_job.sql `sj_group_config`表
-  token: ${VENDOR_SNAIL_JOB_TOKEN:}
-  server:
-    host: ${VENDOR_SNAIL_JOB_SERVER_HOST:127.0.0.1}
-    port: ${VENDOR_SNAIL_JOB_SERVER_PORT:17888}
-  # 命名空间UUID 详见 script/sql/ry_job.sql `sj_namespace`表`unique_id`字段
-  namespace: ${spring.profiles.active}
-  # 随主应用端口漂移
-  port: 2${server.port}
-  # 客户端ip指定
-  host:
-
 --- # 数据源配置
 spring:
   datasource:
@@ -61,24 +44,6 @@ spring:
 #          url: jdbc:mysql://localhost:3306/ry-vue?useUnicode=true&characterEncoding=utf8&zeroDateTimeBehavior=convertToNull&useSSL=true&serverTimezone=GMT%2B8&autoReconnect=true&rewriteBatchedStatements=true&allowPublicKeyRetrieval=true&nullCatalogMeansCurrent=true
 #          username:
 #          password:
-#        oracle:
-#          type: ${spring.datasource.type}
-#          driverClassName: oracle.jdbc.OracleDriver
-#          url: jdbc:oracle:thin:@//localhost:1521/XE
-#          username: ROOT
-#          password: root
-#        postgres:
-#          type: ${spring.datasource.type}
-#          driverClassName: org.postgresql.Driver
-#          url: jdbc:postgresql://localhost:5432/postgres?useUnicode=true&characterEncoding=utf8&useSSL=true&autoReconnect=true&reWriteBatchedInserts=true
-#          username: root
-#          password: root
-#        sqlserver:
-#          type: ${spring.datasource.type}
-#          driverClassName: com.microsoft.sqlserver.jdbc.SQLServerDriver
-#          url: jdbc:sqlserver://localhost:1433;DatabaseName=tempdb;SelectMethod=cursor;encrypt=false;rewriteBatchedStatements=true
-#          username: SA
-#          password: root
       hikari:
         # 最大连接池数量
         maxPoolSize: 20

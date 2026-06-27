@@ -1,6 +1,6 @@
 package org.dromara.carbon.vendor.license;
 
-import org.dromara.carbon.vendor.service.impl.CvLicensePrivateKeyProviderImpl;
+import org.dromara.carbon.vendor.license.service.impl.CvLicensePrivateKeyProviderImpl;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 

@@ -1,0 +1,27 @@
+package org.dromara.carbon.vendor.renewal.service;
+
+import org.dromara.carbon.vendor.renewal.domain.bo.CvRenewalOrderBo;
+import org.dromara.carbon.vendor.renewal.domain.CvRenewalCallbackRequest;
+import org.dromara.carbon.vendor.renewal.domain.vo.CvRenewalOrderVo;
+import org.dromara.common.mybatis.core.page.PageQuery;
+import org.dromara.common.mybatis.core.page.TableDataInfo;
+
+/**
+ * Vendor renewal order service.
+ */
+public interface ICvRenewalOrderService {
+
+    TableDataInfo<CvRenewalOrderVo> selectPageRenewalOrderList(CvRenewalOrderBo bo, PageQuery pageQuery);
+
+    CvRenewalOrderVo selectRenewalOrderById(Long id);
+
+    int insertRenewalOrder(CvRenewalOrderBo bo);
+
+    int updateRenewalOrder(CvRenewalOrderBo bo);
+
+    CvRenewalOrderVo applyRenewalCallback(CvRenewalCallbackRequest request);
+
+    CvRenewalOrderVo retryRenewalIssue(Long id);
+
+    int deleteRenewalOrderByIds(Long[] ids);
+}

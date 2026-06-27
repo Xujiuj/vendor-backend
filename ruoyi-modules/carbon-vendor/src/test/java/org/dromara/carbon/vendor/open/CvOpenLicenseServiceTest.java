@@ -1,20 +1,21 @@
 package org.dromara.carbon.vendor.open;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import org.dromara.carbon.vendor.domain.CvCustomer;
-import org.dromara.carbon.vendor.domain.CvLicenseIssue;
-import org.dromara.carbon.vendor.domain.CvRenewalOrder;
-import org.dromara.carbon.vendor.domain.open.CvOpenLicenseCurrentRequest;
-import org.dromara.carbon.vendor.domain.open.CvOpenLicenseCurrentResponse;
-import org.dromara.carbon.vendor.domain.open.CvOpenRenewalOrderRequest;
-import org.dromara.carbon.vendor.domain.open.CvOpenRenewalOrderResponse;
-import org.dromara.carbon.vendor.mapper.CvCustomerMapper;
-import org.dromara.carbon.vendor.mapper.CvLicenseIssueMapper;
-import org.dromara.carbon.vendor.mapper.CvRenewalOrderMapper;
-import org.dromara.carbon.vendor.mapper.CvSigningKeyMapper;
-import org.dromara.carbon.vendor.service.CvLicensePrivateKeyProvider;
-import org.dromara.carbon.vendor.service.ICvOpenApiAuditService;
-import org.dromara.carbon.vendor.service.impl.CvOpenLicenseServiceImpl;
+import org.dromara.carbon.vendor.customer.domain.CvCustomer;
+import org.dromara.carbon.vendor.license.domain.CvLicenseIssue;
+import org.dromara.carbon.vendor.license.domain.CvSigningKey;
+import org.dromara.carbon.vendor.renewal.domain.CvRenewalOrder;
+import org.dromara.carbon.vendor.openapi.domain.CvOpenLicenseCurrentRequest;
+import org.dromara.carbon.vendor.openapi.domain.CvOpenLicenseCurrentResponse;
+import org.dromara.carbon.vendor.openapi.domain.CvOpenRenewalOrderRequest;
+import org.dromara.carbon.vendor.openapi.domain.CvOpenRenewalOrderResponse;
+import org.dromara.carbon.vendor.customer.mapper.CvCustomerMapper;
+import org.dromara.carbon.vendor.license.mapper.CvLicenseIssueMapper;
+import org.dromara.carbon.vendor.renewal.mapper.CvRenewalOrderMapper;
+import org.dromara.carbon.vendor.license.mapper.CvSigningKeyMapper;
+import org.dromara.carbon.vendor.license.service.CvLicensePrivateKeyProvider;
+import org.dromara.carbon.vendor.openapi.service.ICvOpenApiAuditService;
+import org.dromara.carbon.vendor.openapi.service.impl.CvOpenLicenseServiceImpl;
 import org.dromara.common.core.exception.ServiceException;
 import org.dromara.system.mapper.SysTenantPackageMapper;
 import org.junit.jupiter.api.BeforeEach;
@@ -23,7 +24,11 @@ import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 
 import java.math.BigDecimal;
+import java.nio.charset.StandardCharsets;
+import java.security.KeyPair;
+import java.security.KeyPairGenerator;
 import java.time.Instant;
+import java.util.Base64;
 import java.util.Date;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -46,23 +51,32 @@ class CvOpenLicenseServiceTest {
     private CvRenewalOrderMapper renewalOrderMapper;
     private SysTenantPackageMapper tenantPackageMapper;
     private ICvOpenApiAuditService openApiAuditService;
+    private CvSigningKeyMapper signingKeyMapper;
+    private CvLicensePrivateKeyProvider privateKeyProvider;
+    private KeyPair keyPair;
     private CvOpenLicenseServiceImpl service;
 
     @BeforeEach
-    void setUp() {
+    void setUp() throws Exception {
         licenseIssueMapper = mock(CvLicenseIssueMapper.class);
         customerMapper = mock(CvCustomerMapper.class);
         renewalOrderMapper = mock(CvRenewalOrderMapper.class);
         tenantPackageMapper = mock(SysTenantPackageMapper.class);
         openApiAuditService = mock(ICvOpenApiAuditService.class);
+        signingKeyMapper = mock(CvSigningKeyMapper.class);
+        privateKeyProvider = mock(CvLicensePrivateKeyProvider.class);
+        keyPair = KeyPairGenerator.getInstance("RSA").generateKeyPair();
+        when(signingKeyMapper.selectOne(any(), eq(false))).thenReturn(activeSigningKey());
+        when(privateKeyProvider.resolvePrivateKeyPem(eq("env:UNIT_TEST_LICENSE_PRIVATE_KEY")))
+            .thenReturn(signingKeyMaterial());
         service = new CvOpenLicenseServiceImpl(
             licenseIssueMapper,
             customerMapper,
             renewalOrderMapper,
             tenantPackageMapper,
             openApiAuditService,
-            mock(CvSigningKeyMapper.class),
-            mock(CvLicensePrivateKeyProvider.class),
+            signingKeyMapper,
+            privateKeyProvider,
             new ObjectMapper()
         );
     }
@@ -78,8 +92,10 @@ class CvOpenLicenseServiceTest {
         assertEquals("active", response.getStatus());
         assertEquals("standard", response.getEdition());
         assertEquals("factor-sync,report-template-sync", response.getFeatureCodes());
-        assertEquals("{\"licenseId\":\"LIC-001\"}", response.getLicensePayload());
-        assertEquals("signature-text", response.getSignatureText());
+        assertTrue(response.getLicensePayload().contains("\"installId\":\"INSTALL-001\""));
+        assertTrue(response.getLicensePayload().contains("\"keyId\":\"KEY-001\""));
+        assertTrue(response.getSignatureText().length() > 0);
+        verify(licenseIssueMapper).updateById(any(CvLicenseIssue.class));
         verify(openApiAuditService).recordSuccess(
             eq("/open/licenses/current"), eq("POST"), eq("LIC-001"), eq("INSTALL-001"), eq(1001L),
             eq("keyId=KEY-001;currentSummary=local-cache"));
@@ -222,6 +238,21 @@ class CvOpenLicenseServiceTest {
         license.setLicensePayload("{\"licenseId\":\"LIC-001\"}");
         license.setSignatureText("signature-text");
         return license;
+    }
+
+    private CvSigningKey activeSigningKey() {
+        CvSigningKey signingKey = new CvSigningKey();
+        signingKey.setKeyId("KEY-001");
+        signingKey.setAlgorithm("RS256");
+        signingKey.setPrivateKeyRef("env:UNIT_TEST_LICENSE_PRIVATE_KEY");
+        signingKey.setKeyStatus("active");
+        signingKey.setValidFrom(Date.from(Instant.now().minusSeconds(3600)));
+        return signingKey;
+    }
+
+    private String signingKeyMaterial() {
+        return Base64.getMimeEncoder(64, "\n".getBytes(StandardCharsets.US_ASCII))
+            .encodeToString(keyPair.getPrivate().getEncoded());
     }
 
     private CvCustomer activeCustomer() {

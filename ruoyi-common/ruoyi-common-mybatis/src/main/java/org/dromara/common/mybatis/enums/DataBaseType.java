@@ -16,22 +16,7 @@ public enum DataBaseType {
     /**
      * MySQL
      */
-    MY_SQL("MySQL"),
-
-    /**
-     * Oracle
-     */
-    ORACLE("Oracle"),
-
-    /**
-     * PostgreSQL
-     */
-    POSTGRE_SQL("PostgreSQL"),
-
-    /**
-     * SQL Server
-     */
-    SQL_SERVER("Microsoft SQL Server");
+    MY_SQL("MySQL");
 
     /**
      * 数据库类型
@@ -61,27 +46,6 @@ public enum DataBaseType {
      */
     public boolean isMySql() {
         return this == MY_SQL;
-    }
-
-    /**
-     * 判断是否为 Oracle 类型
-     */
-    public boolean isOracle() {
-        return this == ORACLE;
-    }
-
-    /**
-     * 判断是否为 PostgreSQL 类型
-     */
-    public boolean isPostgreSql() {
-        return this == POSTGRE_SQL;
-    }
-
-    /**
-     * 判断是否为 SQL Server 类型
-     */
-    public boolean isSqlServer() {
-        return this == SQL_SERVER;
     }
 
 }

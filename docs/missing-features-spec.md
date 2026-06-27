@@ -36,7 +36,7 @@ Run from `vendor-backend`.
 ```powershell
 rtk mvn -pl ruoyi-modules/carbon-vendor -am "-DskipTests=false" "-Dtest=CvLicenseIssueServiceTest,CvLicenseIssueControllerTest" "-Dsurefire.failIfNoSpecifiedTests=false" test
 rtk mvn -pl ruoyi-modules/carbon-vendor -am "-DskipTests=false" test
-rtk mvn -pl ruoyi-admin -am package -DskipTests
+rtk mvn -Pprod -pl ruoyi-admin -am package -DskipTests
 ```
 
 Cross-repository boundary checks are run from the original parent workspace when available:
@@ -104,7 +104,7 @@ Vendor owns Power BI template assets and distribution metadata, but the full lif
 Requirements:
 
 - Vendor may upload, version, publish, disable, and distribute `.pbix` templates.
-- Vendor must not connect to enterprise SQL Server to read enterprise business data.
+- Vendor must not connect to enterprise-local databases to read enterprise business data.
 - Template distribution records may reference customers, editions, or License entitlements.
 
 ### VB-5: Renewal / Payment Callback to License Issue
@@ -136,7 +136,7 @@ Vendor backend owns the data sources that enterprise can request through vendor 
 
 Requirements:
 
-- `script/sql/portal/vendor_portal_menu.sql` keeps `数据管理` as a first-level vendor portal directory for factor versions, factor records, factor open scope, report templates, template distribution, dimension data, and announcements.
+- `script/sql/portal/vendor_portal_menu.sql` keeps `数据管理` as a first-level vendor portal directory for factor versions, factor open scope, report templates, template distribution, dimension data, and announcements. Source(A) factor master data is maintained through the strong typed dimension tables rather than a separate factor maintenance page.
 - Vendor administrators have full control permissions for vendor-owned data management pages. Factor open scope must include list, detail, add, edit, and delete permissions when the backend endpoint exists.
 - Factor open scope controls availability by factor `versionId`, optional vendor `customerId`, and optional purchased `edition` or package/version code.
 - Factor open scope must not require assigning each `licenseId`. License remains the authenticated open-API credential and derives its accessible scope from the enterprise customer's purchased edition/version.

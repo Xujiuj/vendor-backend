@@ -65,13 +65,7 @@ public class DataBaseHelper {
     }
 
     /**
-     * 根据当前数据库类型，生成兼容的 FIND_IN_SET 语句片段
-     * <p>
-     * 用于判断指定值是否存在于逗号分隔的字符串列中，SQL写法根据不同数据库方言自动切换：
-     * - Oracle 使用 instr 函数
-     * - PostgreSQL 使用 strpos 函数
-     * - SQL Server 使用 charindex 函数
-     * - 其他默认使用 MySQL 的 find_in_set 函数
+     * 生成 MySQL FIND_IN_SET 语句片段。
      *
      * @param var1 要查找的值（支持任意类型，内部会转换成字符串）
      * @param var2 存储逗号分隔值的数据库列名
@@ -79,16 +73,7 @@ public class DataBaseHelper {
      */
     public static String findInSet(Object var1, String var2) {
         String var = Convert.toStr(var1);
-        return switch (getDataBaseType()) {
-            // instr(',0,100,101,' , ',100,') <> 0
-            case ORACLE -> "instr(','||%s||',' , ',%s,') <> 0".formatted(var2, var);
-            // (select strpos(',0,100,101,' , ',100,')) <> 0
-            case POSTGRE_SQL -> "(select strpos(','||%s||',' , ',%s,')) <> 0".formatted(var2, var);
-            // charindex(',100,' , ',0,100,101,') <> 0
-            case SQL_SERVER -> "charindex(',%s,' , ','+%s+',') <> 0".formatted(var, var2);
-            // find_in_set(100 , '0,100,101')
-            default -> "find_in_set('%s' , %s) <> 0".formatted(var, var2);
-        };
+        return "find_in_set('%s' , %s) <> 0".formatted(var, var2);
     }
 
     /**

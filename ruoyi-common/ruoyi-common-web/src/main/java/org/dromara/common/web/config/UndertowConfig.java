@@ -1,10 +1,8 @@
 package org.dromara.common.web.config;
 
 import io.undertow.UndertowOptions;
-import io.undertow.server.DefaultByteBufferPool;
 import io.undertow.server.handlers.DisallowedMethodsHandler;
 import io.undertow.util.HttpString;
-import io.undertow.websockets.jsr.WebSocketDeploymentInfo;
 import org.dromara.common.core.utils.SpringUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.autoconfigure.AutoConfiguration;
@@ -28,9 +26,8 @@ public class UndertowConfig implements WebServerFactoryCustomizer<UndertowServle
      * 自定义 Undertow 配置
      * <p>
      * 主要配置内容包括：
-     * 1. 配置 WebSocket 部署信息
-     * 2. 在虚拟线程模式下使用虚拟线程池
-     * 3. 禁用不安全的 HTTP 方法，如 CONNECT、TRACE、TRACK
+     * 1. 在虚拟线程模式下使用虚拟线程池
+     * 2. 禁用不安全的 HTTP 方法，如 CONNECT、TRACE、TRACK
      * </p>
      *
      * @param factory Undertow 的 Web 服务器工厂
@@ -43,11 +40,6 @@ public class UndertowConfig implements WebServerFactoryCustomizer<UndertowServle
         });
 
         factory.addDeploymentInfoCustomizers(deploymentInfo -> {
-            // 配置 WebSocket 部署信息，设置 WebSocket 使用的缓冲区池
-            WebSocketDeploymentInfo webSocketDeploymentInfo = new WebSocketDeploymentInfo();
-            webSocketDeploymentInfo.setBuffers(new DefaultByteBufferPool(true, 1024));
-            deploymentInfo.addServletContextAttribute("io.undertow.websockets.jsr.WebSocketDeploymentInfo", webSocketDeploymentInfo);
-
             // 如果启用了虚拟线程，配置 Undertow 使用虚拟线程池
             if (SpringUtils.isVirtual()) {
                 // 创建虚拟线程池，线程池前缀为 "undertow-"

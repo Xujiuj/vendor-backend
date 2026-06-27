@@ -17,50 +17,6 @@ BEGIN
     );
 END//
 
-DROP PROCEDURE IF EXISTS cv_diag_optional_factor_record//
-CREATE PROCEDURE cv_diag_optional_factor_record()
-BEGIN
-    IF cv_diag_table_exists('cv_factor_record') THEN
-        SELECT 'factor_record.version_table_code.duplicate.summary' AS check_code,
-               COUNT(*) AS duplicate_groups,
-               COALESCE(SUM(duplicate_count), 0) AS rows_in_duplicate_groups,
-               COALESCE(SUM(duplicate_count - 1), 0) AS extra_rows
-        FROM (
-            SELECT version_id, factor_table_code, factor_code, COUNT(*) AS duplicate_count
-            FROM cv_factor_record
-            WHERE version_id IS NOT NULL
-              AND factor_table_code IS NOT NULL
-              AND factor_table_code <> ''
-              AND factor_code IS NOT NULL
-              AND factor_code <> ''
-            GROUP BY version_id, factor_table_code, factor_code
-            HAVING COUNT(*) > 1
-        ) d;
-    ELSE
-        SELECT 'factor_record.version_table_code.duplicate.summary' AS check_code,
-               0 AS duplicate_groups,
-               0 AS rows_in_duplicate_groups,
-               0 AS extra_rows;
-    END IF;
-
-    IF cv_diag_table_exists('cv_factor_record') AND cv_diag_table_exists('cv_factor_version') THEN
-        SELECT 'factor_record.version.orphan' AS check_code,
-               fr.version_id,
-               COUNT(*) AS orphan_count
-        FROM cv_factor_record fr
-        LEFT JOIN cv_factor_version fv ON fv.id = fr.version_id
-        WHERE fr.version_id IS NOT NULL
-          AND fv.id IS NULL
-        GROUP BY fr.version_id
-        ORDER BY orphan_count DESC, fr.version_id
-        LIMIT 100;
-    ELSE
-        SELECT 'factor_record.version.orphan' AS check_code,
-               NULL AS version_id,
-               0 AS orphan_count;
-    END IF;
-END//
-
 DROP PROCEDURE IF EXISTS cv_diag_optional_dimension_record//
 CREATE PROCEDURE cv_diag_optional_dimension_record()
 BEGIN
@@ -102,7 +58,6 @@ WHERE table_schema = DATABASE()
       'cv_electricity_factor_scope',
       'cv_greenhouse_gas',
       'cv_factor_version',
-      'cv_factor_record',
       'cv_dimension_record'
   )
 ORDER BY table_name;
@@ -172,7 +127,6 @@ FROM (
     HAVING COUNT(*) > 1
 ) d;
 
-CALL cv_diag_optional_factor_record();
 CALL cv_diag_optional_dimension_record();
 
 SELECT 'admin_division.parent.orphan' AS check_code,
@@ -254,6 +208,5 @@ HAVING COUNT(*) > 1
 ORDER BY duplicate_count DESC
 LIMIT 100;
 
-DROP PROCEDURE IF EXISTS cv_diag_optional_factor_record;
 DROP PROCEDURE IF EXISTS cv_diag_optional_dimension_record;
 DROP FUNCTION IF EXISTS cv_diag_table_exists;

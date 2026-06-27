@@ -108,11 +108,6 @@ public class SysUserBo extends BaseEntity {
      */
     private String userIds;
 
-    /**
-     * 排除不查询的用户(工作流用)
-     */
-    private String excludeUserIds;
-
     public SysUserBo(Long userId) {
         this.userId = userId;
     }

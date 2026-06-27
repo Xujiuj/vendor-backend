@@ -1,10 +1,5 @@
 -- Vendor carbon operations foundation, MySQL development version.
 -- This script intentionally excludes enterprise-local business detail tables.
--- SQL Server migration notes:
---   * BIGINT AUTO_INCREMENT -> BIGINT IDENTITY(1,1)
---   * TEXT -> NVARCHAR(MAX)
---   * TINYINT(1) -> BIT
---   * DATETIME -> DATETIME2
 
 CREATE TABLE IF NOT EXISTS cv_customer (
     id BIGINT NOT NULL AUTO_INCREMENT,
@@ -81,72 +76,6 @@ CREATE TABLE IF NOT EXISTS cv_factor_version (
     PRIMARY KEY (id),
     UNIQUE KEY uk_cv_factor_version_code (version_code)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='Vendor factor library version';
-
-CREATE TABLE IF NOT EXISTS cv_factor_record (
-    id BIGINT NOT NULL AUTO_INCREMENT,
-    version_id BIGINT NOT NULL,
-    factor_table_code VARCHAR(64) NOT NULL DEFAULT '201ef',
-    factor_code VARCHAR(128) NOT NULL,
-    factor_name VARCHAR(255) NOT NULL,
-    factor_category VARCHAR(128) NOT NULL,
-    factor_value DECIMAL(28, 10) NOT NULL,
-    factor_unit VARCHAR(64) NOT NULL,
-    factor_key VARCHAR(128) DEFAULT NULL,
-    emission_source_name VARCHAR(255) DEFAULT NULL,
-    emission_source_name_en VARCHAR(255) DEFAULT NULL,
-    fuel_material_category VARCHAR(255) DEFAULT NULL,
-    source_unit VARCHAR(64) DEFAULT NULL,
-    co2 DECIMAL(28, 10) DEFAULT NULL,
-    ch4 DECIMAL(28, 10) DEFAULT NULL,
-    n2o DECIMAL(28, 10) DEFAULT NULL,
-    hfcs DECIMAL(28, 10) DEFAULT NULL,
-    pfcs DECIMAL(28, 10) DEFAULT NULL,
-    sf6 DECIMAL(28, 10) DEFAULT NULL,
-    nf3 DECIMAL(28, 10) DEFAULT NULL,
-    applicable_scope VARCHAR(255) DEFAULT NULL,
-    factor_source VARCHAR(255) DEFAULT NULL,
-    gwp_ch4 DECIMAL(28, 10) DEFAULT NULL,
-    gwp_n2o DECIMAL(28, 10) DEFAULT NULL,
-    gwp_hfcs DECIMAL(28, 10) DEFAULT NULL,
-    gwp_pfcs DECIMAL(28, 10) DEFAULT NULL,
-    gwp_sf6 DECIMAL(28, 10) DEFAULT NULL,
-    gwp_nf3 DECIMAL(28, 10) DEFAULT NULL,
-    factor_gwp DECIMAL(28, 10) DEFAULT NULL,
-    version_province_code VARCHAR(128) DEFAULT NULL,
-    factor_version VARCHAR(64) DEFAULT NULL,
-    division_code VARCHAR(64) DEFAULT NULL,
-    division_name VARCHAR(255) DEFAULT NULL,
-    region_name VARCHAR(255) DEFAULT NULL,
-    province_factor DECIMAL(28, 10) DEFAULT NULL,
-    region_factor DECIMAL(28, 10) DEFAULT NULL,
-    national_factor DECIMAL(28, 10) DEFAULT NULL,
-    non_fossil_excluded_factor DECIMAL(28, 10) DEFAULT NULL,
-    national_fossil_power_factor DECIMAL(28, 10) DEFAULT NULL,
-    row_no INT DEFAULT NULL,
-    fuel_level1 VARCHAR(255) DEFAULT NULL,
-    fuel_level2 VARCHAR(255) DEFAULT NULL,
-    fuel_level3 VARCHAR(255) DEFAULT NULL,
-    fuel_level4 VARCHAR(255) DEFAULT NULL,
-    lower_heat_value DECIMAL(28, 10) DEFAULT NULL,
-    lower_heat_value_cv DECIMAL(18, 10) DEFAULT NULL,
-    co2_factor DECIMAL(28, 10) DEFAULT NULL,
-    co2_factor_cv DECIMAL(18, 10) DEFAULT NULL,
-    gwp_value DECIMAL(28, 10) DEFAULT NULL,
-    converted_factor DECIMAL(28, 10) DEFAULT NULL,
-    source_ref VARCHAR(512) DEFAULT NULL,
-    custom_fields TEXT DEFAULT NULL,
-    enabled_flag TINYINT(1) NOT NULL DEFAULT 1,
-    create_time DATETIME DEFAULT CURRENT_TIMESTAMP,
-    update_time DATETIME DEFAULT CURRENT_TIMESTAMP,
-    remark VARCHAR(500) DEFAULT NULL,
-    PRIMARY KEY (id),
-    UNIQUE KEY uk_cv_factor_record (version_id, factor_table_code, factor_code),
-    KEY idx_cv_factor_record_version (version_id),
-    KEY idx_cv_factor_record_table (factor_table_code),
-    KEY idx_cv_factor_record_sample_key (factor_key),
-    CONSTRAINT fk_cv_factor_record_version
-        FOREIGN KEY (version_id) REFERENCES cv_factor_version (id)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='Vendor factor library record';
 
 CREATE TABLE IF NOT EXISTS cv_dimension_record (
     id BIGINT NOT NULL AUTO_INCREMENT,

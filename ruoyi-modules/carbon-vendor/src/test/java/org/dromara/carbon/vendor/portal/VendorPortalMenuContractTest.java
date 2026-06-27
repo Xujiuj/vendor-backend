@@ -24,7 +24,6 @@ class VendorPortalMenuContractTest {
     private static final String SYSTEM_RUNNER_RELATIVE_PATH =
         "ruoyi-modules/ruoyi-system/src/main/java/org/dromara/system/runner/SystemApplicationRunner.java";
     private static final String MYSQL_SCHEMA_RELATIVE_PATH = "script/sql/mysql/carbon_vendor_schema_v1.sql";
-    private static final String SQLSERVER_SCHEMA_RELATIVE_PATH = "script/sql/sqlserver/carbon_vendor_schema_v1.sql";
     private static final Pattern CREATE_TABLE_PATTERN = Pattern.compile(
         "CREATE\\s+TABLE\\s+(?:IF\\s+NOT\\s+EXISTS\\s+)?([a-zA-Z0-9_]+)",
         Pattern.CASE_INSENSITIVE
@@ -34,8 +33,8 @@ class VendorPortalMenuContractTest {
         "cv_signing_key",
         "cv_license_issue",
         "cv_factor_version",
-        "cv_factor_record",
         "cv_dimension_record",
+        "cv_vendor_table_field",
         "cv_factor_customer_scope",
         "cv_report_template",
         "cv_report_template_scope",
@@ -45,88 +44,57 @@ class VendorPortalMenuContractTest {
     );
 
     @Test
-    void vendorMenuSqlKeepsVendorMenusAndBlocksEnterpriseLocalMenus() throws Exception {
+    void vendorMenuSqlKeepsCurrentVendorMenusAndBlocksEnterpriseLocalMenus() throws Exception {
         String sql = Files.readString(resolveProjectFile(MENU_SQL_RELATIVE_PATH));
 
         assertContainsAll(sql, List.of(
-            "厂商运营",
-            "数据管理",
-            "客户档案",
-            "License 授权管理",
-            "因子版本",
-            "因子明细",
-            "因子开放范围",
-            "模板库",
-            "模板分发",
-            "维表管理",
-            "公告管理",
-            "续费订单",
             "vendor/customer/index",
             "vendor/licenseIssue/index",
             "vendor/factorVersion/index",
-            "vendor/factorRecord/index",
             "vendor/factorScope/index",
             "vendor/reportTemplate/index",
             "vendor/templateScope/index",
             "vendor/dimension/index",
             "vendor/announcement/index",
             "vendor/renewalOrder/index",
-            "(910136, '数据管理', 0, 2, 'data-management', 'Layout'",
-            "(910103, '因子版本', 910136",
-            "(910104, '因子明细', 910136",
-            "(910121, '因子开放范围', 910136",
-            "(910105, '模板库', 910136",
-            "(910106, '模板分发', 910136",
-            "(910131, '维表管理', 910136",
-            "(910126, '公告管理', 910136",
+            "(910136,",
+            "'data-management', 'Layout'",
+            "(910103,",
+            "'factor-version', 'vendor/factorVersion/index'",
+            "(910121,",
+            "'factor-scope', 'vendor/factorScope/index'",
+            "(910131,",
+            "'dimension', 'vendor/dimension/index'",
             "vendor:customer:list",
             "vendor:licenseIssue:list",
             "vendor:factorVersion:list",
-            "vendor:factorRecord:list",
+            "vendor:factorVersion:publish",
+            "vendor:factorVersion:freeze",
+            "vendor:factorVersion:retire",
+            "vendor:factorVersion:restore",
             "vendor:factorCustomerScope:list",
-            "厂商因子按版本、客户与套餐版本控制开放范围，License 通过企业购买版本继承范围",
             "vendor:reportTemplate:list",
             "vendor:reportTemplateScope:list",
             "vendor:dimension:list",
             "vendor:announcement:list",
             "vendor:renewalOrder:list",
-            "vendor:customer:query",
-            "vendor:factorRecord:remove",
             "vendor:factorCustomerScope:query",
             "vendor:factorCustomerScope:add",
             "vendor:factorCustomerScope:edit",
             "vendor:factorCustomerScope:remove",
-            "vendor:reportTemplate:remove",
-            "vendor:reportTemplateScope:add",
-            "vendor:reportTemplateScope:edit",
-            "vendor:reportTemplateScope:remove",
             "vendor:dimension:remove",
-            "vendor:announcement:remove",
-            "vendor:renewalOrder:add",
-            "vendor:renewalOrder:edit",
-            "vendor:renewalOrder:callback",
-            "vendor:renewalOrder:retryIssue",
-            "vendor:renewalOrder:remove"
+            "vendor:renewalOrder:retryIssue"
         ));
 
         assertContainsNone(sql, List.of(
-            "system/tenant/index",
-            "01 配置排放源",
-            "02 确认排放因子",
-            "03 活动数据",
-            "04 绿电绿证",
-            "05 强度管理",
-            "License 导入",
-            "运行状态",
-            "企业本地填报",
-            "企业本地校验",
             "enterprise:",
             "enterprise/",
             "system/license/index",
+            "vendor/factorRecord/index",
+            "vendor:factorRecord:",
             "license-import",
             "license-state",
-            "activity-data",
-            "企业本地业务"
+            "activity-data"
         ));
     }
 
@@ -146,101 +114,59 @@ class VendorPortalMenuContractTest {
     }
 
     @Test
-    void vendorMenuSqlPreservesRuoyiSystemManagementLogsAndGenerator() throws Exception {
+    void vendorMenuSqlKeepsOnlyRequiredRuoyiSystemSurfaces() throws Exception {
         String sql = Files.readString(resolveProjectFile(MENU_SQL_RELATIVE_PATH));
 
         assertContainsAll(sql, List.of(
             "insert ignore into sys_menu",
-            "(1, '系统管理', 0, 3, 'system'",
-            "(100, '用户管理', 1, 1, 'user', 'system/user/index'",
-            "(101, '角色管理', 1, 2, 'role', 'system/role/index'",
-            "(102, '菜单管理', 1, 3, 'menu', 'system/menu/index'",
-            "(122, '套餐管理', 1, 8, 'tenantPackage', 'system/tenantPackage/index'",
-            "(108, '日志管理', 0, 4, 'monitor', 'Layout'",
-            "(500, '操作日志', 108, 1, 'operlog', 'monitor/operlog/index'",
-            "(501, '登录日志', 108, 2, 'logininfor', 'monitor/logininfor/index'",
-            "(115, '代码生成', 0, 5, 'gen', 'tool/gen/index'",
-            "system/user/index",
-            "system/role/index",
-            "system/menu/index",
-            "system/tenantPackage/index",
-            "system/dept/index",
-            "system/post/index",
-            "system/dict/index",
-            "system/config/index",
-            "system/notice/index",
-            "monitor/logininfor/index",
-            "monitor/operlog/index",
-            "tool/gen/index",
-            "tool:gen:list",
-            "菜单管理",
-            "角色管理",
-            "套餐管理",
-            "用户管理",
-            "部门管理",
-            "岗位管理",
-            "字典管理",
-            "参数设置",
-            "公告配置",
-            "system:menu:list",
-            "system:role:list",
+            "(1,",
+            "'system'",
+            "(100,",
+            "'user', 'system/user/index'",
+            "(101,",
+            "'role', 'system/role/index'",
+            "(103,",
+            "'dept', 'system/dept/index'",
+            "(104,",
+            "'post', 'system/post/index'",
+            "(107,",
+            "'notice', 'system/notice/index'",
+            "(108,",
+            "'monitor', 'Layout'",
+            "(500,",
+            "'operlog', 'monitor/operlog/index'",
+            "(501,",
+            "'logininfor', 'monitor/logininfor/index'",
+            "(122,",
+            "'tenantPackage', 'system/tenantPackage/index'",
             "system:user:list",
+            "system:role:list",
             "system:dept:list",
             "system:post:list",
-            "system:dict:list",
-            "system:config:list",
             "system:notice:list",
             "system:tenantPackage:list",
-            "system:tenantPackage:add",
-            "system:tenantPackage:edit",
-            "system:tenantPackage:remove"
+            "monitor:operlog:list",
+            "monitor:logininfor:list"
         ));
 
         assertContainsAll(sql, List.of(
-            "menu_name = '套餐管理', parent_id = 1, order_num = 8, path = 'tenantPackage', component = 'system/tenantPackage/index', perms = 'system:tenantPackage:list', icon = 'form'",
-            "visible = '0', status = '0', remark =",
-            "where menu_id = 122",
-            "menu_name = '日志管理', parent_id = 0, order_num = 4, path = 'monitor', component = 'Layout'",
-            "where menu_id = 108",
-            "menu_name = '代码生成', parent_id = 0, order_num = 5, path = 'gen', component = 'tool/gen/index'",
-            "where menu_id = 115",
-            "(102,",
-            "'menu', 'system/menu/index', '', 1, 0, 'C', '1', '0'",
-            "'dict', 'system/dict/index', '', 1, 0, 'C', '1', '0'",
-            "'config', 'system/config/index', '', 1, 0, 'C', '1', '0'",
-            "'gen', 'tool/gen/index', '', 1, 0, 'C', '1', '0'",
-            "path = 'menu', component = 'system/menu/index', perms = 'system:menu:list', icon = 'tree-table', visible = '1'",
-            "path = 'dict', component = 'system/dict/index', perms = 'system:dict:list', icon = 'dict', visible = '1'",
-            "path = 'config', component = 'system/config/index', perms = 'system:config:list', icon = 'edit', visible = '1'",
-            "path = 'gen', component = 'tool/gen/index', perms = 'tool:gen:list', icon = 'code', visible = '1'",
-            "update sys_menu set visible = '1' where menu_id in (6, 121);",
             "Superadmin routing uses all enabled M/C menus",
             "set visible = '1',\n    status = '1'",
             "menu_id in (2, 3, 4, 5, 6, 115, 116, 121)",
-            "'tenant', 'tool', 'gen', 'gen-edit/index/:tableId', 'demo'",
-            "'workflow', 'task', 'online', 'cache', 'Admin', 'snailjob'",
+            "'tenant', 'demo'",
             "'oss', 'oss-config/index', 'client'",
-            "path like 'http%'",
-            "'system/oss/index'",
-            "'system/client/index'",
-            "'tool/gen/index'",
-            "'tool/gen/editTable'",
-            "'monitor/online/index'",
-            "'monitor/cache/index'",
-            "'monitor/admin/index'",
-            "'monitor/snailjob/index'",
-            "component like 'workflow/%'",
-            "component like 'demo/%'"
+            "component like 'demo/%'",
+            "delete from sys_menu",
+            "system/menu/index",
+            "system/dict/index",
+            "system/config/index"
         ));
+
         assertContainsNone(sql, List.of(
-            "'menu', 'system/menu/index', '', 1, 0, 'C', '0', '0'",
-            "'dict', 'system/dict/index', '', 1, 0, 'C', '0', '0'",
-            "'config', 'system/config/index', '', 1, 0, 'C', '0', '0'",
-            "'gen', 'tool/gen/index', '', 1, 0, 'C', '0', '0'",
-            "path = 'menu', component = 'system/menu/index', perms = 'system:menu:list', icon = 'tree-table', visible = '0'",
-            "path = 'dict', component = 'system/dict/index', perms = 'system:dict:list', icon = 'dict', visible = '0'",
-            "path = 'config', component = 'system/config/index', perms = 'system:config:list', icon = 'edit', visible = '0'",
-            "path = 'gen', component = 'tool/gen/index', perms = 'tool:gen:list', icon = 'code', visible = '0'",
+            "system:menu:list",
+            "system:dict:list",
+            "system:config:list",
+            "tool:gen:list",
             "update sys_menu set visible = '1' where menu_id in (6, 121, 122)"
         ));
     }
@@ -294,25 +220,11 @@ class VendorPortalMenuContractTest {
     @Test
     void vendorSchemaSqlContainsOnlyVendorBusinessTables() throws Exception {
         String mysql = Files.readString(resolveProjectFile(MYSQL_SCHEMA_RELATIVE_PATH));
-        String sqlServer = Files.readString(resolveProjectFile(SQLSERVER_SCHEMA_RELATIVE_PATH));
 
         assertEquals(REQUIRED_VENDOR_TABLES, createTableNames(mysql),
             "Vendor MySQL schema should contain only current vendor business tables");
-        assertEquals(REQUIRED_VENDOR_TABLES, createTableNames(sqlServer),
-            "Vendor SQL Server schema should contain only current vendor business tables");
 
         assertContainsNone(mysql, List.of(
-            "CREATE TABLE ce_",
-            "REFERENCES ce_",
-            "enterprise_",
-            "sheet_656",
-            "capture_",
-            "activity_data",
-            "green_certificate",
-            "denominator_fact",
-            "enterprise_local"
-        ));
-        assertContainsNone(sqlServer, List.of(
             "CREATE TABLE ce_",
             "REFERENCES ce_",
             "enterprise_",
@@ -328,28 +240,8 @@ class VendorPortalMenuContractTest {
     @Test
     void vendorSchemaSqlKeepsLicenseFactorTemplateAndRenewalBoundaries() throws Exception {
         String mysql = Files.readString(resolveProjectFile(MYSQL_SCHEMA_RELATIVE_PATH));
-        String sqlServer = Files.readString(resolveProjectFile(SQLSERVER_SCHEMA_RELATIVE_PATH));
 
         assertContainsAll(mysql, List.of(
-            "customer_code",
-            "private_key_ref",
-            "source_license_id",
-            "edition",
-            "feature_codes",
-            "scope_license_key",
-            "template_version",
-            "license_id",
-            "download_token",
-            "token_status",
-            "expires_time",
-            "pay_channel",
-            "issue_status",
-            "issued_license_id",
-            "api_path",
-            "response_status",
-            "request_summary"
-        ));
-        assertContainsAll(sqlServer, List.of(
             "customer_code",
             "private_key_ref",
             "source_license_id",

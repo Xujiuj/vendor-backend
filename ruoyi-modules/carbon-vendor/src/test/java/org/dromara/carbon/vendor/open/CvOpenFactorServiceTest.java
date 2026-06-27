@@ -1,17 +1,22 @@
 package org.dromara.carbon.vendor.open;
 
-import org.dromara.carbon.vendor.domain.CvFactorRecord;
-import org.dromara.carbon.vendor.domain.CvFactorVersion;
-import org.dromara.carbon.vendor.domain.CvLicenseIssue;
-import org.dromara.carbon.vendor.domain.open.CvOpenFactorSyncRequest;
-import org.dromara.carbon.vendor.domain.open.CvOpenFactorSyncResponse;
-import org.dromara.carbon.vendor.mapper.CvFactorRecordMapper;
-import org.dromara.carbon.vendor.mapper.CvFactorVersionMapper;
-import org.dromara.carbon.vendor.mapper.CvLicenseIssueMapper;
-import org.dromara.carbon.vendor.mapper.CvVendorTableFieldMapper;
-import org.dromara.carbon.vendor.service.ICvFactorCustomerScopeService;
-import org.dromara.carbon.vendor.service.ICvOpenApiAuditService;
-import org.dromara.carbon.vendor.service.impl.CvOpenFactorServiceImpl;
+import org.dromara.carbon.vendor.factor.domain.CvFactorVersion;
+import org.dromara.carbon.vendor.license.domain.CvLicenseIssue;
+import org.dromara.carbon.vendor.dimension.domain.CvElectricityFactor;
+import org.dromara.carbon.vendor.dimension.domain.CvElectricityFactorScope;
+import org.dromara.carbon.vendor.dimension.domain.CvElectricityFactorVersion;
+import org.dromara.carbon.vendor.dimension.domain.CvGreenhouseGas;
+import org.dromara.carbon.vendor.openapi.domain.CvOpenFactorSyncRequest;
+import org.dromara.carbon.vendor.openapi.domain.CvOpenFactorSyncResponse;
+import org.dromara.carbon.vendor.factor.mapper.CvFactorVersionMapper;
+import org.dromara.carbon.vendor.license.mapper.CvLicenseIssueMapper;
+import org.dromara.carbon.vendor.dimension.mapper.CvElectricityFactorScopeMapper;
+import org.dromara.carbon.vendor.dimension.mapper.CvElectricityFactorVersionMapper;
+import org.dromara.carbon.vendor.dimension.mapper.CvElectricityMapper;
+import org.dromara.carbon.vendor.dimension.mapper.CvGreenhouseGasMapper;
+import org.dromara.carbon.vendor.factor.service.ICvFactorCustomerScopeService;
+import org.dromara.carbon.vendor.openapi.service.ICvOpenApiAuditService;
+import org.dromara.carbon.vendor.openapi.service.impl.CvOpenFactorServiceImpl;
 import org.dromara.common.core.exception.ServiceException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Tag;
@@ -39,8 +44,10 @@ class CvOpenFactorServiceTest {
 
     private CvLicenseIssueMapper licenseIssueMapper;
     private CvFactorVersionMapper factorVersionMapper;
-    private CvFactorRecordMapper factorRecordMapper;
-    private CvVendorTableFieldMapper tableFieldMapper;
+    private CvElectricityMapper electricityMapper;
+    private CvElectricityFactorVersionMapper electricityFactorVersionMapper;
+    private CvElectricityFactorScopeMapper electricityFactorScopeMapper;
+    private CvGreenhouseGasMapper greenhouseGasMapper;
     private ICvFactorCustomerScopeService factorCustomerScopeService;
     private ICvOpenApiAuditService openApiAuditService;
     private CvOpenFactorServiceImpl service;
@@ -49,15 +56,19 @@ class CvOpenFactorServiceTest {
     void setUp() {
         licenseIssueMapper = mock(CvLicenseIssueMapper.class);
         factorVersionMapper = mock(CvFactorVersionMapper.class);
-        factorRecordMapper = mock(CvFactorRecordMapper.class);
-        tableFieldMapper = mock(CvVendorTableFieldMapper.class);
+        electricityMapper = mock(CvElectricityMapper.class);
+        electricityFactorVersionMapper = mock(CvElectricityFactorVersionMapper.class);
+        electricityFactorScopeMapper = mock(CvElectricityFactorScopeMapper.class);
+        greenhouseGasMapper = mock(CvGreenhouseGasMapper.class);
         factorCustomerScopeService = mock(ICvFactorCustomerScopeService.class);
         openApiAuditService = mock(ICvOpenApiAuditService.class);
         service = new CvOpenFactorServiceImpl(
             licenseIssueMapper,
             factorVersionMapper,
-            factorRecordMapper,
-            tableFieldMapper,
+            electricityMapper,
+            electricityFactorVersionMapper,
+            electricityFactorScopeMapper,
+            greenhouseGasMapper,
             factorCustomerScopeService,
             openApiAuditService
         );
@@ -71,7 +82,7 @@ class CvOpenFactorServiceTest {
         when(factorVersionMapper.selectList(any())).thenReturn(List.of(version));
         when(factorCustomerScopeService.isFactorVersionAuthorized(88L, 1001L, null, "standard", "LIC-001"))
             .thenReturn(true);
-        when(factorRecordMapper.selectList(any())).thenReturn(List.of(factorRecord()));
+        mockSourceAFactors();
 
         CvOpenFactorSyncResponse response = service.syncFactors(request("OLD"));
 
@@ -79,8 +90,12 @@ class CvOpenFactorServiceTest {
         assertEquals("88", response.getVendorVersionId());
         assertEquals("FV-2026", response.getVersionCode());
         assertTrue(response.isChanged());
-        assertEquals(1, response.getRecords().size());
-        assertEquals("EF-ELEC-ZJ", response.getRecords().get(0).getFactorCode());
+        assertEquals(4, response.getRecords().size());
+        assertEquals("2026:330000", response.getRecords().get(0).getFactorCode());
+        assertEquals("202ef", response.getRecords().get(0).getFactorTableCode());
+        assertEquals("203ef", response.getRecords().get(1).getFactorTableCode());
+        assertEquals("205ef", response.getRecords().get(2).getFactorTableCode());
+        assertEquals("206", response.getRecords().get(3).getFactorTableCode());
         verify(openApiAuditService).recordSuccess(
             eq("/open/factors"), eq("GET"), eq("LIC-001"), eq("INSTALL-001"), eq(1001L), eq("currentVersionCode=OLD"));
     }
@@ -92,7 +107,7 @@ class CvOpenFactorServiceTest {
         when(factorVersionMapper.selectList(any())).thenReturn(List.of(version));
         when(factorCustomerScopeService.isFactorVersionAuthorized(88L, 1001L, null, "standard", "LIC-001"))
             .thenReturn(true);
-        when(factorRecordMapper.selectList(any())).thenReturn(List.of(factorRecord()));
+        mockSourceAFactors();
 
         CvOpenFactorSyncResponse response = service.syncFactors(request("FV-2026"));
 
@@ -108,12 +123,12 @@ class CvOpenFactorServiceTest {
         when(factorVersionMapper.selectList(any())).thenReturn(List.of(version));
         when(factorCustomerScopeService.isFactorVersionAuthorized(88L, 1001L, null, "standard", "LIC-001"))
             .thenReturn(true);
-        when(factorRecordMapper.selectList(any())).thenReturn(List.of(factorRecord()));
+        mockSourceAFactors();
 
         CvOpenFactorSyncResponse response = service.syncFactors(request(null));
 
         assertEquals("LIC-001", response.getLicenseId());
-        assertEquals(1, response.getRecords().size());
+        assertEquals(4, response.getRecords().size());
     }
 
     @Test
@@ -142,7 +157,7 @@ class CvOpenFactorServiceTest {
         ServiceException exception = assertThrows(ServiceException.class, () -> service.syncFactors(request(null)));
 
         assertEquals("no authorized factor version for license entitlement", exception.getMessage());
-        verify(factorRecordMapper, never()).selectList(any());
+        verify(electricityMapper, never()).selectList(any());
     }
 
     @Test
@@ -201,17 +216,42 @@ class CvOpenFactorServiceTest {
         return version;
     }
 
-    private CvFactorRecord factorRecord() {
-        CvFactorRecord record = new CvFactorRecord();
-        record.setId(701L);
-        record.setVersionId(88L);
-        record.setFactorCode("EF-ELEC-ZJ");
-        record.setFactorName("Zhejiang grid electricity");
-        record.setFactorCategory("electricity");
-        record.setFactorValue(new BigDecimal("0.5703000000"));
-        record.setFactorUnit("kgCO2e/kWh");
-        record.setSourceRef("official-source");
-        record.setEnabledFlag(Boolean.TRUE);
+    private void mockSourceAFactors() {
+        when(electricityMapper.selectList(any())).thenReturn(List.of(electricityFactor()));
+        when(electricityFactorVersionMapper.selectList(any())).thenReturn(List.of(electricityFactorVersion()));
+        when(electricityFactorScopeMapper.selectList(any())).thenReturn(List.of(electricityFactorScope()));
+        when(greenhouseGasMapper.selectList(any())).thenReturn(List.of(greenhouseGas()));
+    }
+
+    private CvElectricityFactor electricityFactor() {
+        CvElectricityFactor record = new CvElectricityFactor();
+        record.setFactorVersion("2026");
+        record.setDivisionCode("330000");
+        record.setDivisionName("浙江省");
+        record.setProvinceFactor(new BigDecimal("0.5703000000"));
+        return record;
+    }
+
+    private CvElectricityFactorVersion electricityFactorVersion() {
+        CvElectricityFactorVersion record = new CvElectricityFactorVersion();
+        record.setFactorVersion("2026");
+        record.setEffectiveYear(2026);
+        return record;
+    }
+
+    private CvElectricityFactorScope electricityFactorScope() {
+        CvElectricityFactorScope record = new CvElectricityFactorScope();
+        record.setScopeKey("province");
+        record.setScopeName("省级电网");
+        return record;
+    }
+
+    private CvGreenhouseGas greenhouseGas() {
+        CvGreenhouseGas record = new CvGreenhouseGas();
+        record.setGasCode("CO2");
+        record.setGasName("二氧化碳");
+        record.setGwpValue(BigDecimal.ONE);
+        record.setGwpVersion("AR6");
         return record;
     }
 }

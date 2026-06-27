@@ -1,11 +1,11 @@
 package org.dromara.carbon.vendor.license;
 
-import org.dromara.carbon.vendor.controller.CvLicenseIssueController;
-import org.dromara.carbon.vendor.domain.CvLicenseIssue;
-import org.dromara.carbon.vendor.domain.license.CvLicenseIssueRequest;
-import org.dromara.carbon.vendor.domain.license.CvLicenseIssueResult;
-import org.dromara.carbon.vendor.domain.license.CvLicenseReissueRequest;
-import org.dromara.carbon.vendor.service.ICvLicenseIssueService;
+import org.dromara.carbon.vendor.license.controller.CvLicenseIssueController;
+import org.dromara.carbon.vendor.license.domain.CvLicenseIssue;
+import org.dromara.carbon.vendor.license.domain.CvLicenseIssueRequest;
+import org.dromara.carbon.vendor.license.domain.CvLicenseIssueResult;
+import org.dromara.carbon.vendor.license.domain.CvLicenseReissueRequest;
+import org.dromara.carbon.vendor.license.service.ICvLicenseIssueService;
 import org.dromara.common.core.domain.R;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;

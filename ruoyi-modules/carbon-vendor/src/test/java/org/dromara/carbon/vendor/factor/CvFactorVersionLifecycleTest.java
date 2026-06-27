@@ -1,8 +1,8 @@
 package org.dromara.carbon.vendor.factor;
 
-import org.dromara.carbon.vendor.domain.CvFactorVersion;
-import org.dromara.carbon.vendor.mapper.CvFactorVersionMapper;
-import org.dromara.carbon.vendor.service.impl.CvFactorVersionServiceImpl;
+import org.dromara.carbon.vendor.factor.domain.CvFactorVersion;
+import org.dromara.carbon.vendor.factor.mapper.CvFactorVersionMapper;
+import org.dromara.carbon.vendor.factor.service.impl.CvFactorVersionServiceImpl;
 import org.dromara.common.core.exception.ServiceException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Tag;
@@ -57,7 +57,7 @@ class CvFactorVersionLifecycleTest {
         ServiceException exception = assertThrows(ServiceException.class,
             () -> service.releaseFactorVersion(101L, "vendor-admin"));
 
-        assertEquals("Only draft factor versions can be published", exception.getMessage());
+        assertEquals("仅草稿状态的因子版本允许发布", exception.getMessage());
     }
 
     @Test
@@ -83,7 +83,7 @@ class CvFactorVersionLifecycleTest {
         ServiceException exception = assertThrows(ServiceException.class,
             () -> service.freezeFactorVersion(101L, "auditor"));
 
-        assertEquals("Only published factor versions can be frozen", exception.getMessage());
+        assertEquals("仅已发布的因子版本允许冻结", exception.getMessage());
     }
 
     @Test
@@ -171,7 +171,7 @@ class CvFactorVersionLifecycleTest {
         ServiceException exception = assertThrows(ServiceException.class,
             () -> service.restoreFactorVersion(101L, "vendor-admin"));
 
-        assertEquals("Only retired factor versions can be restored", exception.getMessage());
+        assertEquals("仅已退役且未冻结的因子版本允许恢复", exception.getMessage());
         verify(factorVersionMapper, never()).updateById(org.mockito.ArgumentMatchers.any(CvFactorVersion.class));
     }
 

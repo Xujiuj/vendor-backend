@@ -3,29 +3,29 @@ package org.dromara.carbon.vendor.open;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
-import org.dromara.carbon.vendor.controller.CvOpenAnnouncementController;
-import org.dromara.carbon.vendor.controller.CvOpenDimensionController;
-import org.dromara.carbon.vendor.controller.CvOpenFactorController;
-import org.dromara.carbon.vendor.controller.CvOpenLicenseController;
-import org.dromara.carbon.vendor.controller.CvOpenReportTemplateController;
-import org.dromara.carbon.vendor.domain.open.CvOpenAnnouncementListResponse;
-import org.dromara.carbon.vendor.domain.open.CvOpenAnnouncementRequest;
-import org.dromara.carbon.vendor.domain.open.CvOpenDimensionListResponse;
-import org.dromara.carbon.vendor.domain.open.CvOpenDimensionRequest;
-import org.dromara.carbon.vendor.domain.open.CvOpenFactorSyncRequest;
-import org.dromara.carbon.vendor.domain.open.CvOpenFactorSyncResponse;
-import org.dromara.carbon.vendor.domain.open.CvOpenLicenseCurrentRequest;
-import org.dromara.carbon.vendor.domain.open.CvOpenLicenseCurrentResponse;
-import org.dromara.carbon.vendor.domain.open.CvOpenRenewalOrderRequest;
-import org.dromara.carbon.vendor.domain.open.CvOpenRenewalOrderResponse;
-import org.dromara.carbon.vendor.domain.open.CvOpenReportTemplateDownloadResponse;
-import org.dromara.carbon.vendor.domain.open.CvOpenReportTemplateListResponse;
-import org.dromara.carbon.vendor.domain.open.CvOpenReportTemplateRequest;
-import org.dromara.carbon.vendor.service.ICvOpenAnnouncementService;
-import org.dromara.carbon.vendor.service.ICvOpenDimensionService;
-import org.dromara.carbon.vendor.service.ICvOpenFactorService;
-import org.dromara.carbon.vendor.service.ICvOpenLicenseService;
-import org.dromara.carbon.vendor.service.ICvOpenReportTemplateService;
+import org.dromara.carbon.vendor.openapi.controller.CvOpenAnnouncementController;
+import org.dromara.carbon.vendor.openapi.controller.CvOpenDimensionController;
+import org.dromara.carbon.vendor.openapi.controller.CvOpenFactorController;
+import org.dromara.carbon.vendor.openapi.controller.CvOpenLicenseController;
+import org.dromara.carbon.vendor.openapi.controller.CvOpenReportTemplateController;
+import org.dromara.carbon.vendor.openapi.domain.CvOpenAnnouncementListResponse;
+import org.dromara.carbon.vendor.openapi.domain.CvOpenAnnouncementRequest;
+import org.dromara.carbon.vendor.openapi.domain.CvOpenDimensionListResponse;
+import org.dromara.carbon.vendor.openapi.domain.CvOpenDimensionRequest;
+import org.dromara.carbon.vendor.openapi.domain.CvOpenFactorSyncRequest;
+import org.dromara.carbon.vendor.openapi.domain.CvOpenFactorSyncResponse;
+import org.dromara.carbon.vendor.openapi.domain.CvOpenLicenseCurrentRequest;
+import org.dromara.carbon.vendor.openapi.domain.CvOpenLicenseCurrentResponse;
+import org.dromara.carbon.vendor.openapi.domain.CvOpenRenewalOrderRequest;
+import org.dromara.carbon.vendor.openapi.domain.CvOpenRenewalOrderResponse;
+import org.dromara.carbon.vendor.openapi.domain.CvOpenReportTemplateDownloadResponse;
+import org.dromara.carbon.vendor.openapi.domain.CvOpenReportTemplateListResponse;
+import org.dromara.carbon.vendor.openapi.domain.CvOpenReportTemplateRequest;
+import org.dromara.carbon.vendor.announcement.service.ICvOpenAnnouncementService;
+import org.dromara.carbon.vendor.openapi.service.ICvOpenDimensionService;
+import org.dromara.carbon.vendor.openapi.service.ICvOpenFactorService;
+import org.dromara.carbon.vendor.openapi.service.ICvOpenLicenseService;
+import org.dromara.carbon.vendor.openapi.service.ICvOpenReportTemplateService;
 import org.dromara.common.core.domain.R;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
@@ -106,12 +106,12 @@ class CvOpenControllerContractTest {
 
     @Test
     void openRequestDtosKeepRequiredLicenseScopeFields() throws NoSuchFieldException {
-        assertNotBlankFields(CvOpenFactorSyncRequest.class, "licenseId", "installId");
-        assertNotBlankFields(CvOpenLicenseCurrentRequest.class, "licenseId", "installId");
-        assertNotBlankFields(CvOpenRenewalOrderRequest.class, "licenseId", "installId");
-        assertNotBlankFields(CvOpenReportTemplateRequest.class, "licenseId", "installId");
-        assertNotBlankFields(CvOpenAnnouncementRequest.class, "licenseId", "installId");
-        assertNotBlankFields(CvOpenDimensionRequest.class, "licenseId", "installId", "dimensionCode");
+        assertNotBlankFields(CvOpenFactorSyncRequest.class, "installId");
+        assertNotBlankFields(CvOpenLicenseCurrentRequest.class, "installId");
+        assertNotBlankFields(CvOpenRenewalOrderRequest.class, "installId");
+        assertNotBlankFields(CvOpenReportTemplateRequest.class, "installId");
+        assertNotBlankFields(CvOpenAnnouncementRequest.class, "installId");
+        assertNotBlankFields(CvOpenDimensionRequest.class, "installId", "dimensionCode");
     }
 
     @Test

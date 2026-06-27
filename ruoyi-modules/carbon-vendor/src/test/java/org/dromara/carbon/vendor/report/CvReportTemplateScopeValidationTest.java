@@ -1,15 +1,15 @@
 package org.dromara.carbon.vendor.report;
 
-import org.dromara.carbon.vendor.domain.CvCustomer;
-import org.dromara.carbon.vendor.domain.CvLicenseIssue;
-import org.dromara.carbon.vendor.domain.CvReportTemplate;
-import org.dromara.carbon.vendor.domain.CvReportTemplateScope;
-import org.dromara.carbon.vendor.domain.bo.CvReportTemplateScopeBo;
-import org.dromara.carbon.vendor.mapper.CvCustomerMapper;
-import org.dromara.carbon.vendor.mapper.CvLicenseIssueMapper;
-import org.dromara.carbon.vendor.mapper.CvReportTemplateMapper;
-import org.dromara.carbon.vendor.mapper.CvReportTemplateScopeMapper;
-import org.dromara.carbon.vendor.service.impl.CvReportTemplateScopeServiceImpl;
+import org.dromara.carbon.vendor.customer.domain.CvCustomer;
+import org.dromara.carbon.vendor.license.domain.CvLicenseIssue;
+import org.dromara.carbon.vendor.template.domain.CvReportTemplate;
+import org.dromara.carbon.vendor.template.domain.CvReportTemplateScope;
+import org.dromara.carbon.vendor.template.domain.bo.CvReportTemplateScopeBo;
+import org.dromara.carbon.vendor.customer.mapper.CvCustomerMapper;
+import org.dromara.carbon.vendor.license.mapper.CvLicenseIssueMapper;
+import org.dromara.carbon.vendor.template.mapper.CvReportTemplateMapper;
+import org.dromara.carbon.vendor.template.mapper.CvReportTemplateScopeMapper;
+import org.dromara.carbon.vendor.template.service.impl.CvReportTemplateScopeServiceImpl;
 import org.dromara.common.core.exception.ServiceException;
 import org.dromara.common.core.validate.AddGroup;
 import org.dromara.system.mapper.SysTenantPackageMapper;

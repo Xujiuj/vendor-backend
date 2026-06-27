@@ -1,0 +1,53 @@
+package org.dromara.carbon.vendor.factor.domain.enums;
+
+import org.dromara.carbon.vendor.factor.domain.CvFactorVersion;
+import org.dromara.common.core.exception.ServiceException;
+import org.dromara.common.core.utils.StringUtils;
+
+import java.util.Locale;
+
+/**
+ * Explicit factor version lifecycle states derived from vendor-owned metadata.
+ */
+public enum CvFactorVersionLifecycleState {
+
+    DRAFT("draft"),
+    PUBLISHED("published"),
+    FROZEN("frozen"),
+    RETIRED("retired");
+
+    private final String status;
+
+    CvFactorVersionLifecycleState(String status) {
+        this.status = status;
+    }
+
+    public String getStatus() {
+        return status;
+    }
+
+    public static CvFactorVersionLifecycleState fromVersion(CvFactorVersion version) {
+        String normalizedStatus = normalizeStatus(version.getPublishStatus());
+        boolean frozen = Boolean.TRUE.equals(version.getFrozenFlag());
+        if (RETIRED.status.equals(normalizedStatus) && !frozen) {
+            return RETIRED;
+        }
+        if (FROZEN.status.equals(normalizedStatus) && frozen) {
+            return FROZEN;
+        }
+        if (PUBLISHED.status.equals(normalizedStatus) && frozen) {
+            return FROZEN;
+        }
+        if (PUBLISHED.status.equals(normalizedStatus) && !frozen) {
+            return PUBLISHED;
+        }
+        if (DRAFT.status.equals(normalizedStatus) && !frozen) {
+            return DRAFT;
+        }
+        throw new ServiceException("Inconsistent factor version lifecycle metadata");
+    }
+
+    public static String normalizeStatus(String status) {
+        return StringUtils.isBlank(status) ? DRAFT.status : status.trim().toLowerCase(Locale.ROOT);
+    }
+}

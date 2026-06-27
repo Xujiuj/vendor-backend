@@ -1,8 +1,8 @@
 package org.dromara.carbon.vendor.factor;
 
 import cn.dev33.satoken.annotation.SaCheckPermission;
-import org.dromara.carbon.vendor.controller.CvFactorVersionController;
-import org.dromara.carbon.vendor.service.ICvFactorVersionService;
+import org.dromara.carbon.vendor.factor.controller.CvFactorVersionController;
+import org.dromara.carbon.vendor.factor.service.ICvFactorVersionService;
 import org.dromara.common.core.domain.R;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
@@ -42,7 +42,7 @@ class CvFactorVersionControllerTest {
     }
 
     @Test
-    void retireEndpointUsesEditPermissionAndPostMapping() throws Exception {
+    void retireEndpointUsesDedicatedPermissionAndPostMapping() throws Exception {
         Method method = CvFactorVersionController.class.getMethod("retire", Long.class);
         PostMapping postMapping = method.getAnnotation(PostMapping.class);
         SaCheckPermission permission = method.getAnnotation(SaCheckPermission.class);
@@ -50,11 +50,11 @@ class CvFactorVersionControllerTest {
         assertNotNull(postMapping);
         assertNotNull(permission);
         assertArrayEquals(new String[] {"/{id}/retire"}, postMapping.value());
-        assertArrayEquals(new String[] {"vendor:factorVersion:edit"}, permission.value());
+        assertArrayEquals(new String[] {"vendor:factorVersion:retire"}, permission.value());
     }
 
     @Test
-    void restoreEndpointUsesEditPermissionAndPostMapping() throws Exception {
+    void restoreEndpointUsesDedicatedPermissionAndPostMapping() throws Exception {
         Method method = CvFactorVersionController.class.getMethod("restore", Long.class);
         PostMapping postMapping = method.getAnnotation(PostMapping.class);
         SaCheckPermission permission = method.getAnnotation(SaCheckPermission.class);
@@ -62,6 +62,6 @@ class CvFactorVersionControllerTest {
         assertNotNull(postMapping);
         assertNotNull(permission);
         assertArrayEquals(new String[] {"/{id}/restore"}, postMapping.value());
-        assertArrayEquals(new String[] {"vendor:factorVersion:edit"}, permission.value());
+        assertArrayEquals(new String[] {"vendor:factorVersion:restore"}, permission.value());
     }
 }

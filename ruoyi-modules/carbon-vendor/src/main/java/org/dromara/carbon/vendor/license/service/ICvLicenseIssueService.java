@@ -1,0 +1,57 @@
+package org.dromara.carbon.vendor.license.service;
+
+import org.dromara.carbon.vendor.license.domain.bo.CvLicenseIssueBo;
+import org.dromara.carbon.vendor.license.domain.CvLicenseIssueRequest;
+import org.dromara.carbon.vendor.license.domain.CvLicenseReissueRequest;
+import org.dromara.carbon.vendor.license.domain.CvLicenseIssueResult;
+import org.dromara.carbon.vendor.license.domain.CvLicenseRevokeRequest;
+import org.dromara.carbon.vendor.license.domain.vo.CvLicenseIssueVo;
+import org.dromara.common.mybatis.core.page.PageQuery;
+import org.dromara.common.mybatis.core.page.TableDataInfo;
+
+/**
+ * Vendor license issue service.
+ */
+public interface ICvLicenseIssueService {
+
+    /**
+     * Query paged vendor license issue list.
+     *
+     * @param bo query object
+     * @param pageQuery pagination query
+     * @return paged license issue list
+     */
+    TableDataInfo<CvLicenseIssueVo> selectPageLicenseIssueList(CvLicenseIssueBo bo, PageQuery pageQuery);
+
+    /**
+     * Query license issue by id.
+     *
+     * @param id primary key
+     * @return license issue view object
+     */
+    CvLicenseIssueVo selectLicenseIssueById(Long id);
+
+    /**
+     * Issue a manual license and persist the issue record.
+     *
+     * @param request issue request
+     * @return issue result
+     */
+    CvLicenseIssueResult issueManualLicense(CvLicenseIssueRequest request);
+
+    /**
+     * Reissue a revoked license and persist a new append-only issue record.
+     *
+     * @param request reissue request
+     * @return issue result
+     */
+    CvLicenseIssueResult reissueRevokedLicense(CvLicenseReissueRequest request);
+
+    /**
+     * Revoke an issued license and keep revocation audit metadata on the vendor record.
+     *
+     * @param request revoke request
+     * @return affected row count
+     */
+    int revokeLicense(CvLicenseRevokeRequest request);
+}

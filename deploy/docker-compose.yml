@@ -18,7 +18,6 @@ services:
     environment:
       TZ: Asia/Shanghai
       SERVER_PORT: 8080
-      SNAIL_PORT: 28080
       SPRING_DATA_REDIS_HOST: redis
       SPRING_DATA_REDIS_PORT: 6379
       SPRING_DATA_REDIS_PASSWORD: ${REDIS_PASSWORD:-ruoyi123}
@@ -30,7 +29,6 @@ services:
       JAVA_OPTS: ${VENDOR_BACKEND_JAVA_OPTS:-}
     ports:
       - "${VENDOR_BACKEND_PORT:-18000}:8080"
-      - "${VENDOR_SNAIL_PORT:-28080}:28080"
     volumes:
       - ./logs/vendor-backend:/ruoyi/server/logs
     networks:
@@ -46,7 +44,6 @@ services:
     environment:
       TZ: Asia/Shanghai
       SERVER_PORT: 8080
-      SNAIL_PORT: 28080
       SPRING_DATA_REDIS_HOST: redis
       SPRING_DATA_REDIS_PORT: 6379
       SPRING_DATA_REDIS_PASSWORD: ${REDIS_PASSWORD:-ruoyi123}
@@ -59,7 +56,6 @@ services:
       JAVA_OPTS: ${ENTERPRISE_BACKEND_JAVA_OPTS:-}
     ports:
       - "${ENTERPRISE_BACKEND_PORT:-18001}:8080"
-      - "${ENTERPRISE_SNAIL_PORT:-28081}:28080"
     volumes:
       - ./logs/enterprise-backend:/ruoyi/server/logs
     networks:

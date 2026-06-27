@@ -184,36 +184,6 @@ BEGIN
     );
 END//
 
-DROP PROCEDURE IF EXISTS cv_select_factor_record_orphans//
-CREATE PROCEDURE cv_select_factor_record_orphans()
-BEGIN
-    IF cv_table_exists('cv_factor_record') AND cv_table_exists('cv_factor_version') THEN
-        SELECT 'factor_record.version.orphan' AS check_code,
-               COUNT(*) AS problem_count
-        FROM cv_factor_record fr
-        LEFT JOIN cv_factor_version fv ON fv.id = fr.version_id
-        WHERE fr.version_id IS NOT NULL
-          AND fv.id IS NULL;
-    ELSE
-        SELECT 'factor_record.version.orphan' AS check_code,
-               0 AS problem_count;
-    END IF;
-END//
-
-DROP PROCEDURE IF EXISTS cv_assert_factor_record_orphans//
-CREATE PROCEDURE cv_assert_factor_record_orphans()
-BEGIN
-    IF cv_table_exists('cv_factor_record') AND cv_table_exists('cv_factor_version') THEN
-        CALL cv_assert_zero('factor_record.version.orphan', (
-            SELECT COUNT(*)
-            FROM cv_factor_record fr
-            LEFT JOIN cv_factor_version fv ON fv.id = fr.version_id
-            WHERE fr.version_id IS NOT NULL
-              AND fv.id IS NULL
-        ));
-    END IF;
-END//
-
 DELIMITER ;
 
 CREATE TABLE IF NOT EXISTS cv_report_content_catalog (
@@ -401,8 +371,6 @@ FROM (
     HAVING COUNT(*) > 1
 ) d;
 
-CALL cv_select_factor_record_orphans();
-
 CALL cv_assert_zero('admin_division.code.duplicate', (
     SELECT COUNT(*)
     FROM (
@@ -523,8 +491,6 @@ CALL cv_assert_zero('electricity_factor_version.effective_year.duplicate', (
         HAVING COUNT(*) > 1
     ) d
 ));
-CALL cv_assert_factor_record_orphans();
-
 CALL cv_drop_fk_if_exists('cv_electricity_factor', 'fk_cv_electricity_factor_version');
 CALL cv_drop_index_if_exists('cv_emission_source_category', 'uk_cv_emission_source_category_code');
 CALL cv_drop_index_if_exists('cv_base_year', 'uk_cv_base_year');
@@ -586,6 +552,4 @@ DROP PROCEDURE IF EXISTS cv_drop_fk_if_exists;
 DROP PROCEDURE IF EXISTS cv_add_fk_if_missing;
 DROP PROCEDURE IF EXISTS cv_add_check_if_missing;
 DROP PROCEDURE IF EXISTS cv_assert_zero;
-DROP PROCEDURE IF EXISTS cv_select_factor_record_orphans;
-DROP PROCEDURE IF EXISTS cv_assert_factor_record_orphans;
 DROP FUNCTION IF EXISTS cv_table_exists;

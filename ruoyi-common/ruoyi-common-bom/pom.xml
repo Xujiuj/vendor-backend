@@ -47,13 +47,6 @@
                 <version>${revision}</version>
             </dependency>
 
-            <!-- 调度模块 -->
-            <dependency>
-                <groupId>org.dromara</groupId>
-                <artifactId>ruoyi-common-job</artifactId>
-                <version>${revision}</version>
-            </dependency>
-
             <!-- 日志记录 -->
             <dependency>
                 <groupId>org.dromara</groupId>
@@ -162,13 +155,6 @@
             <dependency>
                 <groupId>org.dromara</groupId>
                 <artifactId>ruoyi-common-tenant</artifactId>
-                <version>${revision}</version>
-            </dependency>
-
-            <!-- WebSocket模块 -->
-            <dependency>
-                <groupId>org.dromara</groupId>
-                <artifactId>ruoyi-common-websocket</artifactId>
                 <version>${revision}</version>
             </dependency>
 

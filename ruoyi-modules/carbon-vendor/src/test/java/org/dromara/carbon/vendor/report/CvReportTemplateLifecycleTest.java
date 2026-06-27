@@ -1,9 +1,9 @@
 package org.dromara.carbon.vendor.report;
 
-import org.dromara.carbon.vendor.domain.CvReportTemplate;
-import org.dromara.carbon.vendor.domain.bo.CvReportTemplateBo;
-import org.dromara.carbon.vendor.mapper.CvReportTemplateMapper;
-import org.dromara.carbon.vendor.service.impl.CvReportTemplateServiceImpl;
+import org.dromara.carbon.vendor.template.domain.CvReportTemplate;
+import org.dromara.carbon.vendor.template.domain.bo.CvReportTemplateBo;
+import org.dromara.carbon.vendor.template.mapper.CvReportTemplateMapper;
+import org.dromara.carbon.vendor.template.service.impl.CvReportTemplateServiceImpl;
 import org.dromara.common.core.exception.ServiceException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Tag;
