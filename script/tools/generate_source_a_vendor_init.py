@@ -452,18 +452,30 @@ def build_seed_block() -> str:
 
     content_rows = []
     catalog_rows = []
+    current_directory_no: int | None = None
+    current_directory_catalog: str | None = None
+    current_directory_name: str | None = None
     for index, row in enumerate(content, start=1):
-        directory_no = first_int(row.get("目录序号"), index)
+        raw_directory_no = text(row.get("目录序号"))
+        raw_directory_name = text(row.get("目录"))
+        if raw_directory_no:
+            current_directory_no = first_int(raw_directory_no, index)
+            current_directory_catalog = raw_directory_no
+        if raw_directory_name:
+            current_directory_name = raw_directory_name
+        directory_no = current_directory_no or index
+        directory_catalog = current_directory_catalog or str(directory_no)
+        directory_name = current_directory_name or "未分组"
         subdirectory_no = first_int(row.get("子目录序号"), index)
         charts = chart_json(row.get("页面图表"))
         content_rows.append({
-            "id": index, "directory_no": directory_no, "directory_name": row.get("目录"),
+            "id": index, "directory_no": directory_no, "directory_name": directory_name,
             "subdirectory_no": subdirectory_no, "subdirectory_name": row.get("子目录"),
             "chart_names": charts, "display_order": index, "status": "0",
             "create_time": "@now", "update_time": None, "remark": MARK,
         })
         catalog_rows.append({
-            "id": index, "catalog_no": text(row.get("目录序号")), "catalog_name": row.get("目录"),
+            "id": index, "catalog_no": directory_catalog, "catalog_name": directory_name,
             "subcatalog_no": text(row.get("子目录序号")), "subcatalog_name": row.get("子目录"),
             "chart_list": charts, "sort_order": index, "status": "0",
             "create_dept": "@createDept", "create_by": "@createBy", "create_time": "@now",
