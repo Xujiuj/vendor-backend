@@ -41,6 +41,7 @@ public class SysTenantPackageServiceImpl implements ISysTenantPackageService {
     private static final String DEFAULT_PRICE_CURRENCY = "CNY";
     private static final String DEFAULT_BILLING_CYCLE = "YEAR";
     private static final int DEFAULT_YEAR_VALIDITY_DAYS = 365;
+    private static final String LEGACY_STANDARD_PACKAGE_NAME = "standard";
 
     private final SysTenantPackageMapper baseMapper;
     private final SysTenantMapper tenantMapper;
@@ -66,7 +67,9 @@ public class SysTenantPackageServiceImpl implements ISysTenantPackageService {
     @Override
     public List<SysTenantPackageVo> selectList() {
         return baseMapper.selectVoList(new LambdaQueryWrapper<SysTenantPackage>()
-                .eq(SysTenantPackage::getStatus, SystemConstants.NORMAL));
+                .eq(SysTenantPackage::getStatus, SystemConstants.NORMAL)
+                .apply("lower(package_name) <> {0}", LEGACY_STANDARD_PACKAGE_NAME)
+                .orderByAsc(SysTenantPackage::getPackageId));
     }
 
     @Override
