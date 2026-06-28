@@ -1,5 +1,5 @@
 --- # 临时文件存储位置 避免临时文件被系统清理报错
-spring.servlet.multipart.location: /ruoyi/server/temp
+spring.servlet.multipart.location: /opt/fx/data/vendor/temp
 
 --- # 验证码（厂商云端登录关闭）
 captcha:
@@ -34,10 +34,9 @@ spring:
         # 主库数据源
         master:
           type: ${spring.datasource.type}
-          driverClassName: com.mysql.cj.jdbc.Driver
-          # jdbc 所有参数配置参考 https://lionli.blog.csdn.net/article/details/122018562
-          # rewriteBatchedStatements=true 批处理优化 大幅提升批量插入更新删除性能(对数据库有性能损耗 使用批量操作应考虑性能问题)
-          url: ${VENDOR_DB_URL:jdbc:mysql://${VENDOR_DB_HOST:127.0.0.1}:${VENDOR_DB_PORT:3306}/${VENDOR_DB_NAME:vendor}?useUnicode=true&characterEncoding=utf8&zeroDateTimeBehavior=convertToNull&useSSL=true&serverTimezone=GMT%2B8&allowMultiQueries=true&rewriteBatchedStatements=true}
+          driverClassName: com.microsoft.sqlserver.jdbc.SQLServerDriver
+          # SQL Server JDBC 参数通过 VENDOR_DB_URL 统一覆盖。
+          url: ${VENDOR_DB_URL:jdbc:sqlserver://${VENDOR_DB_HOST:127.0.0.1}:${VENDOR_DB_PORT:1433};databaseName=${VENDOR_DB_NAME:vendor};encrypt=${VENDOR_DB_ENCRYPT:false};trustServerCertificate=${VENDOR_DB_TRUST_SERVER_CERTIFICATE:true}}
           username: ${VENDOR_DB_USERNAME:sa}
           password: ${VENDOR_DB_PASSWORD:}
       hikari:
