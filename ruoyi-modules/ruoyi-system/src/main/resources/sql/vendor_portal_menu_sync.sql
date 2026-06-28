@@ -30,6 +30,7 @@ values
 (910149, '客户档案编辑', 910101, 3, '', '', '', 1, 0, 'F', '0', '0', 'vendor:customer:edit', '#', 103, 1, SYSDATETIME(), null, null, '客户档案编辑权限'),
 (910150, '客户档案删除', 910101, 4, '', '', '', 1, 0, 'F', '0', '0', 'vendor:customer:remove', '#', 103, 1, SYSDATETIME(), null, null, '客户档案删除权限'),
 (910151, '客户档案导出', 910101, 5, '', '', '', 1, 0, 'F', '0', '0', 'vendor:customer:export', '#', 103, 1, SYSDATETIME(), null, null, '客户档案导出权限'),
+(910161, '授权管理删除', 910102, 1, '', '', '', 1, 0, 'F', '0', '0', 'vendor:licenseIssue:remove', '#', 103, 1, SYSDATETIME(), null, null, '授权管理删除权限'),
 (910110, '因子版本详情', 910103, 1, '', '', '', 1, 0, 'F', '0', '0', 'vendor:factorVersion:query', '#', 103, 1, SYSDATETIME(), null, null, '因子版本详情权限'),
 (910145, '因子版本新增', 910103, 2, '', '', '', 1, 0, 'F', '0', '0', 'vendor:factorVersion:add', '#', 103, 1, SYSDATETIME(), null, null, '因子版本新增权限'),
 (910146, '因子版本编辑', 910103, 3, '', '', '', 1, 0, 'F', '0', '0', 'vendor:factorVersion:edit', '#', 103, 1, SYSDATETIME(), null, null, '因子版本编辑权限'),

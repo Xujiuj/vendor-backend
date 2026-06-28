@@ -54,4 +54,12 @@ public interface ICvLicenseIssueService {
      * @return affected row count
      */
     int revokeLicense(CvLicenseRevokeRequest request);
+
+    /**
+     * Delete vendor license issue records.
+     *
+     * @param ids primary keys
+     * @return affected row count
+     */
+    int deleteLicenseIssueByIds(Long[] ids);
 }

@@ -19,6 +19,7 @@ import org.dromara.common.log.annotation.Log;
 import org.dromara.common.log.enums.BusinessType;
 import org.dromara.common.web.core.BaseController;
 import org.springframework.validation.annotation.Validated;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -98,6 +99,18 @@ public class CvLicenseIssueController extends BaseController {
     public R<Void> revoke(@Validated @RequestBody CvLicenseRevokeRequest request) {
         request.setRevokedBy(resolveIssuedBy());
         return toAjax(licenseIssueService.revokeLicense(request));
+    }
+
+    /**
+     * Delete vendor license issue records.
+     *
+     * @param ids primary keys
+     */
+    @Log(title = "许可证签发", businessType = BusinessType.DELETE)
+    @SaCheckPermission("vendor:licenseIssue:remove")
+    @DeleteMapping("/{ids}")
+    public R<Void> remove(@PathVariable Long[] ids) {
+        return toAjax(licenseIssueService.deleteLicenseIssueByIds(ids));
     }
 
     private String resolveIssuedBy() {

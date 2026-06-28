@@ -192,18 +192,33 @@ class CvLicenseIssueServiceTest {
         org.dromara.carbon.vendor.license.domain.vo.CvLicenseIssueVo row =
             new org.dromara.carbon.vendor.license.domain.vo.CvLicenseIssueVo();
         row.setPackageId(1001L);
+        row.setPackageName("Enterprise Plan");
         row.setEdition("stale-edition");
         page.setRecords(List.of(row));
         page.setTotal(1);
         when(licenseIssueMapper.selectVoPage(any(), any())).thenReturn(page);
+        SysTenantPackage currentPackage = activePackage();
+        currentPackage.setPackageName("专业版");
+        when(tenantPackageMapper.selectById(eq(1001L))).thenReturn(currentPackage);
         CvLicenseIssueServiceImpl service = newService(signingKeyMaterial());
 
         org.dromara.common.mybatis.core.page.TableDataInfo<org.dromara.carbon.vendor.license.domain.vo.CvLicenseIssueVo> result =
             service.selectPageLicenseIssueList(new org.dromara.carbon.vendor.license.domain.bo.CvLicenseIssueBo(),
                 new org.dromara.common.mybatis.core.page.PageQuery(1, 10));
 
-        assertEquals("Enterprise Plan", result.getRows().get(0).getPackageName());
-        assertEquals("Enterprise Plan", result.getRows().get(0).getEdition());
+        assertEquals("专业版", result.getRows().get(0).getPackageName());
+        assertEquals("专业版", result.getRows().get(0).getEdition());
+    }
+
+    @Test
+    void deleteLicenseIssueRemovesRequestedRecords() {
+        when(licenseIssueMapper.deleteByIds(any())).thenReturn(2);
+        CvLicenseIssueServiceImpl service = newService(signingKeyMaterial());
+
+        int deleted = service.deleteLicenseIssueByIds(new Long[] {10L, 11L});
+
+        assertEquals(2, deleted);
+        verify(licenseIssueMapper).deleteByIds(List.of(10L, 11L));
     }
 
     @Test

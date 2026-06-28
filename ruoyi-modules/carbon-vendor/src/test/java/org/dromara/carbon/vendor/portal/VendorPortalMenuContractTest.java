@@ -44,6 +44,7 @@ class VendorPortalMenuContractTest {
             "'dimension', 'vendor/dimension/index'",
             "vendor:customer:list",
             "vendor:licenseIssue:list",
+            "vendor:licenseIssue:remove",
             "vendor:factorVersion:list",
             "vendor:factorVersion:publish",
             "vendor:factorVersion:freeze",
@@ -87,8 +88,8 @@ class VendorPortalMenuContractTest {
             "Startup menu sync SQL must match the manually executable vendor portal menu SQL");
         assertDoesNotStartWithUtf8Bom(portalSqlPath);
         assertDoesNotStartWithUtf8Bom(startupSqlPath);
-        assertContainsAll(startupSql, List.of("sysdate()"));
-        assertContainsNone(startupSql, List.of("SYSDATETIME()"));
+        assertContainsAll(startupSql, List.of("SYSDATETIME()"));
+        assertContainsNone(startupSql, List.of("sysdate()"));
         assertContainsAll(runner, List.of(
             "syncVendorPortalMenu()",
             "sql/vendor_portal_menu_sync.sql",
@@ -200,7 +201,7 @@ class VendorPortalMenuContractTest {
     }
 
     @Test
-    void vendorSqlDirectoryDoesNotContainMysqlDeliveryTarget() {
+    void vendorSqlDirectoryDoesNotContainLegacyDeliveryTarget() {
         Path sqlRoot = resolveProjectFile("script/sql");
 
         assertFalse(Files.exists(sqlRoot.resolve("my" + "sql")),
@@ -208,20 +209,24 @@ class VendorPortalMenuContractTest {
     }
 
     @Test
-    void vendorRuntimeConfigurationUsesVendorMysqlDefaults() throws Exception {
+    void vendorRuntimeConfigurationUsesSqlServerOnlyDefaults() throws Exception {
         String devConfig = Files.readString(resolveProjectFile("ruoyi-admin/src/main/resources/application-dev.yml"));
         String prodConfig = Files.readString(resolveProjectFile("ruoyi-admin/src/main/resources/application-prod.yml"));
         String factorImportService = Files.readString(resolveProjectFile(
             "ruoyi-modules/carbon-vendor/src/main/java/org/dromara/carbon/vendor/factor/service/impl/CvSourceAFactorImportServiceImpl.java"));
 
         assertContainsAll(devConfig, List.of(
-            "com.mysql.cj.jdbc.Driver",
-            "jdbc:mysql://${VENDOR_DB_HOST:127.0.0.1}:${VENDOR_DB_PORT:3306}/${VENDOR_DB_NAME:vendor}",
+            "com.microsoft.sqlserver.jdbc.SQLServerDriver",
+            "jdbc:sqlserver://${VENDOR_DB_HOST:127.0.0.1}:${VENDOR_DB_PORT:1433};databaseName=${VENDOR_DB_NAME:vendor}",
+            "encrypt=${VENDOR_DB_ENCRYPT:false}",
+            "trustServerCertificate=${VENDOR_DB_TRUST_SERVER_CERTIFICATE:true}",
             "${VENDOR_DB_URL:"
         ));
         assertContainsAll(prodConfig, List.of(
-            "com.mysql.cj.jdbc.Driver",
-            "jdbc:mysql://${VENDOR_DB_HOST:127.0.0.1}:${VENDOR_DB_PORT:3306}/${VENDOR_DB_NAME:vendor}",
+            "com.microsoft.sqlserver.jdbc.SQLServerDriver",
+            "jdbc:sqlserver://${VENDOR_DB_HOST:127.0.0.1}:${VENDOR_DB_PORT:1433};databaseName=${VENDOR_DB_NAME:vendor}",
+            "encrypt=${VENDOR_DB_ENCRYPT:false}",
+            "trustServerCertificate=${VENDOR_DB_TRUST_SERVER_CERTIFICATE:true}",
             "${VENDOR_DB_URL:"
         ));
         assertContainsAll(factorImportService, List.of(
@@ -229,8 +234,8 @@ class VendorPortalMenuContractTest {
             "MERGE INTO cv_electricity_factor_version"
         ));
 
-        assertContainsNone(devConfig, List.of("jdbc:" + "sqlserver://127.0.0.1:1433;DatabaseName=vendor"));
-        assertContainsNone(prodConfig, List.of("jdbc:" + "sqlserver://127.0.0.1:1433;DatabaseName=vendor"));
+        assertContainsNone(devConfig, List.of("jdbc:" + "mysql://", "com.mysql.cj.jdbc.Driver"));
+        assertContainsNone(prodConfig, List.of("jdbc:" + "mysql://", "com.mysql.cj.jdbc.Driver"));
         assertContainsNone(factorImportService, List.of(
             "ON DUPLICATE " + "KEY UPDATE",
             "VAL" + "UES(" + "effective_year)",

@@ -14,6 +14,8 @@ import org.dromara.carbon.vendor.renewal.mapper.CvRenewalOrderMapper;
 import org.dromara.carbon.vendor.template.mapper.CvReportTemplateDownloadTokenMapper;
 import org.dromara.carbon.vendor.overview.service.ICvOverviewService;
 import org.dromara.common.core.utils.StringUtils;
+import org.dromara.system.domain.SysTenantPackage;
+import org.dromara.system.mapper.SysTenantPackageMapper;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDate;
@@ -24,10 +26,13 @@ import java.util.Arrays;
 import java.util.Calendar;
 import java.util.Comparator;
 import java.util.Date;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
@@ -51,6 +56,7 @@ public class CvOverviewServiceImpl implements ICvOverviewService {
     private final CvLicenseIssueMapper licenseIssueMapper;
     private final CvReportTemplateDownloadTokenMapper downloadTokenMapper;
     private final CvRenewalOrderMapper renewalOrderMapper;
+    private final SysTenantPackageMapper tenantPackageMapper;
 
     @Override
     public CvOverviewVo queryOverview() {
@@ -101,9 +107,10 @@ public class CvOverviewServiceImpl implements ICvOverviewService {
             .ne(CvLicenseIssue::getIssueStatus, ISSUE_STATUS_REVOKED)
             .ge(CvLicenseIssue::getIssuedTime, begin)
             .lt(CvLicenseIssue::getIssuedTime, end));
+        Map<Long, String> packageNames = currentPackageNames(issues);
 
         for (CvLicenseIssue issue : issues) {
-            String name = packageSeriesName(issue);
+            String name = packageSeriesName(issue, packageNames);
             CvOverviewVo.Series series = seriesByName.computeIfAbsent(name, key -> series(key, monthStarts.size()));
             int index = monthIndex(monthStarts, issue.getIssuedTime());
             if (index >= 0) {
@@ -119,36 +126,33 @@ public class CvOverviewServiceImpl implements ICvOverviewService {
         return chart;
     }
 
-    private String packageSeriesName(CvLicenseIssue issue) {
-        return StringUtils.blankToDefault(issue.getPackageName(),
-            StringUtils.blankToDefault(issue.getEdition(), "未指定套餐"));
+    private String packageSeriesName(CvLicenseIssue issue, Map<Long, String> packageNames) {
+        Long packageId = issue.getPackageId();
+        if (packageId != null) {
+            return StringUtils.blankToDefault(packageNames.get(packageId), unconfiguredPackageName(packageId));
+        }
+        return "未指定套餐";
     }
 
     private List<CvOverviewVo.Reminder> buildReminders(Date now, Date inThirtyDays) {
         List<CvOverviewVo.Reminder> reminders = new ArrayList<>();
+        Set<String> reminderKeys = new HashSet<>();
         Map<Long, CvCustomer> customers = customersById();
 
-        List<CvLicenseIssue> expiringIssues = selectTopLicenseIssues(Wrappers.<CvLicenseIssue>lambdaQuery()
-            .ne(CvLicenseIssue::getIssueStatus, ISSUE_STATUS_REVOKED)
-            .gt(CvLicenseIssue::getValidTo, now)
-            .le(CvLicenseIssue::getValidTo, inThirtyDays)
-            .orderByAsc(CvLicenseIssue::getValidTo), 3);
+        List<CvLicenseIssue> expiringIssues = expiringLicenseIssues(now, inThirtyDays, 3);
         for (CvLicenseIssue issue : expiringIssues) {
             String customerName = customerName(customers, issue.getCustomerId());
             long days = daysBetween(now, issue.getValidTo());
-            reminders.add(reminder(
+            addReminderIfAbsent(reminders, reminderKeys, "license-expiry:" + customerKey(issue.getCustomerId(), issue.getLicenseId()), reminder(
                 customerName + "授权 " + days + " 天后到期",
                 "建议跟进续签报价与联系人确认。"
             ));
         }
 
-        List<CvReportTemplateDownloadToken> pendingTokens = selectTopDownloadTokens(Wrappers.<CvReportTemplateDownloadToken>lambdaQuery()
-            .eq(CvReportTemplateDownloadToken::getTokenStatus, TOKEN_STATUS_ISSUED)
-            .isNull(CvReportTemplateDownloadToken::getConsumedTime)
-            .orderByDesc(CvReportTemplateDownloadToken::getCreateTime), 3);
+        List<CvReportTemplateDownloadToken> pendingTokens = pendingDownloadTokens(3);
         for (CvReportTemplateDownloadToken token : pendingTokens) {
             String customerName = customerName(customers, token.getCustomerId());
-            reminders.add(reminder(
+            addReminderIfAbsent(reminders, reminderKeys, "template-token:" + tokenBusinessKey(token), reminder(
                 customerName + "模板分发待确认",
                 StringUtils.blankToDefault(token.getFileName(), "模板文件") + " 已推送，等待企业端下载确认。"
             ));
@@ -158,15 +162,20 @@ public class CvOverviewServiceImpl implements ICvOverviewService {
 
     private List<CvOverviewVo.Todo> buildTodos(Date now, Date inThirtyDays) {
         List<CvOverviewVo.Todo> todos = new ArrayList<>();
+        Set<String> todoKeys = new HashSet<>();
         Map<Long, CvCustomer> customers = customersById();
+        List<CvRenewalOrder> pendingOrders = pendingRenewalOrders();
+        Set<Long> pendingRenewalCustomerIds = pendingOrders.stream()
+            .map(CvRenewalOrder::getCustomerId)
+            .filter(Objects::nonNull)
+            .collect(Collectors.toSet());
 
-        List<CvLicenseIssue> expiringIssues = selectTopLicenseIssues(Wrappers.<CvLicenseIssue>lambdaQuery()
-            .ne(CvLicenseIssue::getIssueStatus, ISSUE_STATUS_REVOKED)
-            .gt(CvLicenseIssue::getValidTo, now)
-            .le(CvLicenseIssue::getValidTo, inThirtyDays)
-            .orderByAsc(CvLicenseIssue::getValidTo), 3);
+        List<CvLicenseIssue> expiringIssues = expiringLicenseIssues(now, inThirtyDays, 3).stream()
+            .filter(issue -> issue.getCustomerId() == null || !pendingRenewalCustomerIds.contains(issue.getCustomerId()))
+            .limit(3)
+            .toList();
         for (CvLicenseIssue issue : expiringIssues) {
-            todos.add(todo(
+            addTodoIfAbsent(todos, todoKeys, "license-expiry:" + customerKey(issue.getCustomerId(), issue.getLicenseId()), todo(
                 "续费",
                 customerName(customers, issue.getCustomerId()),
                 "授权 " + daysBetween(now, issue.getValidTo()) + " 天后到期",
@@ -175,11 +184,8 @@ public class CvOverviewServiceImpl implements ICvOverviewService {
             ));
         }
 
-        List<CvRenewalOrder> pendingOrders = selectTopRenewalOrders(Wrappers.<CvRenewalOrder>lambdaQuery()
-            .eq(CvRenewalOrder::getOrderStatus, ORDER_STATUS_PENDING)
-            .orderByDesc(CvRenewalOrder::getCreateTime), 3);
-        for (CvRenewalOrder order : pendingOrders) {
-            todos.add(todo(
+        for (CvRenewalOrder order : pendingOrders.stream().limit(3).toList()) {
+            addTodoIfAbsent(todos, todoKeys, "renewal-order:" + renewalOrderKey(order), todo(
                 "续费",
                 customerName(customers, order.getCustomerId()),
                 "续费订单 " + order.getOrderNo() + " 待处理",
@@ -188,12 +194,9 @@ public class CvOverviewServiceImpl implements ICvOverviewService {
             ));
         }
 
-        List<CvReportTemplateDownloadToken> pendingTokens = selectTopDownloadTokens(Wrappers.<CvReportTemplateDownloadToken>lambdaQuery()
-            .eq(CvReportTemplateDownloadToken::getTokenStatus, TOKEN_STATUS_ISSUED)
-            .isNull(CvReportTemplateDownloadToken::getConsumedTime)
-            .orderByDesc(CvReportTemplateDownloadToken::getCreateTime), 3);
+        List<CvReportTemplateDownloadToken> pendingTokens = pendingDownloadTokens(3);
         for (CvReportTemplateDownloadToken token : pendingTokens) {
-            todos.add(todo(
+            addTodoIfAbsent(todos, todoKeys, "template-token:" + tokenBusinessKey(token), todo(
                 "模板",
                 customerName(customers, token.getCustomerId()),
                 StringUtils.blankToDefault(token.getFileName(), "模板文件") + " 已分发待确认",
@@ -225,17 +228,84 @@ public class CvOverviewServiceImpl implements ICvOverviewService {
             .collect(Collectors.toMap(CvCustomer::getId, Function.identity(), (left, right) -> left));
     }
 
-    private List<CvLicenseIssue> selectTopLicenseIssues(LambdaQueryWrapper<CvLicenseIssue> query, long size) {
-        return licenseIssueMapper.selectList(query).stream().limit(size).toList();
+    private Map<Long, String> currentPackageNames(List<CvLicenseIssue> issues) {
+        Set<Long> packageIds = issues.stream()
+            .map(CvLicenseIssue::getPackageId)
+            .filter(Objects::nonNull)
+            .collect(Collectors.toCollection(LinkedHashSet::new));
+        if (packageIds.isEmpty()) {
+            return Map.of();
+        }
+        return tenantPackageMapper.selectBatchIds(packageIds).stream()
+            .filter(tenantPackage -> tenantPackage.getPackageId() != null)
+            .filter(tenantPackage -> StringUtils.isNotBlank(tenantPackage.getPackageName()))
+            .collect(Collectors.toMap(SysTenantPackage::getPackageId, SysTenantPackage::getPackageName, (left, right) -> left));
     }
 
-    private List<CvRenewalOrder> selectTopRenewalOrders(LambdaQueryWrapper<CvRenewalOrder> query, long size) {
-        return renewalOrderMapper.selectList(query).stream().limit(size).toList();
+    private List<CvLicenseIssue> expiringLicenseIssues(Date now, Date inThirtyDays, long size) {
+        return distinctBy(licenseIssueMapper.selectList(Wrappers.<CvLicenseIssue>lambdaQuery()
+                .ne(CvLicenseIssue::getIssueStatus, ISSUE_STATUS_REVOKED)
+                .gt(CvLicenseIssue::getValidTo, now)
+                .le(CvLicenseIssue::getValidTo, inThirtyDays)
+                .orderByAsc(CvLicenseIssue::getValidTo)),
+            issue -> customerKey(issue.getCustomerId(), issue.getLicenseId()))
+            .stream()
+            .limit(size)
+            .toList();
     }
 
-    private List<CvReportTemplateDownloadToken> selectTopDownloadTokens(
-        LambdaQueryWrapper<CvReportTemplateDownloadToken> query, long size) {
-        return downloadTokenMapper.selectList(query).stream().limit(size).toList();
+    private List<CvRenewalOrder> pendingRenewalOrders() {
+        return distinctBy(renewalOrderMapper.selectList(Wrappers.<CvRenewalOrder>lambdaQuery()
+                .eq(CvRenewalOrder::getOrderStatus, ORDER_STATUS_PENDING)
+                .orderByDesc(CvRenewalOrder::getCreateTime)),
+            this::renewalOrderKey);
+    }
+
+    private List<CvReportTemplateDownloadToken> pendingDownloadTokens(long size) {
+        return distinctBy(downloadTokenMapper.selectList(Wrappers.<CvReportTemplateDownloadToken>lambdaQuery()
+                .eq(CvReportTemplateDownloadToken::getTokenStatus, TOKEN_STATUS_ISSUED)
+                .isNull(CvReportTemplateDownloadToken::getConsumedTime)
+                .orderByDesc(CvReportTemplateDownloadToken::getCreateTime)),
+            this::tokenBusinessKey)
+            .stream()
+            .limit(size)
+            .toList();
+    }
+
+    private <T> List<T> distinctBy(List<T> items, Function<T, String> keyResolver) {
+        Map<String, T> uniqueItems = new LinkedHashMap<>();
+        for (T item : items) {
+            uniqueItems.putIfAbsent(keyResolver.apply(item), item);
+        }
+        return new ArrayList<>(uniqueItems.values());
+    }
+
+    private void addReminderIfAbsent(List<CvOverviewVo.Reminder> reminders, Set<String> keys,
+                                     String key, CvOverviewVo.Reminder reminder) {
+        if (keys.add(key)) {
+            reminders.add(reminder);
+        }
+    }
+
+    private void addTodoIfAbsent(List<CvOverviewVo.Todo> todos, Set<String> keys, String key, CvOverviewVo.Todo todo) {
+        if (keys.add(key)) {
+            todos.add(todo);
+        }
+    }
+
+    private String customerKey(Long customerId, String fallback) {
+        return customerId == null ? StringUtils.blankToDefault(fallback, "unknown") : String.valueOf(customerId);
+    }
+
+    private String renewalOrderKey(CvRenewalOrder order) {
+        return StringUtils.blankToDefault(order.getOrderNo(),
+            customerKey(order.getCustomerId(), String.valueOf(order.getId())));
+    }
+
+    private String tokenBusinessKey(CvReportTemplateDownloadToken token) {
+        return customerKey(token.getCustomerId(), token.getLicenseId())
+            + ":" + Objects.toString(token.getTemplateId(), "")
+            + ":" + StringUtils.blankToDefault(token.getFileName(), token.getDownloadToken());
     }
 
     private CvOverviewVo.Metric metric(String label, Long value, String note) {
@@ -279,6 +349,10 @@ public class CvOverviewServiceImpl implements ICvOverviewService {
             return "客户 " + customerId;
         }
         return StringUtils.blankToDefault(customer.getCustomerName(), customer.getCustomerCode());
+    }
+
+    private String unconfiguredPackageName(Long packageId) {
+        return "套餐未配置#" + packageId;
     }
 
     private Date daysAfter(Date date, int days) {

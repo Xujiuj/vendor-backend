@@ -161,6 +161,14 @@ public class CvLicenseIssueServiceImpl implements ICvLicenseIssueService {
         return baseMapper.updateById(update);
     }
 
+    @Override
+    public int deleteLicenseIssueByIds(Long[] ids) {
+        if (ids == null || ids.length == 0) {
+            return 0;
+        }
+        return baseMapper.deleteByIds(Arrays.asList(ids));
+    }
+
     private CvLicenseIssueResult issueLicense(CvLicenseIssueRequest request, String defaultIssueType, boolean allowRevokedHistory) {
         CvLicenseIssueResult validation = validateIssueRequest(request);
         if (!validation.isIssued()) {
@@ -436,10 +444,12 @@ public class CvLicenseIssueServiceImpl implements ICvLicenseIssueService {
         if (issue == null) {
             return;
         }
-        if (StringUtils.isBlank(issue.getPackageName()) && issue.getPackageId() != null) {
+        if (issue.getPackageId() != null) {
             SysTenantPackage tenantPackage = tenantPackageMapper.selectById(issue.getPackageId());
             if (tenantPackage != null && StringUtils.isNotBlank(tenantPackage.getPackageName())) {
                 issue.setPackageName(tenantPackage.getPackageName());
+            } else {
+                issue.setPackageName("套餐未配置#" + issue.getPackageId());
             }
         }
         String packageName = issue.getPackageName();
