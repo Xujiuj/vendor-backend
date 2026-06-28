@@ -31,6 +31,7 @@ class VendorPortalMenuContractTest {
             "vendor/factorScope/index",
             "vendor/reportTemplate/index",
             "vendor/templateScope/index",
+            "vendor/reportContent/index",
             "vendor/dimension/index",
             "vendor/announcement/index",
             "vendor/renewalOrder/index",
@@ -42,6 +43,8 @@ class VendorPortalMenuContractTest {
             "'factor-scope', 'vendor/factorScope/index'",
             "(910131,",
             "'dimension', 'vendor/dimension/index'",
+            "(910156,",
+            "'report-content', 'vendor/reportContent/index'",
             "vendor:customer:list",
             "vendor:licenseIssue:list",
             "vendor:licenseIssue:remove",
@@ -60,6 +63,11 @@ class VendorPortalMenuContractTest {
             "vendor:factorCustomerScope:add",
             "vendor:factorCustomerScope:edit",
             "vendor:factorCustomerScope:remove",
+            "vendor:reportContent:list",
+            "vendor:reportContent:query",
+            "vendor:reportContent:add",
+            "vendor:reportContent:edit",
+            "vendor:reportContent:remove",
             "vendor:dimension:remove",
             "vendor:renewalOrder:retryIssue"
         ));
@@ -214,30 +222,53 @@ class VendorPortalMenuContractTest {
         String prodConfig = Files.readString(resolveProjectFile("ruoyi-admin/src/main/resources/application-prod.yml"));
         String factorImportService = Files.readString(resolveProjectFile(
             "ruoyi-modules/carbon-vendor/src/main/java/org/dromara/carbon/vendor/factor/service/impl/CvSourceAFactorImportServiceImpl.java"));
+        String adminPom = Files.readString(resolveProjectFile("ruoyi-admin/pom.xml"));
+        String mybatisConfig = Files.readString(resolveProjectFile(
+            "ruoyi-common/ruoyi-common-mybatis/src/main/java/org/dromara/common/mybatis/config/MybatisPlusConfig.java"));
+        String overviewService = Files.readString(resolveProjectFile(
+            "ruoyi-modules/carbon-vendor/src/main/java/org/dromara/carbon/vendor/overview/service/impl/CvOverviewServiceImpl.java"));
+        String renewalService = Files.readString(resolveProjectFile(
+            "ruoyi-modules/carbon-vendor/src/main/java/org/dromara/carbon/vendor/renewal/service/impl/CvRenewalOrderServiceImpl.java"));
+        String dimensionService = Files.readString(resolveProjectFile(
+            "ruoyi-modules/carbon-vendor/src/main/java/org/dromara/carbon/vendor/dimension/service/impl/CvDimensionDataServiceImpl.java"));
 
         assertContainsAll(devConfig, List.of(
             "com.microsoft.sqlserver.jdbc.SQLServerDriver",
             "jdbc:sqlserver://${VENDOR_DB_HOST:127.0.0.1}:${VENDOR_DB_PORT:1433};databaseName=${VENDOR_DB_NAME:vendor}",
-            "encrypt=${VENDOR_DB_ENCRYPT:false}",
-            "trustServerCertificate=${VENDOR_DB_TRUST_SERVER_CERTIFICATE:true}",
             "${VENDOR_DB_URL:"
         ));
         assertContainsAll(prodConfig, List.of(
             "com.microsoft.sqlserver.jdbc.SQLServerDriver",
             "jdbc:sqlserver://${VENDOR_DB_HOST:127.0.0.1}:${VENDOR_DB_PORT:1433};databaseName=${VENDOR_DB_NAME:vendor}",
-            "encrypt=${VENDOR_DB_ENCRYPT:false}",
-            "trustServerCertificate=${VENDOR_DB_TRUST_SERVER_CERTIFICATE:true}",
             "${VENDOR_DB_URL:"
         ));
         assertContainsAll(factorImportService, List.of(
             "SYSDATETIME()",
             "MERGE INTO cv_electricity_factor_version"
         ));
+        assertContainsAll(adminPom, List.of(
+            "com.microsoft.sqlserver",
+            "mssql-jdbc"
+        ));
+        assertContainsAll(mybatisConfig, List.of(
+            "DbType.SQL_SERVER"
+        ));
+        assertContainsAll(renewalService, List.of(
+            "new Page<>(1, 2, false)"
+        ));
+        assertContainsAll(dimensionService, List.of(
+            "OFFSET ? ROWS FETCH NEXT ? ROWS ONLY",
+            "dbo."
+        ));
 
-        assertContainsNone(devConfig, List.of("jdbc:" + "mysql://", "com.mysql.cj.jdbc.Driver"));
-        assertContainsNone(prodConfig, List.of("jdbc:" + "mysql://", "com.mysql.cj.jdbc.Driver"));
+        assertContainsNone(devConfig, List.of("com." + "my" + "sql", "jdbc:" + "my" + "sql:"));
+        assertContainsNone(prodConfig, List.of("com." + "my" + "sql", "jdbc:" + "my" + "sql:"));
+        assertContainsNone(adminPom, List.of("my" + "sql" + "-connector-j"));
+        assertContainsNone(overviewService, List.of(".last(\"limit", "new Page<>(1, size, false)"));
+        assertContainsNone(renewalService, List.of(".last(\"limit"));
+        assertContainsNone(dimensionService, List.of("is" + "My" + "sql", "LIMIT ? OFFSET ?", "maria" + "db", "`"));
         assertContainsNone(factorImportService, List.of(
-            "ON DUPLICATE " + "KEY UPDATE",
+            "ON " + "DUP" + "LICATE " + "KEY UPDATE",
             "VAL" + "UES(" + "effective_year)",
             "NOW" + "()"
         ));

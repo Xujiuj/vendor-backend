@@ -90,7 +90,7 @@ class CvLicenseReissueServiceTest {
 
         assertEquals("LIC-REISSUE-001", issue.getLicenseId());
         assertEquals(1001L, issue.getPackageId());
-        assertEquals("Enterprise Plan", issue.getPackageName());
+        assertEquals("专业版", issue.getPackageName());
         assertEquals("reissue", issue.getIssueType());
         assertEquals("LIC-REVOKED-001", issue.getSourceLicenseId());
         assertEquals("INSTALL-ENTERPRISE-001", issue.getInstallId());
@@ -102,7 +102,7 @@ class CvLicenseReissueServiceTest {
         assertEquals("CUST-001", payload.get("customerId").asText());
         assertEquals("Test Manufacturing Co", payload.get("customerName").asText());
         assertEquals(1001L, payload.get("packageId").asLong());
-        assertEquals("Enterprise Plan", payload.get("packageName").asText());
+        assertEquals("专业版", payload.get("packageName").asText());
         assertEquals("INSTALL-ENTERPRISE-001", payload.get("installId").asText());
         assertTrue(verifySignature(payload.toString(), envelope.get("signature").asText()));
     }
@@ -259,7 +259,7 @@ class CvLicenseReissueServiceTest {
         request.setSchemaVersion("license.v1");
         request.setAlgorithm("RS256");
         request.setPackageId(1001L);
-        request.setEdition("Enterprise Plan");
+        request.setEdition("standard");
         request.setFeatures(List.of("factor_api", "report_template"));
         request.setValidFrom(VALID_FROM);
         request.setValidTo(VALID_TO);
@@ -314,7 +314,7 @@ class CvLicenseReissueServiceTest {
     private SysTenantPackage activePackage() {
         SysTenantPackage tenantPackage = new SysTenantPackage();
         tenantPackage.setPackageId(1001L);
-        tenantPackage.setPackageName("Enterprise Plan");
+        tenantPackage.setPackageName("专业版");
         tenantPackage.setStatus("0");
         tenantPackage.setDelFlag("0");
         tenantPackage.setLicenseFeatureCodes("factor_api,report_template");

@@ -18,8 +18,9 @@ values
 (910121, '因子开放范围', 910136, 2, 'factor-scope', 'vendor/factorScope/index', '', 1, 0, 'C', '0', '0', 'vendor:factorCustomerScope:list', 'tree', 103, 1, SYSDATETIME(), null, null, '厂商按版本、客户与套餐控制因子开放范围'),
 (910105, '模板库', 910136, 3, 'report-template', 'vendor/reportTemplate/index', '', 1, 0, 'C', '0', '0', 'vendor:reportTemplate:list', 'form', 103, 1, SYSDATETIME(), null, null, '厂商报表模板库与发布管理'),
 (910106, '模板分发', 910136, 4, 'template-scope', 'vendor/templateScope/index', '', 1, 0, 'C', '0', '0', 'vendor:reportTemplateScope:list', 'share', 103, 1, SYSDATETIME(), null, null, '厂商模板按客户与授权分发范围'),
-(910131, '维表管理', 910136, 5, 'dimension', 'vendor/dimension/index', '', 1, 0, 'C', '0', '0', 'vendor:dimension:list', 'tree', 103, 1, SYSDATETIME(), null, null, '厂商维表管理，供企业端通过开放接口读取基础数据'),
-(910126, '公告管理', 910136, 6, 'announcement', 'vendor/announcement/index', '', 1, 0, 'C', '0', '0', 'vendor:announcement:list', 'message', 103, 1, SYSDATETIME(), null, null, '厂商公告管理，供企业端工作台按授权同步读取'),
+(910156, '报表内容', 910136, 5, 'report-content', 'vendor/reportContent/index', '', 1, 0, 'C', '0', '0', 'vendor:reportContent:list', 'documentation', 103, 1, SYSDATETIME(), null, null, '厂商报表内容目录配置，供企业端自动同步'),
+(910131, '维表管理', 910136, 6, 'dimension', 'vendor/dimension/index', '', 1, 0, 'C', '0', '0', 'vendor:dimension:list', 'tree', 103, 1, SYSDATETIME(), null, null, '厂商维表管理，供企业端通过开放接口读取基础数据'),
+(910126, '公告管理', 910136, 7, 'announcement', 'vendor/announcement/index', '', 1, 0, 'C', '0', '0', 'vendor:announcement:list', 'message', 103, 1, SYSDATETIME(), null, null, '厂商公告管理，供企业端工作台按授权同步读取'),
 (910107, '续费订单', 910100, 10, 'renewal-order', 'vendor/renewalOrder/index', '', 1, 0, 'C', '0', '0', 'vendor:renewalOrder:list', 'money', 103, 1, SYSDATETIME(), null, null, '厂商续费订单与支付回调运营');
 
 insert into sys_menu
@@ -51,6 +52,10 @@ values
 (910139, '模板分发新增', 910106, 2, '', '', '', 1, 0, 'F', '0', '0', 'vendor:reportTemplateScope:add', '#', 103, 1, SYSDATETIME(), null, null, '模板分发新增权限'),
 (910140, '模板分发编辑', 910106, 3, '', '', '', 1, 0, 'F', '0', '0', 'vendor:reportTemplateScope:edit', '#', 103, 1, SYSDATETIME(), null, null, '模板分发编辑权限'),
 (910118, '模板分发删除', 910106, 4, '', '', '', 1, 0, 'F', '0', '0', 'vendor:reportTemplateScope:remove', '#', 103, 1, SYSDATETIME(), null, null, '模板分发删除权限'),
+(910157, '报表内容详情', 910156, 1, '', '', '', 1, 0, 'F', '0', '0', 'vendor:reportContent:query', '#', 103, 1, SYSDATETIME(), null, null, '报表内容详情权限'),
+(910158, '报表内容新增', 910156, 2, '', '', '', 1, 0, 'F', '0', '0', 'vendor:reportContent:add', '#', 103, 1, SYSDATETIME(), null, null, '报表内容新增权限'),
+(910159, '报表内容编辑', 910156, 3, '', '', '', 1, 0, 'F', '0', '0', 'vendor:reportContent:edit', '#', 103, 1, SYSDATETIME(), null, null, '报表内容编辑权限'),
+(910160, '报表内容删除', 910156, 4, '', '', '', 1, 0, 'F', '0', '0', 'vendor:reportContent:remove', '#', 103, 1, SYSDATETIME(), null, null, '报表内容删除权限'),
 (910132, '维表详情', 910131, 1, '', '', '', 1, 0, 'F', '0', '0', 'vendor:dimension:query', '#', 103, 1, SYSDATETIME(), null, null, '维表详情权限'),
 (910133, '维表新增', 910131, 2, '', '', '', 1, 0, 'F', '0', '0', 'vendor:dimension:add', '#', 103, 1, SYSDATETIME(), null, null, '维表新增权限'),
 (910134, '维表编辑', 910131, 3, '', '', '', 1, 0, 'F', '0', '0', 'vendor:dimension:edit', '#', 103, 1, SYSDATETIME(), null, null, '维表编辑权限'),

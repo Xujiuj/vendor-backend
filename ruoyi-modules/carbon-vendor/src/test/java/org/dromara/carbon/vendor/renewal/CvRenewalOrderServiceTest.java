@@ -317,9 +317,9 @@ class CvRenewalOrderServiceTest {
     @Test
     void rejectsManualBindingWhenIssuedLicensePackageNameDiffers() {
         CvRenewalOrder order = existingOrder();
-        order.setRequestedPackageName("Enterprise Plan");
+        order.setRequestedPackageName("专业版");
         CvLicenseIssue renewed = activeLicense("LIC-RENEWED-001");
-        renewed.setPackageName("Basic Plan");
+        renewed.setPackageName("标准版");
         stubRenewalOrdersByOrderNo(order);
         stubLicenseIssuesByLicenseId(activeLicense("LIC-ORIGINAL-001"), renewed);
         CvRenewalCallbackRequest callback = validPaidCallback();

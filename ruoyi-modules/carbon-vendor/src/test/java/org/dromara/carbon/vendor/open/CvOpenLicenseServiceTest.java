@@ -17,6 +17,7 @@ import org.dromara.carbon.vendor.license.service.CvLicensePrivateKeyProvider;
 import org.dromara.carbon.vendor.openapi.service.ICvOpenApiAuditService;
 import org.dromara.carbon.vendor.openapi.service.impl.CvOpenLicenseServiceImpl;
 import org.dromara.common.core.exception.ServiceException;
+import org.dromara.system.domain.SysTenantPackage;
 import org.dromara.system.mapper.SysTenantPackageMapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Tag;
@@ -69,6 +70,7 @@ class CvOpenLicenseServiceTest {
         when(signingKeyMapper.selectOne(any(), eq(false))).thenReturn(activeSigningKey());
         when(privateKeyProvider.resolvePrivateKeyPem(eq("env:UNIT_TEST_LICENSE_PRIVATE_KEY")))
             .thenReturn(signingKeyMaterial());
+        when(tenantPackageMapper.selectById(eq(1001L))).thenReturn(activePackage());
         service = new CvOpenLicenseServiceImpl(
             licenseIssueMapper,
             customerMapper,
@@ -90,7 +92,8 @@ class CvOpenLicenseServiceTest {
         assertEquals("LIC-001", response.getLicenseId());
         assertEquals(1001L, response.getCustomerId());
         assertEquals("active", response.getStatus());
-        assertEquals("standard", response.getEdition());
+        assertEquals("专业版", response.getPackageName());
+        assertEquals("专业版", response.getEdition());
         assertEquals("factor-sync,report-template-sync", response.getFeatureCodes());
         assertTrue(response.getLicensePayload().contains("\"installId\":\"INSTALL-001\""));
         assertTrue(response.getLicensePayload().contains("\"keyId\":\"KEY-001\""));
@@ -99,6 +102,24 @@ class CvOpenLicenseServiceTest {
         verify(openApiAuditService).recordSuccess(
             eq("/open/licenses/current"), eq("POST"), eq("LIC-001"), eq("INSTALL-001"), eq(1001L),
             eq("keyId=KEY-001;currentSummary=local-cache"));
+    }
+
+    @Test
+    void currentLicenseDoesNotTrustLegacyPackageSnapshotWithoutPackageId() {
+        CvLicenseIssue legacy = activeLicense();
+        legacy.setPackageId(null);
+        legacy.setPackageName("Enterprise Plan");
+        legacy.setEdition("standard");
+        when(licenseIssueMapper.selectOne(any(), eq(false))).thenReturn(legacy);
+
+        CvOpenLicenseCurrentResponse response = service.currentLicense(currentRequest());
+
+        assertNull(response.getPackageId());
+        assertEquals("套餐未配置", response.getPackageName());
+        assertEquals("套餐未配置", response.getEdition());
+        assertTrue(response.getLicensePayload().contains("\"packageName\":\"套餐未配置\""));
+        assertTrue(response.getLicensePayload().contains("\"edition\":\"套餐未配置\""));
+        verify(licenseIssueMapper).updateById(any(CvLicenseIssue.class));
     }
 
     @Test
@@ -122,10 +143,10 @@ class CvOpenLicenseServiceTest {
 
         ServiceException exception = assertThrows(ServiceException.class, () -> service.currentLicense(request));
 
-        assertEquals("license installId does not match", exception.getMessage());
+        assertEquals("授权文件的部署指纹与本机不匹配", exception.getMessage());
         verify(openApiAuditService).recordFailure(
             eq("/open/licenses/current"), eq("POST"), eq("LIC-001"), eq("OTHER-INSTALL"), isNull(),
-            eq("keyId=KEY-001;currentSummary=local-cache"), eq("license installId does not match"));
+            eq("keyId=KEY-001;currentSummary=local-cache"), eq("授权文件的部署指纹与本机不匹配"));
     }
 
     @Test
@@ -146,7 +167,9 @@ class CvOpenLicenseServiceTest {
         assertEquals("manual", order.getPayChannel());
         assertEquals(BigDecimal.ZERO, order.getAmount());
         assertEquals("INSTALL-001", order.getInstallId());
-        assertEquals("standard", order.getRequestedEdition());
+        assertEquals(1001L, order.getRequestedPackageId());
+        assertEquals("专业版", order.getRequestedPackageName());
+        assertEquals("专业版", order.getRequestedEdition());
         assertEquals("P1Y", order.getRenewalPeriod());
         assertEquals("Ops", order.getContactName());
         assertEquals("ops@example.com", order.getContactEmail());
@@ -226,6 +249,8 @@ class CvOpenLicenseServiceTest {
         CvLicenseIssue license = new CvLicenseIssue();
         license.setLicenseId("LIC-001");
         license.setCustomerId(1001L);
+        license.setPackageId(1001L);
+        license.setPackageName("Enterprise Plan");
         license.setKeyId("KEY-001");
         license.setAlgorithm("Ed25519");
         license.setSchemaVersion("1");
@@ -238,6 +263,15 @@ class CvOpenLicenseServiceTest {
         license.setLicensePayload("{\"licenseId\":\"LIC-001\"}");
         license.setSignatureText("signature-text");
         return license;
+    }
+
+    private SysTenantPackage activePackage() {
+        SysTenantPackage tenantPackage = new SysTenantPackage();
+        tenantPackage.setPackageId(1001L);
+        tenantPackage.setPackageName("专业版");
+        tenantPackage.setStatus("0");
+        tenantPackage.setDelFlag("0");
+        return tenantPackage;
     }
 
     private CvSigningKey activeSigningKey() {

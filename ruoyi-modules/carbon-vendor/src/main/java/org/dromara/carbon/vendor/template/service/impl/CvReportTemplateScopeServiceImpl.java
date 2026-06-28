@@ -18,6 +18,7 @@ import org.dromara.common.core.utils.MapstructUtils;
 import org.dromara.common.core.utils.StringUtils;
 import org.dromara.common.mybatis.core.page.PageQuery;
 import org.dromara.common.mybatis.core.page.TableDataInfo;
+import org.dromara.common.tenant.helper.TenantHelper;
 import org.dromara.system.domain.SysTenantPackage;
 import org.dromara.system.mapper.SysTenantPackageMapper;
 import org.springframework.stereotype.Service;
@@ -133,7 +134,7 @@ public class CvReportTemplateScopeServiceImpl implements ICvReportTemplateScopeS
         if (packageId == null) {
             return null;
         }
-        SysTenantPackage tenantPackage = tenantPackageMapper.selectById(packageId);
+        SysTenantPackage tenantPackage = TenantHelper.ignore(() -> tenantPackageMapper.selectById(packageId));
         if (tenantPackage == null || "1".equals(tenantPackage.getDelFlag())) {
             throw new ServiceException("Referenced package does not exist");
         }

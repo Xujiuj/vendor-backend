@@ -23,6 +23,7 @@ import org.dromara.carbon.vendor.license.service.ICvLicenseIssueService;
 import org.dromara.carbon.vendor.renewal.service.IOnlinePurchaseService;
 import org.dromara.common.core.constant.SystemConstants;
 import org.dromara.common.core.exception.ServiceException;
+import org.dromara.common.tenant.helper.TenantHelper;
 import org.dromara.system.domain.SysTenantPackage;
 import org.dromara.system.domain.vo.SysTenantPackageVo;
 import org.dromara.system.mapper.SysTenantPackageMapper;
@@ -77,10 +78,10 @@ public class OnlinePurchaseServiceImpl implements IOnlinePurchaseService {
             }
         }
 
-        SysTenantPackageVo tenantPackage = tenantPackageMapper.selectVoOne(new LambdaQueryWrapper<SysTenantPackage>()
+        SysTenantPackageVo tenantPackage = TenantHelper.ignore(() -> tenantPackageMapper.selectVoOne(new LambdaQueryWrapper<SysTenantPackage>()
             .eq(SysTenantPackage::getPackageId, bo.getPackageId())
             .eq(SysTenantPackage::getStatus, SystemConstants.NORMAL)
-            .eq(SysTenantPackage::getOnlinePurchaseEnabled, Boolean.TRUE));
+            .eq(SysTenantPackage::getOnlinePurchaseEnabled, Boolean.TRUE)));
         if (tenantPackage == null) {
             throw new ServiceException("套餐不可在线购买");
         }
@@ -162,7 +163,7 @@ public class OnlinePurchaseServiceImpl implements IOnlinePurchaseService {
     }
 
     private void issueLicenseIfConfigured(CvRenewalOrder order) {
-        SysTenantPackageVo tenantPackage = tenantPackageMapper.selectVoById(order.getRequestedPackageId());
+        SysTenantPackageVo tenantPackage = TenantHelper.ignore(() -> tenantPackageMapper.selectVoById(order.getRequestedPackageId()));
         if (tenantPackage == null || !Boolean.TRUE.equals(tenantPackage.getLicenseAutoIssueEnabled())) {
             return;
         }

@@ -19,6 +19,7 @@ import org.dromara.common.core.exception.ServiceException;
 import org.dromara.common.core.utils.StringUtils;
 import org.dromara.common.mybatis.core.page.PageQuery;
 import org.dromara.common.mybatis.core.page.TableDataInfo;
+import org.dromara.common.tenant.helper.TenantHelper;
 import org.dromara.system.domain.SysTenantPackage;
 import org.dromara.system.mapper.SysTenantPackageMapper;
 import org.springframework.stereotype.Service;
@@ -227,7 +228,7 @@ public class CvRenewalOrderServiceImpl implements ICvRenewalOrderService {
         if (packageId == null) {
             return;
         }
-        SysTenantPackage tenantPackage = tenantPackageMapper.selectById(packageId);
+        SysTenantPackage tenantPackage = TenantHelper.ignore(() -> tenantPackageMapper.selectById(packageId));
         if (tenantPackage == null || "1".equals(tenantPackage.getDelFlag())) {
             throw new ServiceException("Requested renewal package does not exist");
         }

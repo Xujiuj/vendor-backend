@@ -28,6 +28,7 @@ import org.dromara.common.core.exception.ServiceException;
 import org.dromara.common.core.utils.StringUtils;
 import org.dromara.common.mybatis.core.page.PageQuery;
 import org.dromara.common.mybatis.core.page.TableDataInfo;
+import org.dromara.common.tenant.helper.TenantHelper;
 import org.dromara.system.domain.SysTenantPackage;
 import org.dromara.system.mapper.SysTenantPackageMapper;
 import org.springframework.dao.DuplicateKeyException;
@@ -308,7 +309,7 @@ public class CvLicenseIssueServiceImpl implements ICvLicenseIssueService {
     }
 
     private SysTenantPackage resolveTenantPackage(CvLicenseIssueRequest request) {
-        SysTenantPackage tenantPackage = tenantPackageMapper.selectById(request.getPackageId());
+        SysTenantPackage tenantPackage = TenantHelper.ignore(() -> tenantPackageMapper.selectById(request.getPackageId()));
         if (tenantPackage == null || "1".equals(tenantPackage.getDelFlag())) {
             throw new ServiceException("授权套餐不存在，不能签发授权");
         }
@@ -444,8 +445,13 @@ public class CvLicenseIssueServiceImpl implements ICvLicenseIssueService {
         if (issue == null) {
             return;
         }
+        if (issue.getPackageId() == null) {
+            issue.setPackageName("套餐未配置");
+            issue.setEdition("套餐未配置");
+            return;
+        }
         if (issue.getPackageId() != null) {
-            SysTenantPackage tenantPackage = tenantPackageMapper.selectById(issue.getPackageId());
+            SysTenantPackage tenantPackage = TenantHelper.ignore(() -> tenantPackageMapper.selectById(issue.getPackageId()));
             if (tenantPackage != null && StringUtils.isNotBlank(tenantPackage.getPackageName())) {
                 issue.setPackageName(tenantPackage.getPackageName());
             } else {

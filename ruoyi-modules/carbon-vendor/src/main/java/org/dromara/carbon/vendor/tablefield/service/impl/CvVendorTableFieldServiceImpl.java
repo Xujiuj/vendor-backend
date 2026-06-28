@@ -18,9 +18,6 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import javax.sql.DataSource;
-import java.sql.Connection;
-import java.sql.SQLException;
 import java.util.Collection;
 import java.util.Date;
 import java.util.LinkedHashMap;
@@ -40,7 +37,6 @@ public class CvVendorTableFieldServiceImpl implements ICvVendorTableFieldService
 
     private final CvVendorTableFieldMapper baseMapper;
     private final JdbcTemplate jdbcTemplate;
-    private Boolean mysqlDatabase;
 
     @Override
     public TableDataInfo<CvVendorTableFieldVo> queryPageList(CvVendorTableFieldBo bo, PageQuery pageQuery) {
@@ -95,9 +91,7 @@ public class CvVendorTableFieldServiceImpl implements ICvVendorTableFieldService
         normalizeAndValidateField(bo);
         if (!physicalColumnExists(table.physicalTableName(), bo.getFieldKey())) {
             jdbcTemplate.execute(buildAddColumnSql(table.physicalTableName(), bo));
-            if (!isMysql()) {
-                upsertColumnComment(table.physicalTableName(), bo.getFieldKey(), bo.getFieldLabel());
-            }
+            upsertColumnComment(table.physicalTableName(), bo.getFieldKey(), bo.getFieldLabel());
         }
         CvVendorTableField entity = copyToEntity(bo);
         entity.setId(null);
@@ -208,31 +202,6 @@ public class CvVendorTableFieldServiceImpl implements ICvVendorTableFieldService
     }
 
     private List<ColumnMeta> queryPhysicalColumns(String tableName) {
-        if (isMysql()) {
-            String sql = """
-                SELECT
-                    column_name,
-                    column_type,
-                    data_type,
-                    column_comment,
-                    is_nullable = 'YES' AS is_nullable,
-                    (extra LIKE '%GENERATED%' OR COALESCE(generation_expression, '') <> '') AS is_computed,
-                    ordinal_position
-                FROM information_schema.columns
-                WHERE table_schema = DATABASE()
-                  AND table_name = ?
-                ORDER BY ordinal_position
-                """;
-            return jdbcTemplate.query(sql, (rs, rowNum) -> new ColumnMeta(
-                rs.getString("column_name"),
-                rs.getString("column_type"),
-                rs.getString("data_type"),
-                rs.getString("column_comment"),
-                rs.getBoolean("is_nullable"),
-                rs.getBoolean("is_computed"),
-                rs.getInt("ordinal_position")
-            ), tableName);
-        }
         String sql = """
             SELECT
                 c.name AS column_name,
@@ -272,16 +241,6 @@ public class CvVendorTableFieldServiceImpl implements ICvVendorTableFieldService
     }
 
     private boolean physicalColumnExists(String tableName, String columnName) {
-        if (isMysql()) {
-            Integer count = jdbcTemplate.queryForObject("""
-                SELECT COUNT(*)
-                FROM information_schema.columns
-                WHERE table_schema = DATABASE()
-                  AND table_name = ?
-                  AND column_name = ?
-                """, Integer.class, tableName, columnName);
-            return count != null && count > 0;
-        }
         Integer count = jdbcTemplate.queryForObject("""
             SELECT COUNT(*)
             FROM sys.columns
@@ -358,20 +317,6 @@ public class CvVendorTableFieldServiceImpl implements ICvVendorTableFieldService
 
     private String columnDefinition(CvVendorTableFieldBo bo) {
         String nullClause = " NULL";
-        if (isMysql()) {
-            String commentClause = " COMMENT " + quoteLiteral(defaultIfBlank(bo.getFieldLabel(), ""));
-            return switch (bo.getFieldType()) {
-                case "number" -> {
-                    int scale = bo.getFieldPrecision() == null ? 4 : bo.getFieldPrecision();
-                    yield "DECIMAL(28, " + scale + ")" + nullClause + commentClause;
-                }
-                case "date" -> "DATE" + nullClause + commentClause;
-                case "datetime" -> "DATETIME" + nullClause + commentClause;
-                case "boolean" -> "TINYINT(1)" + nullClause + commentClause;
-                case "select", "text" -> "VARCHAR(" + normalizeTextWidth(bo.getFieldWidth()) + ")" + nullClause + commentClause;
-                default -> throw new ServiceException("涓嶆敮鎸佺殑瀛楁绫诲瀷: " + bo.getFieldType());
-            };
-        }
         return switch (bo.getFieldType()) {
             case "number" -> {
                 int scale = bo.getFieldPrecision() == null ? 4 : bo.getFieldPrecision();
@@ -386,20 +331,6 @@ public class CvVendorTableFieldServiceImpl implements ICvVendorTableFieldService
     }
 
     private void upsertColumnComment(String tableName, String columnName, String comment) {
-        if (isMysql()) {
-            ColumnMeta column = queryPhysicalColumns(tableName).stream()
-                .filter(item -> item.columnName().equals(columnName))
-                .findFirst()
-                .orElseThrow(() -> new ServiceException("鏁版嵁搴撳瓧娈典笉瀛樺湪: " + columnName));
-            if (column.generatedColumn() || IMMUTABLE_COLUMNS.contains(columnName)) {
-                return;
-            }
-            String nullClause = column.nullable() ? " NULL" : " NOT NULL";
-            jdbcTemplate.execute("ALTER TABLE " + quoteTable(tableName)
-                + " MODIFY COLUMN " + quoteIdentifier(columnName) + " " + column.columnType()
-                + nullClause + " COMMENT " + quoteLiteral(defaultIfBlank(comment, "")));
-            return;
-        }
         Integer count = jdbcTemplate.queryForObject("""
             SELECT COUNT(*)
             FROM sys.extended_properties ep
@@ -439,40 +370,11 @@ public class CvVendorTableFieldServiceImpl implements ICvVendorTableFieldService
     }
 
     private String quoteTable(String tableName) {
-        if (isMysql()) {
-            return quoteIdentifier(tableName);
-        }
         return "dbo." + quoteIdentifier(tableName);
     }
 
     private String quoteIdentifier(String identifier) {
-        if (isMysql()) {
-            return "`" + identifier.replace("`", "``") + "`";
-        }
         return "[" + identifier.replace("]", "]]") + "]";
-    }
-
-    private String quoteLiteral(String value) {
-        return "'" + defaultIfBlank(value, "").replace("\\", "\\\\").replace("'", "''") + "'";
-    }
-
-    private boolean isMysql() {
-        if (mysqlDatabase != null) {
-            return mysqlDatabase;
-        }
-        DataSource dataSource = jdbcTemplate.getDataSource();
-        if (dataSource == null) {
-            mysqlDatabase = false;
-            return false;
-        }
-        try (Connection connection = dataSource.getConnection()) {
-            String productName = connection.getMetaData().getDatabaseProductName();
-            String normalizedProductName = productName == null ? "" : productName.toLowerCase(Locale.ROOT);
-            mysqlDatabase = normalizedProductName.contains("mysql") || normalizedProductName.contains("mariadb");
-            return mysqlDatabase;
-        } catch (SQLException e) {
-            throw new ServiceException("failed to detect vendor database type");
-        }
     }
 
     private record ManagedTable(String tableGroup, String tableCode, String physicalTableName) {

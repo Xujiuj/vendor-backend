@@ -14,10 +14,10 @@ import org.dromara.carbon.vendor.factor.mapper.CvFactorCustomerScopeMapper;
 import org.dromara.carbon.vendor.factor.mapper.CvFactorVersionMapper;
 import org.dromara.carbon.vendor.factor.service.ICvFactorCustomerScopeService;
 import org.dromara.common.core.exception.ServiceException;
-import org.dromara.common.core.utils.MapstructUtils;
 import org.dromara.common.core.utils.StringUtils;
 import org.dromara.common.mybatis.core.page.PageQuery;
 import org.dromara.common.mybatis.core.page.TableDataInfo;
+import org.dromara.common.tenant.helper.TenantHelper;
 import org.dromara.system.domain.SysTenantPackage;
 import org.dromara.system.mapper.SysTenantPackageMapper;
 import org.springframework.stereotype.Service;
@@ -140,7 +140,7 @@ public class CvFactorCustomerScopeServiceImpl implements ICvFactorCustomerScopeS
         if (packageId == null) {
             return null;
         }
-        SysTenantPackage tenantPackage = tenantPackageMapper.selectById(packageId);
+        SysTenantPackage tenantPackage = TenantHelper.ignore(() -> tenantPackageMapper.selectById(packageId));
         if (tenantPackage == null || "1".equals(tenantPackage.getDelFlag())) {
             throw new ServiceException("Referenced package does not exist");
         }
@@ -218,6 +218,12 @@ public class CvFactorCustomerScopeServiceImpl implements ICvFactorCustomerScopeS
     }
 
     protected CvFactorCustomerScope toEntity(CvFactorCustomerScopeBo bo) {
-        return MapstructUtils.convert(bo, CvFactorCustomerScope.class);
+        CvFactorCustomerScope scope = new CvFactorCustomerScope();
+        scope.setId(bo.getId());
+        scope.setVersionId(bo.getVersionId());
+        scope.setPackageId(bo.getPackageId());
+        scope.setPackageName(bo.getPackageName());
+        scope.setScopeStatus(bo.getScopeStatus());
+        return scope;
     }
 }

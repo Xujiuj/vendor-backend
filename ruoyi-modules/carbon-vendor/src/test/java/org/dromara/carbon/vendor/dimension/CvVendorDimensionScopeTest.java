@@ -8,7 +8,6 @@ import org.dromara.carbon.vendor.dimension.mapper.CvElectricityFactorVersionMapp
 import org.dromara.carbon.vendor.dimension.mapper.CvElectricityMapper;
 import org.dromara.carbon.vendor.dimension.mapper.CvEmissionSourceCategoryMapper;
 import org.dromara.carbon.vendor.dimension.mapper.CvGreenhouseGasMapper;
-import org.dromara.carbon.vendor.dimension.service.impl.CvDimensionDataServiceImpl;
 import org.dromara.carbon.vendor.dimension.domain.CvEmissionSourceCategory;
 import org.dromara.carbon.vendor.license.domain.CvLicenseIssue;
 import org.dromara.carbon.vendor.license.mapper.CvLicenseIssueMapper;
@@ -25,13 +24,8 @@ import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.springframework.jdbc.core.JdbcTemplate;
 
-import javax.sql.DataSource;
-import java.sql.Connection;
-import java.sql.DatabaseMetaData;
 import java.time.Instant;
 import java.util.Date;
-import java.util.List;
-import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertNull;
@@ -123,51 +117,6 @@ class CvVendorDimensionScopeTest {
         assertNull(record.getGhgScopeCategoryEn());
         assertNull(record.getIsoCategoryDescriptionEn());
         assertNull(record.getIsoCustomSubcategory());
-    }
-
-    @Test
-    void mysqlDimensionPageUsesMysqlPagingAndQuotedIdentifiers() throws Exception {
-        JdbcTemplate jdbcTemplate = mockMysqlJdbcTemplate();
-        when(jdbcTemplate.queryForObject(
-            "SELECT COUNT(*) FROM `cv_admin_division` WHERE `status` = '0'",
-            Long.class
-        )).thenReturn(0L);
-        when(jdbcTemplate.queryForList(
-            "SELECT * FROM `cv_admin_division` WHERE `status` = '0' ORDER BY `sort_order` ASC, `id` ASC LIMIT ? OFFSET ?",
-            1,
-            9L
-        )).thenReturn(List.of());
-        CvDimensionDataServiceImpl service = new CvDimensionDataServiceImpl(
-            mock(CvAdminDivisionMapper.class),
-            mock(CvEmissionSourceCategoryMapper.class),
-            mock(CvBaseYearMapper.class),
-            mock(CvElectricityMapper.class),
-            mock(CvElectricityFactorVersionMapper.class),
-            mock(CvElectricityFactorScopeMapper.class),
-            mock(CvGreenhouseGasMapper.class),
-            jdbcTemplate
-        );
-
-        Object result = service.queryPageList("admin-division", new org.dromara.common.mybatis.core.page.PageQuery(1, 10));
-
-        assertEquals(0L, ((org.dromara.common.mybatis.core.page.TableDataInfo<?>) result).getTotal());
-        verify(jdbcTemplate).queryForList(
-            "SELECT * FROM `cv_admin_division` WHERE `status` = '0' ORDER BY `sort_order` ASC, `id` ASC LIMIT ? OFFSET ?",
-            1,
-            9L
-        );
-    }
-
-    private JdbcTemplate mockMysqlJdbcTemplate() throws Exception {
-        JdbcTemplate jdbcTemplate = mock(JdbcTemplate.class);
-        DataSource dataSource = mock(DataSource.class);
-        Connection connection = mock(Connection.class);
-        DatabaseMetaData metaData = mock(DatabaseMetaData.class);
-        when(jdbcTemplate.getDataSource()).thenReturn(dataSource);
-        when(dataSource.getConnection()).thenReturn(connection);
-        when(connection.getMetaData()).thenReturn(metaData);
-        when(metaData.getDatabaseProductName()).thenReturn("MySQL");
-        return jdbcTemplate;
     }
 
     private CvVendorTableFieldBo tableField(String tableCode) {

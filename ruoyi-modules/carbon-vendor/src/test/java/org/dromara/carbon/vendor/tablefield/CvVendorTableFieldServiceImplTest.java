@@ -9,10 +9,6 @@ import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.springframework.jdbc.core.JdbcTemplate;
 
-import javax.sql.DataSource;
-import java.sql.Connection;
-import java.sql.DatabaseMetaData;
-
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
@@ -81,34 +77,6 @@ class CvVendorTableFieldServiceImplTest {
         assertEquals(true, inserted);
         verify(jdbcTemplate, never()).execute(any(String.class));
         verify(mapper).insert(any(CvVendorTableField.class));
-    }
-
-    @Test
-    void mysqlInsertUsesInformationSchemaAndMysqlColumnSyntax() throws Exception {
-        CvVendorTableFieldMapper mapper = mock(CvVendorTableFieldMapper.class);
-        JdbcTemplate jdbcTemplate = mockMysqlJdbcTemplate();
-        when(jdbcTemplate.queryForObject(any(String.class), eq(Integer.class), eq("cv_admin_division"), eq("custom_level"))).thenReturn(0);
-        when(mapper.insert(any(CvVendorTableField.class))).thenReturn(1);
-        CvVendorTableFieldServiceImpl service = new CvVendorTableFieldServiceImpl(mapper, jdbcTemplate);
-
-        boolean inserted = service.insertByBo(validBo());
-
-        assertEquals(true, inserted);
-        verify(jdbcTemplate).execute("ALTER TABLE `cv_admin_division` ADD `custom_level` VARCHAR(255) NULL COMMENT '自定义层级'");
-        verify(jdbcTemplate, never()).update(any(String.class), any(), any(), any());
-        verify(mapper).insert(any(CvVendorTableField.class));
-    }
-
-    private JdbcTemplate mockMysqlJdbcTemplate() throws Exception {
-        JdbcTemplate jdbcTemplate = mock(JdbcTemplate.class);
-        DataSource dataSource = mock(DataSource.class);
-        Connection connection = mock(Connection.class);
-        DatabaseMetaData metaData = mock(DatabaseMetaData.class);
-        when(jdbcTemplate.getDataSource()).thenReturn(dataSource);
-        when(dataSource.getConnection()).thenReturn(connection);
-        when(connection.getMetaData()).thenReturn(metaData);
-        when(metaData.getDatabaseProductName()).thenReturn("MySQL");
-        return jdbcTemplate;
     }
 
     private CvVendorTableFieldBo validBo() {

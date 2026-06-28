@@ -14,6 +14,7 @@ import org.dromara.carbon.vendor.renewal.mapper.CvRenewalOrderMapper;
 import org.dromara.carbon.vendor.template.mapper.CvReportTemplateDownloadTokenMapper;
 import org.dromara.carbon.vendor.overview.service.ICvOverviewService;
 import org.dromara.common.core.utils.StringUtils;
+import org.dromara.common.tenant.helper.TenantHelper;
 import org.dromara.system.domain.SysTenantPackage;
 import org.dromara.system.mapper.SysTenantPackageMapper;
 import org.springframework.stereotype.Service;
@@ -236,7 +237,7 @@ public class CvOverviewServiceImpl implements ICvOverviewService {
         if (packageIds.isEmpty()) {
             return Map.of();
         }
-        return tenantPackageMapper.selectBatchIds(packageIds).stream()
+        return TenantHelper.ignore(() -> tenantPackageMapper.selectBatchIds(packageIds)).stream()
             .filter(tenantPackage -> tenantPackage.getPackageId() != null)
             .filter(tenantPackage -> StringUtils.isNotBlank(tenantPackage.getPackageName()))
             .collect(Collectors.toMap(SysTenantPackage::getPackageId, SysTenantPackage::getPackageName, (left, right) -> left));

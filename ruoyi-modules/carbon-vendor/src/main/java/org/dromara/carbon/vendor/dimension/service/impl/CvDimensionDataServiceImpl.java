@@ -1,6 +1,7 @@
 package org.dromara.carbon.vendor.dimension.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
+import com.baomidou.mybatisplus.core.incrementer.DefaultIdentifierGenerator;
 import lombok.RequiredArgsConstructor;
 import org.dromara.carbon.vendor.dimension.domain.CvAdminDivision;
 import org.dromara.carbon.vendor.dimension.domain.CvElectricityFactor;
@@ -22,9 +23,6 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import javax.sql.DataSource;
-import java.sql.Connection;
-import java.sql.SQLException;
 import java.sql.Timestamp;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -48,6 +46,7 @@ public class CvDimensionDataServiceImpl implements ICvDimensionDataService {
 
     private static final Pattern COLUMN_NAME_PATTERN = Pattern.compile("^[a-z][a-z0-9_]{1,62}$");
     private static final Set<String> READONLY_COLUMNS = Set.of("id", "create_dept", "create_by", "create_time", "update_by", "update_time");
+    private static final DefaultIdentifierGenerator IDENTIFIER_GENERATOR = DefaultIdentifierGenerator.getInstance();
 
     private final CvAdminDivisionMapper adminDivisionMapper;
     private final CvEmissionSourceCategoryMapper emissionSourceCategoryMapper;
@@ -57,7 +56,6 @@ public class CvDimensionDataServiceImpl implements ICvDimensionDataService {
     private final CvElectricityFactorScopeMapper electricityFactorScopeMapper;
     private final CvGreenhouseGasMapper greenhouseGasMapper;
     private final JdbcTemplate jdbcTemplate;
-    private Boolean mysqlDatabase;
 
     @Override
     public TableDataInfo<?> queryPageList(String dimensionCode, PageQuery pageQuery) {
@@ -308,13 +306,6 @@ public class CvDimensionDataServiceImpl implements ICvDimensionDataService {
 
     private List<Map<String, Object>> queryPageRows(String tableName, long offset, int pageSize) {
         String orderSql = " ORDER BY " + quoteIdentifier("sort_order") + " ASC, " + quoteIdentifier("id") + " ASC";
-        if (isMysql()) {
-            return jdbcTemplate.queryForList(
-                "SELECT * FROM " + quoteTable(tableName) + " WHERE " + quoteIdentifier("status") + " = '0'" + orderSql + " LIMIT ? OFFSET ?",
-                pageSize,
-                offset
-            );
-        }
         return jdbcTemplate.queryForList(
             "SELECT * FROM " + quoteTable(tableName) + " WHERE " + quoteIdentifier("status") + " = '0'" + orderSql + " OFFSET ? ROWS FETCH NEXT ? ROWS ONLY",
             offset,
@@ -323,17 +314,6 @@ public class CvDimensionDataServiceImpl implements ICvDimensionDataService {
     }
 
     private List<String> physicalColumns(String tableName) {
-        if (isMysql()) {
-            return jdbcTemplate.queryForList("""
-                SELECT column_name
-                FROM information_schema.columns
-                WHERE table_schema = DATABASE()
-                  AND table_name = ?
-                  AND COALESCE(generation_expression, '') = ''
-                  AND extra NOT LIKE '%GENERATED%'
-                ORDER BY ordinal_position
-                """, String.class, tableName);
-        }
         return jdbcTemplate.queryForList("""
             SELECT column_name
             FROM information_schema.columns
@@ -359,6 +339,7 @@ public class CvDimensionDataServiceImpl implements ICvDimensionDataService {
         }
         values.put("update_time", new Timestamp(System.currentTimeMillis()));
         if (!update) {
+            values.put("id", IDENTIFIER_GENERATOR.nextId(null));
             values.putIfAbsent("status", "0");
             values.put("create_time", new Timestamp(System.currentTimeMillis()));
         }
@@ -401,36 +382,11 @@ public class CvDimensionDataServiceImpl implements ICvDimensionDataService {
     }
 
     private String quoteTable(String tableName) {
-        if (isMysql()) {
-            return quoteIdentifier(tableName);
-        }
         return "dbo." + quoteIdentifier(tableName);
     }
 
     private String quoteIdentifier(String identifier) {
-        if (isMysql()) {
-            return "`" + identifier.replace("`", "``") + "`";
-        }
         return "[" + identifier.replace("]", "]]") + "]";
-    }
-
-    private boolean isMysql() {
-        if (mysqlDatabase != null) {
-            return mysqlDatabase;
-        }
-        DataSource dataSource = jdbcTemplate.getDataSource();
-        if (dataSource == null) {
-            mysqlDatabase = false;
-            return false;
-        }
-        try (Connection connection = dataSource.getConnection()) {
-            String productName = connection.getMetaData().getDatabaseProductName();
-            String normalizedProductName = productName == null ? "" : productName.toLowerCase();
-            mysqlDatabase = normalizedProductName.contains("mysql") || normalizedProductName.contains("mariadb");
-            return mysqlDatabase;
-        } catch (SQLException e) {
-            throw new ServiceException("failed to detect vendor database type");
-        }
     }
 
     private record ManagedDimension(String dimensionCode, String tableName) {

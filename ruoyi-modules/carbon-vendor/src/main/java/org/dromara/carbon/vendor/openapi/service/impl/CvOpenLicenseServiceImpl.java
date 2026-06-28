@@ -22,6 +22,7 @@ import org.dromara.carbon.vendor.openapi.service.ICvOpenApiAuditService;
 import org.dromara.carbon.vendor.openapi.service.ICvOpenLicenseService;
 import org.dromara.common.core.exception.ServiceException;
 import org.dromara.common.core.utils.StringUtils;
+import org.dromara.common.tenant.helper.TenantHelper;
 import org.dromara.system.domain.SysTenantPackage;
 import org.dromara.system.mapper.SysTenantPackageMapper;
 import org.springframework.stereotype.Service;
@@ -38,6 +39,7 @@ import java.time.format.DateTimeFormatter;
 import java.util.Base64;
 import java.util.Date;
 import java.util.Locale;
+import java.util.Objects;
 import java.util.UUID;
 
 /**
@@ -82,6 +84,7 @@ public class CvOpenLicenseServiceImpl implements ICvOpenLicenseService {
         try {
             CvLicenseIssue issue = requireLicenseAndInstall(request.getLicenseId(), request.getInstallId());
             customerId = issue.getCustomerId();
+            normalizePackageSnapshot(issue);
             refreshBoundLicensePayload(issue);
             CvOpenLicenseCurrentResponse response = toCurrentResponse(issue);
             openApiAuditService.recordSuccess(API_LICENSE_CURRENT, METHOD_POST, request.getLicenseId(),
@@ -121,9 +124,7 @@ public class CvOpenLicenseServiceImpl implements ICvOpenLicenseService {
             SysTenantPackage requestedPackage = resolveRenewalPackage(request, issue);
             order.setRequestedPackageId(requestedPackage == null ? issue.getPackageId() : requestedPackage.getPackageId());
             order.setRequestedPackageName(requestedPackage == null ? issue.getPackageName() : requestedPackage.getPackageName());
-            order.setRequestedEdition(trimToNull(request.getEdition()) == null
-                ? StringUtils.blankToDefault(order.getRequestedPackageName(), issue.getEdition())
-                : trimToNull(request.getEdition()));
+            order.setRequestedEdition(StringUtils.blankToDefault(order.getRequestedPackageName(), issue.getEdition()));
             order.setRenewalPeriod(trimToNull(request.getRenewalPeriod()));
             order.setContactName(trimToNull(request.getContactName()));
             order.setContactEmail(trimToNull(request.getContactEmail()));
@@ -184,7 +185,7 @@ public class CvOpenLicenseServiceImpl implements ICvOpenLicenseService {
     }
 
     private void refreshBoundLicensePayload(CvLicenseIssue issue) {
-        if (StringUtils.isBlank(issue.getLicensePayload()) || !licensePayloadHasInstallId(issue, issue.getInstallId())) {
+        if (shouldRefreshLicensePayload(issue)) {
             try {
                 CvSigningKey signingKey = findSigningKey(issue);
                 String signingKeyMaterial = privateKeyProvider.resolvePrivateKeyPem(signingKey.getPrivateKeyRef());
@@ -194,6 +195,9 @@ public class CvOpenLicenseServiceImpl implements ICvOpenLicenseService {
                 CvLicensePayload payload = objectMapper.readValue(issue.getLicensePayload(), CvLicensePayload.class);
                 payload.setInstallId(issue.getInstallId());
                 payload.setKeyId(signingKey.getKeyId());
+                payload.setPackageId(issue.getPackageId());
+                payload.setPackageName(issue.getPackageName());
+                payload.setEdition(issue.getEdition());
                 String canonicalPayload = objectMapper.writeValueAsString(payload);
                 String signatureText = signPayload(signingKeyMaterial, canonicalPayload.getBytes(StandardCharsets.UTF_8));
 
@@ -215,12 +219,18 @@ public class CvOpenLicenseServiceImpl implements ICvOpenLicenseService {
         }
     }
 
-    private boolean licensePayloadHasInstallId(CvLicenseIssue issue, String installId) {
+    private boolean shouldRefreshLicensePayload(CvLicenseIssue issue) {
+        if (StringUtils.isBlank(issue.getLicensePayload())) {
+            return true;
+        }
         try {
             CvLicensePayload payload = objectMapper.readValue(issue.getLicensePayload(), CvLicensePayload.class);
-            return installId.equals(payload.getInstallId());
+            return !Objects.equals(issue.getInstallId(), payload.getInstallId())
+                || !Objects.equals(issue.getPackageId(), payload.getPackageId())
+                || !Objects.equals(issue.getPackageName(), payload.getPackageName())
+                || !Objects.equals(issue.getEdition(), payload.getEdition());
         } catch (Exception e) {
-            return false;
+            return true;
         }
     }
 
@@ -315,7 +325,8 @@ public class CvOpenLicenseServiceImpl implements ICvOpenLicenseService {
         if (packageId == null) {
             return null;
         }
-        SysTenantPackage tenantPackage = tenantPackageMapper.selectById(packageId);
+        Long resolvedPackageId = packageId;
+        SysTenantPackage tenantPackage = TenantHelper.ignore(() -> tenantPackageMapper.selectById(resolvedPackageId));
         if (tenantPackage == null || "1".equals(tenantPackage.getDelFlag())) {
             throw new ServiceException("renewal package does not exist");
         }
@@ -323,6 +334,22 @@ public class CvOpenLicenseServiceImpl implements ICvOpenLicenseService {
             throw new ServiceException("renewal package is disabled");
         }
         return tenantPackage;
+    }
+
+    private void normalizePackageSnapshot(CvLicenseIssue issue) {
+        if (issue == null) {
+            return;
+        }
+        if (issue.getPackageId() == null) {
+            issue.setPackageName("套餐未配置");
+            issue.setEdition("套餐未配置");
+            return;
+        }
+        SysTenantPackage tenantPackage = TenantHelper.ignore(() -> tenantPackageMapper.selectById(issue.getPackageId()));
+        if (tenantPackage != null && StringUtils.isNotBlank(tenantPackage.getPackageName())) {
+            issue.setPackageName(tenantPackage.getPackageName());
+            issue.setEdition(tenantPackage.getPackageName());
+        }
     }
 
     private boolean isDisabledCustomer(String customerStatus) {

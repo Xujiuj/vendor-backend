@@ -49,8 +49,8 @@ class CvOverviewServiceImplTest {
         when(licenseIssueMapper.selectCount(any())).thenReturn(0L);
         when(licenseIssueMapper.selectList(any())).thenReturn(
             List.of(license("LIC-CHART-1", 1001L, "Enterprise Plan")),
-            List.of(license("LIC-EXP-1", 1001L, "Enterprise Plan"), license("LIC-EXP-2", 1001L, "Enterprise Plan")),
-            List.of(license("LIC-EXP-1", 1001L, "Enterprise Plan"), license("LIC-EXP-2", 1001L, "Enterprise Plan"))
+            List.of(license("LIC-EXP-1", 1001L, "专业版"), license("LIC-EXP-2", 1001L, "专业版")),
+            List.of(license("LIC-EXP-1", 1001L, "专业版"), license("LIC-EXP-2", 1001L, "专业版"))
         );
         when(tenantPackageMapper.selectBatchIds(any())).thenReturn(List.of(packageConfig()));
         when(renewalOrderMapper.selectList(any())).thenReturn(List.of(pendingRenewalOrder()));
@@ -62,7 +62,7 @@ class CvOverviewServiceImplTest {
 
         CvOverviewVo overview = service.queryOverview();
 
-        assertEquals(List.of("Current Plan"), overview.getAuthorizationChart().getSeries().stream()
+        assertEquals(List.of("专业版"), overview.getAuthorizationChart().getSeries().stream()
             .map(CvOverviewVo.Series::getName)
             .toList());
         assertEquals(2, overview.getReminders().size());
@@ -76,7 +76,7 @@ class CvOverviewServiceImplTest {
         CvCustomer customer = new CvCustomer();
         customer.setId(id);
         customer.setCustomerCode("CUST-001");
-        customer.setCustomerName("Customer A");
+        customer.setCustomerName("测试客户");
         customer.setCustomerStatus("active");
         return customer;
     }
@@ -97,7 +97,7 @@ class CvOverviewServiceImplTest {
     private SysTenantPackage packageConfig() {
         SysTenantPackage tenantPackage = new SysTenantPackage();
         tenantPackage.setPackageId(1001L);
-        tenantPackage.setPackageName("Current Plan");
+        tenantPackage.setPackageName("专业版");
         tenantPackage.setStatus("0");
         tenantPackage.setDelFlag("0");
         return tenantPackage;
@@ -119,7 +119,7 @@ class CvOverviewServiceImplTest {
         token.setCustomerId(1001L);
         token.setLicenseId("LIC-EXP-1");
         token.setTemplateId(3001L);
-        token.setFileName("monthly-template.xlsx");
+        token.setFileName("月度报告模板.xlsx");
         token.setTokenStatus("issued");
         token.setCreateTime(Date.from(Instant.now()));
         return token;
