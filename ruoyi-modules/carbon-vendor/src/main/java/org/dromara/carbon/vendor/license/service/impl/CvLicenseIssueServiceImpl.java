@@ -442,25 +442,11 @@ public class CvLicenseIssueServiceImpl implements ICvLicenseIssueService {
                 issue.setPackageName(tenantPackage.getPackageName());
             }
         }
-        String packageName = StringUtils.blankToDefault(issue.getPackageName(), displayNameForLegacyEdition(issue.getEdition()));
+        String packageName = issue.getPackageName();
         if (StringUtils.isNotBlank(packageName)) {
             issue.setPackageName(packageName);
             issue.setEdition(packageName);
         }
-    }
-
-    private String displayNameForLegacyEdition(String edition) {
-        String normalized = normalizeStatus(edition);
-        if ("standard".equals(normalized)) {
-            return "标准版";
-        }
-        if ("professional".equals(normalized) || "pro".equals(normalized)) {
-            return "专业版";
-        }
-        if ("enterprise".equals(normalized) || "group".equals(normalized)) {
-            return "集团版";
-        }
-        return StringUtils.isBlank(edition) ? null : edition.trim();
     }
 
     private CvSigningKey findActiveSigningKey(CvLicenseIssueRequest request, Date issuedTime) {

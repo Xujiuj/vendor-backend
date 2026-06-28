@@ -88,8 +88,8 @@ class CvLicenseIssueServiceTest {
         assertEquals("LIC-UNIT-001", issue.getLicenseId());
         assertEquals(1001L, issue.getCustomerId());
         assertEquals(1001L, issue.getPackageId());
-        assertEquals("标准版", issue.getPackageName());
-        assertEquals("标准版", issue.getEdition());
+        assertEquals("Enterprise Plan", issue.getPackageName());
+        assertEquals("Enterprise Plan", issue.getEdition());
         assertEquals("test-key-2026-01", issue.getKeyId());
         assertEquals("RS256", issue.getAlgorithm());
         assertEquals("license.v1", issue.getSchemaVersion());
@@ -108,7 +108,7 @@ class CvLicenseIssueServiceTest {
         assertEquals("CUST-001", issuedPayload.get("customerId").asText());
         assertEquals("Test Manufacturing Co", issuedPayload.get("customerName").asText());
         assertEquals(1001L, issuedPayload.get("packageId").asLong());
-        assertEquals("标准版", issuedPayload.get("packageName").asText());
+        assertEquals("Enterprise Plan", issuedPayload.get("packageName").asText());
         assertEquals("CUST-001", persistedPayload.get("customerId").asText());
         assertEquals("Test Manufacturing Co", persistedPayload.get("customerName").asText());
         assertTrue(verifySignature(issuedPayload.toString(), envelope.get("signature").asText()));
@@ -186,13 +186,13 @@ class CvLicenseIssueServiceTest {
     }
 
     @Test
-    void listNormalizesLegacyStandardEditionToPackageDisplayName() {
+    void listNormalizesPackageSnapshotFromPackageId() {
         com.baomidou.mybatisplus.extension.plugins.pagination.Page<org.dromara.carbon.vendor.license.domain.vo.CvLicenseIssueVo> page =
             new com.baomidou.mybatisplus.extension.plugins.pagination.Page<>();
         org.dromara.carbon.vendor.license.domain.vo.CvLicenseIssueVo row =
             new org.dromara.carbon.vendor.license.domain.vo.CvLicenseIssueVo();
         row.setPackageId(1001L);
-        row.setEdition("standard");
+        row.setEdition("stale-edition");
         page.setRecords(List.of(row));
         page.setTotal(1);
         when(licenseIssueMapper.selectVoPage(any(), any())).thenReturn(page);
@@ -202,8 +202,8 @@ class CvLicenseIssueServiceTest {
             service.selectPageLicenseIssueList(new org.dromara.carbon.vendor.license.domain.bo.CvLicenseIssueBo(),
                 new org.dromara.common.mybatis.core.page.PageQuery(1, 10));
 
-        assertEquals("标准版", result.getRows().get(0).getPackageName());
-        assertEquals("标准版", result.getRows().get(0).getEdition());
+        assertEquals("Enterprise Plan", result.getRows().get(0).getPackageName());
+        assertEquals("Enterprise Plan", result.getRows().get(0).getEdition());
     }
 
     @Test
@@ -278,7 +278,7 @@ class CvLicenseIssueServiceTest {
         request.setSchemaVersion("license.v1");
         request.setAlgorithm("RS256");
         request.setPackageId(1001L);
-        request.setEdition("standard");
+        request.setEdition("Enterprise Plan");
         request.setFeatures(List.of("factor_api", "report_template"));
         request.setInstallId("INSTALL-ENTERPRISE-001");
         request.setValidFrom(VALID_FROM);
@@ -318,7 +318,7 @@ class CvLicenseIssueServiceTest {
     private SysTenantPackage activePackage() {
         SysTenantPackage tenantPackage = new SysTenantPackage();
         tenantPackage.setPackageId(1001L);
-        tenantPackage.setPackageName("标准版");
+        tenantPackage.setPackageName("Enterprise Plan");
         tenantPackage.setStatus("0");
         tenantPackage.setDelFlag("0");
         tenantPackage.setLicenseFeatureCodes("factor_api,report_template");
