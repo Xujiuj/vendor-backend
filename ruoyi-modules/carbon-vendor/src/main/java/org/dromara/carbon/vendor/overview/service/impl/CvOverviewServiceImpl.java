@@ -128,12 +128,11 @@ public class CvOverviewServiceImpl implements ICvOverviewService {
         List<CvOverviewVo.Reminder> reminders = new ArrayList<>();
         Map<Long, CvCustomer> customers = customersById();
 
-        List<CvLicenseIssue> expiringIssues = licenseIssueMapper.selectList(Wrappers.<CvLicenseIssue>lambdaQuery()
+        List<CvLicenseIssue> expiringIssues = selectTopLicenseIssues(Wrappers.<CvLicenseIssue>lambdaQuery()
             .ne(CvLicenseIssue::getIssueStatus, ISSUE_STATUS_REVOKED)
             .gt(CvLicenseIssue::getValidTo, now)
             .le(CvLicenseIssue::getValidTo, inThirtyDays)
-            .orderByAsc(CvLicenseIssue::getValidTo)
-            .last("limit 3"));
+            .orderByAsc(CvLicenseIssue::getValidTo), 3);
         for (CvLicenseIssue issue : expiringIssues) {
             String customerName = customerName(customers, issue.getCustomerId());
             long days = daysBetween(now, issue.getValidTo());
@@ -143,11 +142,10 @@ public class CvOverviewServiceImpl implements ICvOverviewService {
             ));
         }
 
-        List<CvReportTemplateDownloadToken> pendingTokens = downloadTokenMapper.selectList(Wrappers.<CvReportTemplateDownloadToken>lambdaQuery()
+        List<CvReportTemplateDownloadToken> pendingTokens = selectTopDownloadTokens(Wrappers.<CvReportTemplateDownloadToken>lambdaQuery()
             .eq(CvReportTemplateDownloadToken::getTokenStatus, TOKEN_STATUS_ISSUED)
             .isNull(CvReportTemplateDownloadToken::getConsumedTime)
-            .orderByDesc(CvReportTemplateDownloadToken::getCreateTime)
-            .last("limit 3"));
+            .orderByDesc(CvReportTemplateDownloadToken::getCreateTime), 3);
         for (CvReportTemplateDownloadToken token : pendingTokens) {
             String customerName = customerName(customers, token.getCustomerId());
             reminders.add(reminder(
@@ -162,12 +160,11 @@ public class CvOverviewServiceImpl implements ICvOverviewService {
         List<CvOverviewVo.Todo> todos = new ArrayList<>();
         Map<Long, CvCustomer> customers = customersById();
 
-        List<CvLicenseIssue> expiringIssues = licenseIssueMapper.selectList(Wrappers.<CvLicenseIssue>lambdaQuery()
+        List<CvLicenseIssue> expiringIssues = selectTopLicenseIssues(Wrappers.<CvLicenseIssue>lambdaQuery()
             .ne(CvLicenseIssue::getIssueStatus, ISSUE_STATUS_REVOKED)
             .gt(CvLicenseIssue::getValidTo, now)
             .le(CvLicenseIssue::getValidTo, inThirtyDays)
-            .orderByAsc(CvLicenseIssue::getValidTo)
-            .last("limit 3"));
+            .orderByAsc(CvLicenseIssue::getValidTo), 3);
         for (CvLicenseIssue issue : expiringIssues) {
             todos.add(todo(
                 "续费",
@@ -178,10 +175,9 @@ public class CvOverviewServiceImpl implements ICvOverviewService {
             ));
         }
 
-        List<CvRenewalOrder> pendingOrders = renewalOrderMapper.selectList(Wrappers.<CvRenewalOrder>lambdaQuery()
+        List<CvRenewalOrder> pendingOrders = selectTopRenewalOrders(Wrappers.<CvRenewalOrder>lambdaQuery()
             .eq(CvRenewalOrder::getOrderStatus, ORDER_STATUS_PENDING)
-            .orderByDesc(CvRenewalOrder::getCreateTime)
-            .last("limit 3"));
+            .orderByDesc(CvRenewalOrder::getCreateTime), 3);
         for (CvRenewalOrder order : pendingOrders) {
             todos.add(todo(
                 "续费",
@@ -192,11 +188,10 @@ public class CvOverviewServiceImpl implements ICvOverviewService {
             ));
         }
 
-        List<CvReportTemplateDownloadToken> pendingTokens = downloadTokenMapper.selectList(Wrappers.<CvReportTemplateDownloadToken>lambdaQuery()
+        List<CvReportTemplateDownloadToken> pendingTokens = selectTopDownloadTokens(Wrappers.<CvReportTemplateDownloadToken>lambdaQuery()
             .eq(CvReportTemplateDownloadToken::getTokenStatus, TOKEN_STATUS_ISSUED)
             .isNull(CvReportTemplateDownloadToken::getConsumedTime)
-            .orderByDesc(CvReportTemplateDownloadToken::getCreateTime)
-            .last("limit 3"));
+            .orderByDesc(CvReportTemplateDownloadToken::getCreateTime), 3);
         for (CvReportTemplateDownloadToken token : pendingTokens) {
             todos.add(todo(
                 "模板",
@@ -228,6 +223,19 @@ public class CvOverviewServiceImpl implements ICvOverviewService {
         return customerMapper.selectList(Wrappers.lambdaQuery()).stream()
             .filter(customer -> customer.getId() != null)
             .collect(Collectors.toMap(CvCustomer::getId, Function.identity(), (left, right) -> left));
+    }
+
+    private List<CvLicenseIssue> selectTopLicenseIssues(LambdaQueryWrapper<CvLicenseIssue> query, long size) {
+        return licenseIssueMapper.selectList(query).stream().limit(size).toList();
+    }
+
+    private List<CvRenewalOrder> selectTopRenewalOrders(LambdaQueryWrapper<CvRenewalOrder> query, long size) {
+        return renewalOrderMapper.selectList(query).stream().limit(size).toList();
+    }
+
+    private List<CvReportTemplateDownloadToken> selectTopDownloadTokens(
+        LambdaQueryWrapper<CvReportTemplateDownloadToken> query, long size) {
+        return downloadTokenMapper.selectList(query).stream().limit(size).toList();
     }
 
     private CvOverviewVo.Metric metric(String label, Long value, String note) {
