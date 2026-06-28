@@ -33,7 +33,6 @@ class VendorPortalMenuContractTest {
         "cv_signing_key",
         "cv_license_issue",
         "cv_factor_version",
-        "cv_dimension_record",
         "cv_vendor_table_field",
         "cv_factor_customer_scope",
         "cv_report_template",
@@ -247,7 +246,8 @@ class VendorPortalMenuContractTest {
             "source_license_id",
             "edition",
             "feature_codes",
-            "scope_license_key",
+            "uk_cv_factor_scope_package",
+            "uk_cv_report_template_scope",
             "template_version",
             "license_id",
             "download_token",
@@ -259,6 +259,14 @@ class VendorPortalMenuContractTest {
             "api_path",
             "response_status",
             "request_summary"
+        ));
+        assertContainsNone(mysql, List.of(
+            "scope_customer_key",
+            "scope_edition_key",
+            "scope_license_key",
+            "chk_cv_report_template_scope_entitlement",
+            "fk_cv_factor_scope_customer",
+            "fk_cv_report_scope_customer"
         ));
     }
 

@@ -19,11 +19,8 @@ public class CvFactorCustomerScope implements Serializable {
     private Long id;
 
     private Long versionId;
-    private Long customerId;
     private Long packageId;
     private String packageName;
-    private String edition;
-    private String licenseId;
     private String scopeStatus;
     private Date createTime;
 }

@@ -37,9 +37,7 @@ import java.util.Collection;
 import java.util.Comparator;
 import java.util.Date;
 import java.util.List;
-import java.util.Locale;
 import java.util.Map;
-import java.util.Objects;
 import java.util.UUID;
 import java.util.function.Function;
 import java.util.stream.Collectors;
@@ -196,24 +194,14 @@ public class CvOpenReportTemplateServiceImpl implements ICvOpenReportTemplateSer
     }
 
     private List<CvReportTemplate> findAuthorizedTemplates(CvLicenseIssue entitlement) {
-        String normalizedEdition = normalizeEdition(entitlement.getEdition());
+        if (entitlement.getPackageId() == null) {
+            return List.of();
+        }
         List<CvReportTemplateScope> scopes = reportTemplateScopeMapper.selectList(Wrappers.<CvReportTemplateScope>lambdaQuery()
             .eq(CvReportTemplateScope::getScopeStatus, SCOPE_STATUS_ENABLED)
-            .and(wrapper -> {
-                wrapper.eq(CvReportTemplateScope::getCustomerId, entitlement.getCustomerId());
-                if (entitlement.getPackageId() != null) {
-                    wrapper.or().eq(CvReportTemplateScope::getPackageId, entitlement.getPackageId());
-                }
-                if (normalizedEdition != null) {
-                    wrapper.or().eq(CvReportTemplateScope::getEdition, normalizedEdition);
-                }
-                wrapper.or().eq(CvReportTemplateScope::getLicenseId, entitlement.getLicenseId());
-            })
+            .eq(CvReportTemplateScope::getPackageId, entitlement.getPackageId())
             .orderByAsc(CvReportTemplateScope::getTemplateId)
-            .orderByAsc(CvReportTemplateScope::getId))
-            .stream()
-            .filter(scope -> isScopeAuthorized(scope, entitlement))
-            .toList();
+            .orderByAsc(CvReportTemplateScope::getId));
         if (scopes.isEmpty()) {
             return List.of();
         }
@@ -234,26 +222,6 @@ public class CvOpenReportTemplateServiceImpl implements ICvOpenReportTemplateSer
                 .thenComparing(CvReportTemplate::getTemplateVersion, Comparator.nullsLast(String::compareTo))
                 .thenComparing(CvReportTemplate::getId))
             .toList();
-    }
-
-    private boolean isScopeAuthorized(CvReportTemplateScope scope, CvLicenseIssue entitlement) {
-        boolean hasCustomerScope = scope.getCustomerId() != null;
-        boolean hasPackageScope = scope.getPackageId() != null;
-        boolean hasEditionScope = StringUtils.isNotBlank(scope.getEdition());
-        boolean hasLicenseScope = StringUtils.isNotBlank(scope.getLicenseId());
-        boolean customerMatches = entitlement.getCustomerId() != null
-            && entitlement.getCustomerId().equals(scope.getCustomerId());
-        boolean packageMatches = entitlement.getPackageId() != null
-            && entitlement.getPackageId().equals(scope.getPackageId());
-        boolean editionMatches = hasEditionScope
-            && Objects.equals(normalizeEdition(entitlement.getEdition()), normalizeEdition(scope.getEdition()));
-        boolean licenseMatches = hasLicenseScope
-            && entitlement.getLicenseId().equals(scope.getLicenseId().trim());
-        return (hasCustomerScope || hasPackageScope || hasEditionScope || hasLicenseScope)
-            && (!hasCustomerScope || customerMatches)
-            && (!hasPackageScope || packageMatches)
-            && (!hasEditionScope || editionMatches)
-            && (!hasLicenseScope || licenseMatches);
     }
 
     private CvOpenReportTemplateVo toTemplateVo(CvReportTemplate template) {
@@ -338,10 +306,6 @@ public class CvOpenReportTemplateServiceImpl implements ICvOpenReportTemplateSer
             throw new ServiceException(message);
         }
         return value.trim();
-    }
-
-    private String normalizeEdition(String edition) {
-        return StringUtils.isBlank(edition) ? null : edition.trim().toLowerCase(Locale.ROOT);
     }
 
     private String downloadSummary(Long templateId) {

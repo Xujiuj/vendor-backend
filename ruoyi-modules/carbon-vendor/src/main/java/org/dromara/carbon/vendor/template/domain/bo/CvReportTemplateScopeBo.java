@@ -29,11 +29,6 @@ public class CvReportTemplateScopeBo extends BaseEntity {
     @NotNull(message = "templateId cannot be null", groups = { AddGroup.class, EditGroup.class })
     private Long templateId;
 
-     /**
-     * Customer identifier.
-     */
-    private Long customerId;
-
     /**
      * Package identifier controlling this scope.
      */
@@ -43,16 +38,6 @@ public class CvReportTemplateScopeBo extends BaseEntity {
      * Package name snapshot.
      */
     private String packageName;
-
-    /**
-     * License identifier.
-     */
-    private String licenseId;
-
-    /**
-     * License edition/package scope.
-     */
-    private String edition;
 
     /**
      * Scope lifecycle status.

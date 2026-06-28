@@ -3,18 +3,15 @@ package org.dromara.carbon.vendor.factor;
 import jakarta.validation.ConstraintViolation;
 import jakarta.validation.Validation;
 import jakarta.validation.Validator;
-import org.dromara.carbon.vendor.customer.domain.CvCustomer;
 import org.dromara.carbon.vendor.factor.domain.CvFactorCustomerScope;
 import org.dromara.carbon.vendor.factor.domain.CvFactorVersion;
-import org.dromara.carbon.vendor.license.domain.CvLicenseIssue;
 import org.dromara.carbon.vendor.factor.domain.bo.CvFactorCustomerScopeBo;
-import org.dromara.carbon.vendor.customer.mapper.CvCustomerMapper;
 import org.dromara.carbon.vendor.factor.mapper.CvFactorCustomerScopeMapper;
 import org.dromara.carbon.vendor.factor.mapper.CvFactorVersionMapper;
-import org.dromara.carbon.vendor.license.mapper.CvLicenseIssueMapper;
 import org.dromara.carbon.vendor.factor.service.impl.CvFactorCustomerScopeServiceImpl;
 import org.dromara.common.core.exception.ServiceException;
 import org.dromara.common.core.validate.AddGroup;
+import org.dromara.system.domain.SysTenantPackage;
 import org.dromara.system.mapper.SysTenantPackageMapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Tag;
@@ -41,8 +38,6 @@ class CvFactorCustomerScopeTest {
 
     private CvFactorCustomerScopeMapper scopeMapper;
     private CvFactorVersionMapper factorVersionMapper;
-    private CvCustomerMapper customerMapper;
-    private CvLicenseIssueMapper licenseIssueMapper;
     private SysTenantPackageMapper tenantPackageMapper;
     private CvFactorCustomerScopeServiceImpl service;
 
@@ -50,23 +45,18 @@ class CvFactorCustomerScopeTest {
     void setUp() {
         scopeMapper = mock(CvFactorCustomerScopeMapper.class);
         factorVersionMapper = mock(CvFactorVersionMapper.class);
-        customerMapper = mock(CvCustomerMapper.class);
-        licenseIssueMapper = mock(CvLicenseIssueMapper.class);
         tenantPackageMapper = mock(SysTenantPackageMapper.class);
         when(factorVersionMapper.selectById(401L)).thenReturn(publishedVersion());
-        when(customerMapper.selectById(1001L)).thenReturn(activeCustomer());
-        when(licenseIssueMapper.selectOne(any(), any(Boolean.class))).thenReturn(issuedLicense());
+        when(tenantPackageMapper.selectById(1002L)).thenReturn(activePackage());
         when(scopeMapper.selectCount(any())).thenReturn(0L);
         when(scopeMapper.selectOne(any(), any(Boolean.class))).thenReturn(null);
-        service = new CvFactorCustomerScopeServiceImpl(scopeMapper, factorVersionMapper, customerMapper, licenseIssueMapper, tenantPackageMapper) {
+        service = new CvFactorCustomerScopeServiceImpl(scopeMapper, factorVersionMapper, tenantPackageMapper) {
             @Override
             protected CvFactorCustomerScope toEntity(CvFactorCustomerScopeBo bo) {
                 CvFactorCustomerScope scope = new CvFactorCustomerScope();
                 scope.setId(bo.getId());
                 scope.setVersionId(bo.getVersionId());
-                scope.setCustomerId(bo.getCustomerId());
-                scope.setEdition(bo.getEdition());
-                scope.setLicenseId(bo.getLicenseId());
+                scope.setPackageId(bo.getPackageId());
                 scope.setScopeStatus(bo.getScopeStatus());
                 return scope;
             }
@@ -74,118 +64,39 @@ class CvFactorCustomerScopeTest {
     }
 
     @Test
-    void insertsCustomerScopedMetadataForReleasedVersion() {
-        service.insertFactorCustomerScope(validCustomerScopeBo());
+    void insertsPackageScopedMetadataForReleasedVersion() {
+        service.insertFactorCustomerScope(validPackageScopeBo());
 
         ArgumentCaptor<CvFactorCustomerScope> insertCaptor = ArgumentCaptor.forClass(CvFactorCustomerScope.class);
         verify(scopeMapper).insert(insertCaptor.capture());
         CvFactorCustomerScope inserted = insertCaptor.getValue();
         assertEquals(401L, inserted.getVersionId());
-        assertEquals(1001L, inserted.getCustomerId());
-        assertNull(inserted.getEdition());
-        assertNull(inserted.getLicenseId());
+        assertEquals(1002L, inserted.getPackageId());
+        assertEquals("专业版", inserted.getPackageName());
         assertEquals("enabled", inserted.getScopeStatus());
     }
 
     @Test
-    void allowsEditionScopedMetadataWithoutLicenseAssignmentAndAuthorizesPurchasedEdition() {
-        CvFactorCustomerScopeBo bo = validEditionScopeBo();
-        bo.setLicenseId(" LIC-001 ");
+    void authorizesOnlyMatchingPackageScope() {
+        when(scopeMapper.selectCount(any())).thenReturn(1L);
 
-        Validator validator = Validation.buildDefaultValidatorFactory().getValidator();
-        Set<ConstraintViolation<CvFactorCustomerScopeBo>> violations = validator.validate(bo, AddGroup.class);
-        assertTrue(violations.isEmpty());
-
-        service.insertFactorCustomerScope(bo);
-        when(scopeMapper.selectList(any())).thenReturn(List.of(enabledEditionScope()));
-
-        boolean authorized = service.isFactorVersionAuthorized(401L, null, null, "PRO", "LIC-001");
-
-        ArgumentCaptor<CvFactorCustomerScope> insertCaptor = ArgumentCaptor.forClass(CvFactorCustomerScope.class);
-        verify(scopeMapper).insert(insertCaptor.capture());
-        CvFactorCustomerScope inserted = insertCaptor.getValue();
-        assertNull(inserted.getCustomerId());
-        assertEquals("pro", inserted.getEdition());
-        assertNull(inserted.getLicenseId());
-        assertTrue(authorized);
+        assertTrue(service.isFactorVersionAuthorized(401L, 1002L));
     }
 
     @Test
-    void authorizesCustomerScopeUsingLicenseEntitlementMetadata() {
-        when(scopeMapper.selectList(any())).thenReturn(List.of(enabledCustomerScope()));
-
-        boolean authorized = service.isFactorVersionAuthorized(401L, null, null, null, " LIC-001 ");
-
-        assertTrue(authorized);
+    void deniesMissingPackageDuringAuthorization() {
+        assertFalse(service.isFactorVersionAuthorized(401L, null));
     }
 
     @Test
-    void treatsBlankCustomerAndEditionAsVersionWideScopeForValidLicenseEntitlement() {
-        CvFactorCustomerScopeBo bo = validVersionWideScopeBo();
-        service.insertFactorCustomerScope(bo);
-        when(scopeMapper.selectList(any())).thenReturn(List.of(enabledVersionWideScope()));
+    void rejectsScopeWithoutPackage() {
+        CvFactorCustomerScopeBo bo = validPackageScopeBo();
+        bo.setPackageId(null);
 
-        boolean authorized = service.isFactorVersionAuthorized(401L, null, null, null, "LIC-001");
+        ServiceException exception = assertThrows(ServiceException.class,
+            () -> service.insertFactorCustomerScope(bo));
 
-        ArgumentCaptor<CvFactorCustomerScope> insertCaptor = ArgumentCaptor.forClass(CvFactorCustomerScope.class);
-        verify(scopeMapper).insert(insertCaptor.capture());
-        CvFactorCustomerScope inserted = insertCaptor.getValue();
-        assertNull(inserted.getCustomerId());
-        assertNull(inserted.getEdition());
-        assertNull(inserted.getLicenseId());
-        assertTrue(authorized);
-    }
-
-    @Test
-    void deniesUnauthorizedCustomerForReleasedVersion() {
-        when(scopeMapper.selectList(any())).thenReturn(List.of(enabledCustomerScope()));
-
-        boolean authorized = service.isFactorVersionAuthorized(401L, 2002L, null, null, "LIC-001");
-
-        assertFalse(authorized);
-    }
-
-    @Test
-    void rejectsForgedCustomerOrEditionWithoutLicenseEntitlement() {
-        when(scopeMapper.selectList(any())).thenReturn(List.of(enabledEditionScope(), enabledCustomerScope()));
-
-        boolean forgedCustomer = service.isFactorVersionAuthorized(401L, 1001L, null, null, null);
-        boolean forgedEdition = service.isFactorVersionAuthorized(401L, null, null, "pro", null);
-
-        assertFalse(forgedCustomer);
-        assertFalse(forgedEdition);
-    }
-
-    @Test
-    void rejectsForgedCustomerOrEditionWhenLicenseEntitlementDiffers() {
-        when(scopeMapper.selectList(any())).thenReturn(List.of(enabledEditionScope(), enabledCustomerScope()));
-
-        boolean forgedCustomer = service.isFactorVersionAuthorized(401L, 2002L, null, null, "LIC-001");
-        boolean forgedEdition = service.isFactorVersionAuthorized(401L, null, null, "enterprise", "LIC-001");
-
-        assertFalse(forgedCustomer);
-        assertFalse(forgedEdition);
-    }
-
-    @Test
-    void returnsFalseForUnknownLicenseDuringAuthorization() {
-        when(licenseIssueMapper.selectOne(any(), any(Boolean.class))).thenReturn(null);
-
-        boolean authorized = service.isFactorVersionAuthorized(401L, null, null, null, "LIC-UNKNOWN");
-
-        assertFalse(authorized);
-    }
-
-    @Test
-    void deniesAuthorizationForRevokedLicenseEntitlement() {
-        CvLicenseIssue revoked = issuedLicense();
-        revoked.setIssueStatus("revoked");
-        when(licenseIssueMapper.selectOne(any(), any(Boolean.class))).thenReturn(revoked);
-        when(scopeMapper.selectList(any())).thenReturn(List.of(enabledCustomerScope()));
-
-        boolean authorized = service.isFactorVersionAuthorized(401L, null, null, null, "LIC-001");
-
-        assertFalse(authorized);
+        assertEquals("Factor scope must reference a package", exception.getMessage());
     }
 
     @Test
@@ -193,25 +104,14 @@ class CvFactorCustomerScopeTest {
         when(scopeMapper.selectCount(any())).thenReturn(1L);
 
         ServiceException exception = assertThrows(ServiceException.class,
-            () -> service.insertFactorCustomerScope(validCustomerScopeBo()));
+            () -> service.insertFactorCustomerScope(validPackageScopeBo()));
 
-        assertEquals("Factor scope already exists for this version, customer, and package", exception.getMessage());
-    }
-
-    @Test
-    void ignoresSoftDeletedScopeWhenCheckingDuplicates() {
-        when(scopeMapper.selectCount(any())).thenReturn(0L);
-
-        service.insertFactorCustomerScope(validCustomerScopeBo());
-
-        ArgumentCaptor<CvFactorCustomerScope> insertCaptor = ArgumentCaptor.forClass(CvFactorCustomerScope.class);
-        verify(scopeMapper).insert(insertCaptor.capture());
-        assertEquals("enabled", insertCaptor.getValue().getScopeStatus());
+        assertEquals("Factor scope already exists for this version and package", exception.getMessage());
     }
 
     @Test
     void removeSoftDeletesFactorScopes() {
-        CvFactorCustomerScope existing = enabledCustomerScope();
+        CvFactorCustomerScope existing = enabledPackageScope();
         existing.setId(55L);
         when(scopeMapper.selectList(any())).thenReturn(List.of(existing));
         when(scopeMapper.updateBatchById(any())).thenReturn(true);
@@ -226,13 +126,13 @@ class CvFactorCustomerScopeTest {
     }
 
     @Test
-    void insertRestoresDeletedFactorScopeWithSameEntitlementKey() {
-        CvFactorCustomerScope deletedScope = enabledCustomerScope();
+    void insertRestoresDeletedFactorScopeWithSamePackageKey() {
+        CvFactorCustomerScope deletedScope = enabledPackageScope();
         deletedScope.setId(55L);
         deletedScope.setScopeStatus("deleted");
         when(scopeMapper.selectOne(any(), any(Boolean.class))).thenReturn(deletedScope);
 
-        service.insertFactorCustomerScope(validCustomerScopeBo());
+        service.insertFactorCustomerScope(validPackageScopeBo());
 
         ArgumentCaptor<CvFactorCustomerScope> updateCaptor = ArgumentCaptor.forClass(CvFactorCustomerScope.class);
         verify(scopeMapper).updateById(updateCaptor.capture());
@@ -250,9 +150,7 @@ class CvFactorCustomerScopeTest {
 
         service.selectPageFactorCustomerScopeList(bo, new org.dromara.common.mybatis.core.page.PageQuery(1, 10));
 
-        ArgumentCaptor<com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<CvFactorCustomerScope>> queryCaptor =
-            ArgumentCaptor.forClass(com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper.class);
-        verify(scopeMapper).selectVoPage(any(), queryCaptor.capture());
+        verify(scopeMapper).selectVoPage(any(), any());
         assertEquals("enabled", normalizeScopeStatusFilter(" ENABLED "));
     }
 
@@ -264,22 +162,8 @@ class CvFactorCustomerScopeTest {
 
         service.selectPageFactorCustomerScopeList(bo, new org.dromara.common.mybatis.core.page.PageQuery(1, 10));
 
-        ArgumentCaptor<com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<CvFactorCustomerScope>> queryCaptor =
-            ArgumentCaptor.forClass(com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper.class);
-        verify(scopeMapper).selectVoPage(any(), queryCaptor.capture());
-        assertEquals("__invalid_scope_status__", normalizeScopeStatusFilter(" archived "));
-    }
-
-    @Test
-    void normalizesLicenseIdForListQueries() {
-        CvFactorCustomerScopeBo bo = new CvFactorCustomerScopeBo();
-        bo.setLicenseId(" LIC-001 ");
-        when(scopeMapper.selectVoPage(any(), any())).thenReturn(new com.baomidou.mybatisplus.extension.plugins.pagination.Page<>());
-
-        service.selectPageFactorCustomerScopeList(bo, new org.dromara.common.mybatis.core.page.PageQuery(1, 10));
-
         verify(scopeMapper).selectVoPage(any(), any());
-        assertEquals("LIC-001", normalizeLicenseId(" LIC-001 "));
+        assertEquals("__invalid_scope_status__", normalizeScopeStatusFilter(" archived "));
     }
 
     @Test
@@ -287,28 +171,26 @@ class CvFactorCustomerScopeTest {
         when(factorVersionMapper.selectById(401L)).thenReturn(draftVersion());
 
         ServiceException exception = assertThrows(ServiceException.class,
-            () -> service.insertFactorCustomerScope(validCustomerScopeBo()));
+            () -> service.insertFactorCustomerScope(validPackageScopeBo()));
 
         assertEquals("Only published or frozen factor versions can be scoped", exception.getMessage());
     }
 
     @Test
-    void allowsScopeWithoutLicenseEntitlementMetadata() {
-        CvFactorCustomerScopeBo bo = validCustomerScopeBo();
-        bo.setLicenseId(" ");
+    void addGroupStillRequiresVersionId() {
+        CvFactorCustomerScopeBo bo = validPackageScopeBo();
+        bo.setVersionId(null);
 
-        service.insertFactorCustomerScope(bo);
+        Validator validator = Validation.buildDefaultValidatorFactory().getValidator();
+        Set<ConstraintViolation<CvFactorCustomerScopeBo>> violations = validator.validate(bo, AddGroup.class);
 
-        ArgumentCaptor<CvFactorCustomerScope> insertCaptor = ArgumentCaptor.forClass(CvFactorCustomerScope.class);
-        verify(scopeMapper).insert(insertCaptor.capture());
-        assertNull(insertCaptor.getValue().getLicenseId());
+        assertFalse(violations.isEmpty());
     }
 
-    private CvFactorCustomerScopeBo validCustomerScopeBo() {
+    private CvFactorCustomerScopeBo validPackageScopeBo() {
         CvFactorCustomerScopeBo bo = new CvFactorCustomerScopeBo();
         bo.setVersionId(401L);
-        bo.setCustomerId(1001L);
-        bo.setLicenseId(" LIC-001 ");
+        bo.setPackageId(1002L);
         bo.setScopeStatus(null);
         return bo;
     }
@@ -324,52 +206,10 @@ class CvFactorCustomerScopeTest {
         }
     }
 
-    private String normalizeLicenseId(String licenseId) {
-        try {
-            Method method = CvFactorCustomerScopeServiceImpl.class
-                .getDeclaredMethod("normalizeLicenseId", String.class);
-            method.setAccessible(true);
-            return (String) method.invoke(service, licenseId);
-        } catch (Exception e) {
-            throw new AssertionError(e);
-        }
-    }
-
-    private CvFactorCustomerScopeBo validEditionScopeBo() {
-        CvFactorCustomerScopeBo bo = new CvFactorCustomerScopeBo();
-        bo.setVersionId(401L);
-        bo.setEdition(" Pro ");
-        bo.setLicenseId(" LIC-001 ");
-        bo.setScopeStatus(" ENABLED ");
-        return bo;
-    }
-
-    private CvFactorCustomerScopeBo validVersionWideScopeBo() {
-        CvFactorCustomerScopeBo bo = new CvFactorCustomerScopeBo();
-        bo.setVersionId(401L);
-        bo.setLicenseId(" LIC-001 ");
-        return bo;
-    }
-
-    private CvFactorCustomerScope enabledCustomerScope() {
+    private CvFactorCustomerScope enabledPackageScope() {
         CvFactorCustomerScope scope = new CvFactorCustomerScope();
         scope.setVersionId(401L);
-        scope.setCustomerId(1001L);
-        scope.setScopeStatus("enabled");
-        return scope;
-    }
-
-    private CvFactorCustomerScope enabledEditionScope() {
-        CvFactorCustomerScope scope = new CvFactorCustomerScope();
-        scope.setVersionId(401L);
-        scope.setEdition("pro");
-        scope.setScopeStatus("enabled");
-        return scope;
-    }
-
-    private CvFactorCustomerScope enabledVersionWideScope() {
-        CvFactorCustomerScope scope = new CvFactorCustomerScope();
-        scope.setVersionId(401L);
+        scope.setPackageId(1002L);
         scope.setScopeStatus("enabled");
         return scope;
     }
@@ -389,19 +229,12 @@ class CvFactorCustomerScopeTest {
         return version;
     }
 
-    private CvCustomer activeCustomer() {
-        CvCustomer customer = new CvCustomer();
-        customer.setId(1001L);
-        customer.setCustomerStatus("active");
-        return customer;
-    }
-
-    private CvLicenseIssue issuedLicense() {
-        CvLicenseIssue licenseIssue = new CvLicenseIssue();
-        licenseIssue.setLicenseId("LIC-001");
-        licenseIssue.setCustomerId(1001L);
-        licenseIssue.setEdition("pro");
-        licenseIssue.setIssueStatus("issued");
-        return licenseIssue;
+    private SysTenantPackage activePackage() {
+        SysTenantPackage tenantPackage = new SysTenantPackage();
+        tenantPackage.setPackageId(1002L);
+        tenantPackage.setPackageName("专业版");
+        tenantPackage.setStatus("0");
+        tenantPackage.setDelFlag("0");
+        return tenantPackage;
     }
 }

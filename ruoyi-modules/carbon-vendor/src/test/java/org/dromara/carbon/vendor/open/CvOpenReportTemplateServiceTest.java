@@ -72,9 +72,8 @@ class CvOpenReportTemplateServiceTest {
     void listsPublishedTemplatesAuthorizedForLicense() {
         when(licenseIssueMapper.selectOne(any(), eq(false))).thenReturn(activeLicense());
         when(reportTemplateScopeMapper.selectList(any())).thenReturn(List.of(
-            scope(301L, "LIC-001"),
-            scope(302L, null),
-            scope(303L, "OTHER-LIC")
+            scope(301L, 1002L),
+            scope(302L, 1002L)
         ));
         when(reportTemplateMapper.selectByIds(anyCollection())).thenReturn(List.of(
             template(301L, "carbon-standard", "2026.1", "published"),
@@ -107,57 +106,36 @@ class CvOpenReportTemplateServiceTest {
     }
 
     @Test
-    void includesLicenseOnlyTemplateScopeWhenLicenseMatches() {
+    void includesPackageTemplateScopeWhenPackageMatches() {
         when(licenseIssueMapper.selectOne(any(), eq(false))).thenReturn(activeLicense());
-        CvReportTemplateScope scope = scope(301L, "LIC-001");
-        scope.setCustomerId(null);
+        CvReportTemplateScope scope = scope(301L, 1002L);
         when(reportTemplateScopeMapper.selectList(any())).thenReturn(List.of(scope));
         when(reportTemplateMapper.selectByIds(anyCollection())).thenReturn(List.of(
-            template(301L, "carbon-license", "2026.1", "published")
+            template(301L, "carbon-package", "2026.1", "published")
         ));
 
         CvOpenReportTemplateListResponse response = service.listTemplates(request());
 
         assertEquals(1, response.getTemplates().size());
-        assertEquals("carbon-license", response.getTemplates().get(0).getTemplateCode());
+        assertEquals("carbon-package", response.getTemplates().get(0).getTemplateCode());
     }
 
     @Test
-    void includesEditionOnlyTemplateScopeWhenEditionMatches() {
-        when(licenseIssueMapper.selectOne(any(), eq(false))).thenReturn(activeLicense());
-        CvReportTemplateScope scope = scope(301L, null);
-        scope.setCustomerId(null);
-        scope.setEdition("Professional");
-        when(reportTemplateScopeMapper.selectList(any())).thenReturn(List.of(scope));
-        when(reportTemplateMapper.selectByIds(anyCollection())).thenReturn(List.of(
-            template(301L, "carbon-professional", "2026.1", "published")
-        ));
-
-        CvOpenReportTemplateListResponse response = service.listTemplates(request());
-
-        assertEquals(1, response.getTemplates().size());
-        assertEquals("carbon-professional", response.getTemplates().get(0).getTemplateCode());
-    }
-
-    @Test
-    void excludesTemplateScopeWhenEditionDoesNotMatch() {
-        when(licenseIssueMapper.selectOne(any(), eq(false))).thenReturn(activeLicense());
-        CvReportTemplateScope scope = scope(301L, null);
-        scope.setEdition("group");
-        when(reportTemplateScopeMapper.selectList(any())).thenReturn(List.of(scope));
+    void returnsNoTemplatesWhenLicenseHasNoPackage() {
+        CvLicenseIssue license = activeLicense();
+        license.setPackageId(null);
+        when(licenseIssueMapper.selectOne(any(), eq(false))).thenReturn(license);
 
         CvOpenReportTemplateListResponse response = service.listTemplates(request());
 
         assertEquals(0, response.getTemplates().size());
-        verify(reportTemplateMapper, never()).selectByIds(anyCollection());
+        verify(reportTemplateScopeMapper, never()).selectList(any());
     }
 
     @Test
-    void rejectsCustomerAndLicenseScopeWhenCustomerDoesNotMatch() {
+    void excludesTemplateScopeWhenPackageDoesNotMatch() {
         when(licenseIssueMapper.selectOne(any(), eq(false))).thenReturn(activeLicense());
-        CvReportTemplateScope scope = scope(301L, "LIC-001");
-        scope.setCustomerId(2002L);
-        when(reportTemplateScopeMapper.selectList(any())).thenReturn(List.of(scope));
+        when(reportTemplateScopeMapper.selectList(any())).thenReturn(List.of());
 
         CvOpenReportTemplateListResponse response = service.listTemplates(request());
 
@@ -168,7 +146,7 @@ class CvOpenReportTemplateServiceTest {
     @Test
     void returnsDownloadTokenOnlyAfterAuthorization() {
         when(licenseIssueMapper.selectOne(any(), eq(false))).thenReturn(activeLicense());
-        when(reportTemplateScopeMapper.selectList(any())).thenReturn(List.of(scope(301L, "LIC-001")));
+        when(reportTemplateScopeMapper.selectList(any())).thenReturn(List.of(scope(301L, 1002L)));
         when(reportTemplateMapper.selectByIds(anyCollection())).thenReturn(List.of(
             template(301L, "carbon-standard", "2026.1", "published")
         ));
@@ -208,7 +186,7 @@ class CvOpenReportTemplateServiceTest {
     @Test
     void rejectsDownloadForTemplateOutsideLicenseScope() {
         when(licenseIssueMapper.selectOne(any(), eq(false))).thenReturn(activeLicense());
-        when(reportTemplateScopeMapper.selectList(any())).thenReturn(List.of(scope(301L, "OTHER-LIC")));
+        when(reportTemplateScopeMapper.selectList(any())).thenReturn(List.of());
 
         ServiceException exception = assertThrows(ServiceException.class,
             () -> service.downloadTemplate(301L, request()));
@@ -308,6 +286,8 @@ class CvOpenReportTemplateServiceTest {
         CvLicenseIssue license = new CvLicenseIssue();
         license.setLicenseId("LIC-001");
         license.setCustomerId(1001L);
+        license.setPackageId(1002L);
+        license.setPackageName("专业版");
         license.setEdition("professional");
         license.setFeatureCodes("report-template-sync");
         license.setInstallId("INSTALL-001");
@@ -317,11 +297,10 @@ class CvOpenReportTemplateServiceTest {
         return license;
     }
 
-    private CvReportTemplateScope scope(Long templateId, String licenseId) {
+    private CvReportTemplateScope scope(Long templateId, Long packageId) {
         CvReportTemplateScope scope = new CvReportTemplateScope();
         scope.setTemplateId(templateId);
-        scope.setCustomerId(1001L);
-        scope.setLicenseId(licenseId);
+        scope.setPackageId(packageId);
         scope.setScopeStatus("enabled");
         return scope;
     }

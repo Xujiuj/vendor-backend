@@ -80,7 +80,7 @@ class CvOpenFactorServiceTest {
         CvFactorVersion version = publishedVersion(88L, "FV-2026");
         when(licenseIssueMapper.selectOne(any(), eq(false))).thenReturn(license);
         when(factorVersionMapper.selectList(any())).thenReturn(List.of(version));
-        when(factorCustomerScopeService.isFactorVersionAuthorized(88L, 1001L, null, "standard", "LIC-001"))
+        when(factorCustomerScopeService.isFactorVersionAuthorized(88L, 1002L))
             .thenReturn(true);
         mockSourceAFactors();
 
@@ -107,7 +107,7 @@ class CvOpenFactorServiceTest {
         CvFactorVersion version = publishedVersion(88L, "FV-2026");
         when(licenseIssueMapper.selectOne(any(), eq(false))).thenReturn(activeLicense());
         when(factorVersionMapper.selectList(any())).thenReturn(List.of(version));
-        when(factorCustomerScopeService.isFactorVersionAuthorized(88L, 1001L, null, "standard", "LIC-001"))
+        when(factorCustomerScopeService.isFactorVersionAuthorized(88L, 1002L))
             .thenReturn(true);
         mockSourceAFactors();
 
@@ -123,7 +123,7 @@ class CvOpenFactorServiceTest {
         CvFactorVersion version = publishedVersion(88L, "FV-2026");
         when(licenseIssueMapper.selectOne(any(), eq(false))).thenReturn(license);
         when(factorVersionMapper.selectList(any())).thenReturn(List.of(version));
-        when(factorCustomerScopeService.isFactorVersionAuthorized(88L, 1001L, null, "standard", "LIC-001"))
+        when(factorCustomerScopeService.isFactorVersionAuthorized(88L, 1002L))
             .thenReturn(true);
         mockSourceAFactors();
 
@@ -153,7 +153,7 @@ class CvOpenFactorServiceTest {
         CvFactorVersion version = publishedVersion(88L, "FV-2026");
         when(licenseIssueMapper.selectOne(any(), eq(false))).thenReturn(activeLicense());
         when(factorVersionMapper.selectList(any())).thenReturn(List.of(version));
-        when(factorCustomerScopeService.isFactorVersionAuthorized(88L, 1001L, null, "standard", "LIC-001"))
+        when(factorCustomerScopeService.isFactorVersionAuthorized(88L, 1002L))
             .thenReturn(false);
 
         ServiceException exception = assertThrows(ServiceException.class, () -> service.syncFactors(request(null)));
@@ -198,6 +198,8 @@ class CvOpenFactorServiceTest {
         CvLicenseIssue license = new CvLicenseIssue();
         license.setLicenseId("LIC-001");
         license.setCustomerId(1001L);
+        license.setPackageId(1002L);
+        license.setPackageName("专业版");
         license.setEdition("standard");
         license.setFeatureCodes("factor-sync");
         license.setInstallId("INSTALL-001");

@@ -29,11 +29,6 @@ public class CvFactorCustomerScopeVo implements Serializable {
     private Long versionId;
 
     /**
-     * Customer identifier.
-     */
-    private Long customerId;
-
-    /**
      * Package identifier controlling this scope.
      */
     private Long packageId;
@@ -42,16 +37,6 @@ public class CvFactorCustomerScopeVo implements Serializable {
      * Package name snapshot.
      */
     private String packageName;
-
-    /**
-     * Edition code.
-     */
-    private String edition;
-
-    /**
-     * License identifier.
-     */
-    private String licenseId;
 
     /**
      * Scope lifecycle status.

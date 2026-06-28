@@ -111,12 +111,7 @@ public class CvOpenFactorServiceImpl implements ICvOpenFactorService {
             .orderByDesc(CvFactorVersion::getId));
         return versions.stream()
             .filter(version -> isPublishedOrFrozen(version)
-                && factorCustomerScopeService.isFactorVersionAuthorized(
-                    version.getId(),
-                    entitlement.getCustomerId(),
-                    entitlement.getPackageId(),
-                    entitlement.getEdition(),
-                    entitlement.getLicenseId()))
+                && factorCustomerScopeService.isFactorVersionAuthorized(version.getId(), entitlement.getPackageId()))
             .findFirst()
             .orElseThrow(() -> new ServiceException("no authorized factor version for license entitlement"));
     }

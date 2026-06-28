@@ -22,9 +22,10 @@ import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Calendar;
+import java.util.Comparator;
 import java.util.Date;
+import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.function.Function;
@@ -92,17 +93,7 @@ public class CvOverviewServiceImpl implements ICvOverviewService {
     private CvOverviewVo.AuthorizationChart buildAuthorizationChart(Date now) {
         List<Date> monthStarts = lastMonthStarts(now, 6);
         List<String> months = monthStarts.stream().map(this::formatMonth).toList();
-        List<String> editions = List.of("集团版", "专业版", "标准版");
-        Map<String, String> editionNames = Map.of(
-            "group", "集团版",
-            "enterprise", "集团版",
-            "professional", "专业版",
-            "pro", "专业版",
-            "standard", "标准版"
-        );
-        Map<String, Integer> editionOrder = Map.of("集团版", 0, "专业版", 1, "标准版", 2);
-        Map<String, CvOverviewVo.Series> seriesByName = editions.stream()
-            .collect(Collectors.toMap(Function.identity(), name -> series(name, monthStarts.size())));
+        Map<String, CvOverviewVo.Series> seriesByName = new LinkedHashMap<>();
 
         Date begin = monthStarts.get(0);
         Date end = monthStart(daysAfter(monthStarts.get(monthStarts.size() - 1), 32));
@@ -112,7 +103,7 @@ public class CvOverviewServiceImpl implements ICvOverviewService {
             .lt(CvLicenseIssue::getIssuedTime, end));
 
         for (CvLicenseIssue issue : issues) {
-            String name = editionNames.getOrDefault(normalizeStatus(issue.getEdition()), StringUtils.blankToDefault(issue.getEdition(), "其他"));
+            String name = packageSeriesName(issue);
             CvOverviewVo.Series series = seriesByName.computeIfAbsent(name, key -> series(key, monthStarts.size()));
             int index = monthIndex(monthStarts, issue.getIssuedTime());
             if (index >= 0) {
@@ -123,11 +114,14 @@ public class CvOverviewServiceImpl implements ICvOverviewService {
         CvOverviewVo.AuthorizationChart chart = new CvOverviewVo.AuthorizationChart();
         chart.setMonths(months);
         chart.setSeries(seriesByName.values().stream()
-            .sorted((left, right) -> Integer.compare(
-                editionOrder.getOrDefault(left.getName(), Integer.MAX_VALUE),
-                editionOrder.getOrDefault(right.getName(), Integer.MAX_VALUE)))
+            .sorted(Comparator.comparing(CvOverviewVo.Series::getName, Comparator.nullsLast(String::compareTo)))
             .toList());
         return chart;
+    }
+
+    private String packageSeriesName(CvLicenseIssue issue) {
+        return StringUtils.blankToDefault(issue.getPackageName(),
+            StringUtils.blankToDefault(issue.getEdition(), "未指定套餐"));
     }
 
     private List<CvOverviewVo.Reminder> buildReminders(Date now, Date inThirtyDays) {
@@ -277,10 +271,6 @@ public class CvOverviewServiceImpl implements ICvOverviewService {
             return "客户 " + customerId;
         }
         return StringUtils.blankToDefault(customer.getCustomerName(), customer.getCustomerCode());
-    }
-
-    private String normalizeStatus(String status) {
-        return StringUtils.isBlank(status) ? null : status.trim().toLowerCase(Locale.ROOT);
     }
 
     private Date daysAfter(Date date, int days) {

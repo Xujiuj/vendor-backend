@@ -17,32 +17,6 @@ BEGIN
     );
 END//
 
-DROP PROCEDURE IF EXISTS cv_diag_optional_dimension_record//
-CREATE PROCEDURE cv_diag_optional_dimension_record()
-BEGIN
-    IF cv_diag_table_exists('cv_dimension_record') THEN
-        SELECT 'dimension_record.dimension_code.duplicate.summary' AS check_code,
-               COUNT(*) AS duplicate_groups,
-               COALESCE(SUM(duplicate_count), 0) AS rows_in_duplicate_groups,
-               COALESCE(SUM(duplicate_count - 1), 0) AS extra_rows
-        FROM (
-            SELECT dimension_code, record_code, COUNT(*) AS duplicate_count
-            FROM cv_dimension_record
-            WHERE dimension_code IS NOT NULL
-              AND dimension_code <> ''
-              AND record_code IS NOT NULL
-              AND record_code <> ''
-            GROUP BY dimension_code, record_code
-            HAVING COUNT(*) > 1
-        ) d;
-    ELSE
-        SELECT 'dimension_record.dimension_code.duplicate.summary' AS check_code,
-               0 AS duplicate_groups,
-               0 AS rows_in_duplicate_groups,
-               0 AS extra_rows;
-    END IF;
-END//
-
 DELIMITER ;
 
 SELECT table_name,
@@ -57,8 +31,7 @@ WHERE table_schema = DATABASE()
       'cv_electricity_factor_version',
       'cv_electricity_factor_scope',
       'cv_greenhouse_gas',
-      'cv_factor_version',
-      'cv_dimension_record'
+      'cv_factor_version'
   )
 ORDER BY table_name;
 
@@ -126,8 +99,6 @@ FROM (
     GROUP BY effective_year
     HAVING COUNT(*) > 1
 ) d;
-
-CALL cv_diag_optional_dimension_record();
 
 SELECT 'admin_division.parent.orphan' AS check_code,
        child.parent_code,
@@ -208,5 +179,4 @@ HAVING COUNT(*) > 1
 ORDER BY duplicate_count DESC
 LIMIT 100;
 
-DROP PROCEDURE IF EXISTS cv_diag_optional_dimension_record;
 DROP FUNCTION IF EXISTS cv_diag_table_exists;

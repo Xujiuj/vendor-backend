@@ -5,14 +5,11 @@ import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.baomidou.mybatisplus.core.toolkit.support.SFunction;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import lombok.RequiredArgsConstructor;
-import org.dromara.carbon.vendor.license.domain.CvLicenseIssue;
 import org.dromara.carbon.vendor.template.domain.CvReportTemplate;
 import org.dromara.carbon.vendor.template.domain.CvReportTemplateScope;
 import org.dromara.carbon.vendor.template.domain.bo.CvReportTemplateScopeBo;
 import org.dromara.carbon.vendor.template.domain.enums.CvReportTemplateLifecycleState;
 import org.dromara.carbon.vendor.template.domain.vo.CvReportTemplateScopeVo;
-import org.dromara.carbon.vendor.customer.mapper.CvCustomerMapper;
-import org.dromara.carbon.vendor.license.mapper.CvLicenseIssueMapper;
 import org.dromara.carbon.vendor.template.mapper.CvReportTemplateMapper;
 import org.dromara.carbon.vendor.template.mapper.CvReportTemplateScopeMapper;
 import org.dromara.carbon.vendor.template.service.ICvReportTemplateScopeService;
@@ -27,7 +24,6 @@ import org.springframework.stereotype.Service;
 
 import java.util.Arrays;
 import java.util.List;
-import java.util.Locale;
 import java.util.Map;
 
 /**
@@ -43,8 +39,6 @@ public class CvReportTemplateScopeServiceImpl implements ICvReportTemplateScopeS
 
     private final CvReportTemplateScopeMapper baseMapper;
     private final CvReportTemplateMapper reportTemplateMapper;
-    private final CvCustomerMapper customerMapper;
-    private final CvLicenseIssueMapper licenseIssueMapper;
     private final SysTenantPackageMapper tenantPackageMapper;
 
     @Override
@@ -66,8 +60,6 @@ public class CvReportTemplateScopeServiceImpl implements ICvReportTemplateScopeS
         validateScope(bo);
         CvReportTemplateScope reportTemplateScope = toEntity(bo);
         applyPackageSnapshot(reportTemplateScope);
-        reportTemplateScope.setLicenseId(normalizeLicenseId(reportTemplateScope.getLicenseId()));
-        reportTemplateScope.setEdition(normalizeEdition(reportTemplateScope.getEdition()));
         reportTemplateScope.setScopeStatus(normalizeScopeStatus(reportTemplateScope.getScopeStatus()));
         CvReportTemplateScope deletedScope = findDeletedScope(reportTemplateScope);
         if (deletedScope != null) {
@@ -82,8 +74,6 @@ public class CvReportTemplateScopeServiceImpl implements ICvReportTemplateScopeS
         validateScope(bo);
         CvReportTemplateScope reportTemplateScope = toEntity(bo);
         applyPackageSnapshot(reportTemplateScope);
-        reportTemplateScope.setLicenseId(normalizeLicenseId(reportTemplateScope.getLicenseId()));
-        reportTemplateScope.setEdition(normalizeEdition(reportTemplateScope.getEdition()));
         reportTemplateScope.setScopeStatus(normalizeScopeStatus(reportTemplateScope.getScopeStatus()));
         return baseMapper.updateById(reportTemplateScope);
     }
@@ -111,11 +101,8 @@ public class CvReportTemplateScopeServiceImpl implements ICvReportTemplateScopeS
         LambdaQueryWrapper<CvReportTemplateScope> lqw = Wrappers.lambdaQuery();
         lqw.eq(bo.getId() != null, CvReportTemplateScope::getId, bo.getId());
         lqw.eq(bo.getTemplateId() != null, CvReportTemplateScope::getTemplateId, bo.getTemplateId());
-        lqw.eq(bo.getCustomerId() != null, CvReportTemplateScope::getCustomerId, bo.getCustomerId());
         lqw.eq(bo.getPackageId() != null, CvReportTemplateScope::getPackageId, bo.getPackageId());
         lqw.like(StringUtils.isNotBlank(bo.getPackageName()), CvReportTemplateScope::getPackageName, bo.getPackageName());
-        lqw.eq(StringUtils.isNotBlank(bo.getEdition()), CvReportTemplateScope::getEdition, normalizeEdition(bo.getEdition()));
-        lqw.like(StringUtils.isNotBlank(bo.getLicenseId()), CvReportTemplateScope::getLicenseId, bo.getLicenseId());
         lqw.eq(StringUtils.isNotBlank(bo.getScopeStatus()), CvReportTemplateScope::getScopeStatus, bo.getScopeStatus());
         lqw.ne(CvReportTemplateScope::getScopeStatus, SCOPE_STATUS_DELETED);
         lqw.between(params.get("beginTime") != null && params.get("endTime") != null,
@@ -136,18 +123,10 @@ public class CvReportTemplateScopeServiceImpl implements ICvReportTemplateScopeS
         if (CvReportTemplateLifecycleState.fromTemplate(template) != CvReportTemplateLifecycleState.PUBLISHED) {
             throw new ServiceException("Only published report templates can be distributed");
         }
-        if (StringUtils.isBlank(bo.getLicenseId()) && StringUtils.isBlank(bo.getEdition()) && bo.getPackageId() == null && bo.getCustomerId() == null) {
-            throw new ServiceException("Distribution must reference customer, package, edition, or license entitlement metadata");
-        }
-        if (bo.getCustomerId() != null && customerMapper.selectById(bo.getCustomerId()) == null) {
-            throw new ServiceException("Referenced vendor customer does not exist");
+        if (bo.getPackageId() == null) {
+            throw new ServiceException("Distribution must reference a package");
         }
         requireActivePackage(bo.getPackageId());
-        String licenseId = normalizeLicenseId(bo.getLicenseId());
-        if (licenseId != null && licenseIssueMapper.selectOne(Wrappers.<CvLicenseIssue>lambdaQuery()
-            .eq(CvLicenseIssue::getLicenseId, licenseId), false) == null) {
-            throw new ServiceException("Referenced vendor license entitlement does not exist");
-        }
     }
 
     private SysTenantPackage requireActivePackage(Long packageId) {
@@ -168,18 +147,9 @@ public class CvReportTemplateScopeServiceImpl implements ICvReportTemplateScopeS
         SysTenantPackage tenantPackage = requireActivePackage(scope.getPackageId());
         if (tenantPackage != null) {
             scope.setPackageName(tenantPackage.getPackageName());
-            scope.setEdition(null);
         } else {
             scope.setPackageName(null);
         }
-    }
-
-    private String normalizeLicenseId(String licenseId) {
-        return StringUtils.isBlank(licenseId) ? null : licenseId.trim();
-    }
-
-    private String normalizeEdition(String edition) {
-        return StringUtils.isBlank(edition) ? null : edition.trim().toLowerCase(Locale.ROOT);
     }
 
     private String normalizeScopeStatus(String scopeStatus) {
@@ -194,10 +164,7 @@ public class CvReportTemplateScopeServiceImpl implements ICvReportTemplateScopeS
         LambdaQueryWrapper<CvReportTemplateScope> wrapper = Wrappers.<CvReportTemplateScope>lambdaQuery()
             .eq(CvReportTemplateScope::getTemplateId, scope.getTemplateId())
             .eq(CvReportTemplateScope::getScopeStatus, SCOPE_STATUS_DELETED);
-        appendNullableEq(wrapper, CvReportTemplateScope::getCustomerId, scope.getCustomerId());
         appendNullableEq(wrapper, CvReportTemplateScope::getPackageId, scope.getPackageId());
-        appendNullableEq(wrapper, CvReportTemplateScope::getEdition, scope.getEdition());
-        appendNullableEq(wrapper, CvReportTemplateScope::getLicenseId, scope.getLicenseId());
         return baseMapper.selectOne(wrapper, false);
     }
 

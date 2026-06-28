@@ -7,7 +7,6 @@ SHOW CREATE TABLE cv_electricity_factor;
 SHOW CREATE TABLE cv_electricity_factor_version;
 SHOW CREATE TABLE cv_electricity_factor_scope;
 SHOW CREATE TABLE cv_greenhouse_gas;
-SHOW CREATE TABLE cv_dimension_record;
 
 SELECT table_name,
        constraint_name,
@@ -21,8 +20,7 @@ WHERE table_schema = DATABASE()
       'cv_electricity_factor',
       'cv_electricity_factor_version',
       'cv_electricity_factor_scope',
-      'cv_greenhouse_gas',
-      'cv_dimension_record'
+      'cv_greenhouse_gas'
   )
 ORDER BY table_name, constraint_type, constraint_name;
 
@@ -39,8 +37,7 @@ WHERE table_schema = DATABASE()
       'cv_electricity_factor',
       'cv_electricity_factor_version',
       'cv_electricity_factor_scope',
-      'cv_greenhouse_gas',
-      'cv_dimension_record'
+      'cv_greenhouse_gas'
   )
 GROUP BY table_name, index_name, non_unique
 ORDER BY table_name, index_name;
@@ -60,7 +57,6 @@ WHERE table_schema = DATABASE()
       'cv_electricity_factor',
       'cv_electricity_factor_version',
       'cv_electricity_factor_scope',
-      'cv_greenhouse_gas',
-      'cv_dimension_record'
+      'cv_greenhouse_gas'
   )
 ORDER BY table_name, constraint_name, ordinal_position;

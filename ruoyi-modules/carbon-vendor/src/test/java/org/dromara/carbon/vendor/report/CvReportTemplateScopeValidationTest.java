@@ -1,47 +1,40 @@
 package org.dromara.carbon.vendor.report;
 
-import org.dromara.carbon.vendor.customer.domain.CvCustomer;
-import org.dromara.carbon.vendor.license.domain.CvLicenseIssue;
+import jakarta.validation.ConstraintViolation;
+import jakarta.validation.Validation;
+import jakarta.validation.Validator;
 import org.dromara.carbon.vendor.template.domain.CvReportTemplate;
 import org.dromara.carbon.vendor.template.domain.CvReportTemplateScope;
 import org.dromara.carbon.vendor.template.domain.bo.CvReportTemplateScopeBo;
-import org.dromara.carbon.vendor.customer.mapper.CvCustomerMapper;
-import org.dromara.carbon.vendor.license.mapper.CvLicenseIssueMapper;
 import org.dromara.carbon.vendor.template.mapper.CvReportTemplateMapper;
 import org.dromara.carbon.vendor.template.mapper.CvReportTemplateScopeMapper;
 import org.dromara.carbon.vendor.template.service.impl.CvReportTemplateScopeServiceImpl;
 import org.dromara.common.core.exception.ServiceException;
 import org.dromara.common.core.validate.AddGroup;
+import org.dromara.system.domain.SysTenantPackage;
 import org.dromara.system.mapper.SysTenantPackageMapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 
-import jakarta.validation.ConstraintViolation;
-import jakarta.validation.Validation;
-import jakarta.validation.Validator;
-
 import java.util.List;
 import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
-import static org.mockito.ArgumentMatchers.any;
 
 @Tag("dev")
 class CvReportTemplateScopeValidationTest {
 
     private CvReportTemplateScopeMapper scopeMapper;
     private CvReportTemplateMapper templateMapper;
-    private CvCustomerMapper customerMapper;
-    private CvLicenseIssueMapper licenseIssueMapper;
     private SysTenantPackageMapper tenantPackageMapper;
     private CvReportTemplateScopeServiceImpl service;
 
@@ -49,20 +42,15 @@ class CvReportTemplateScopeValidationTest {
     void setUp() {
         scopeMapper = mock(CvReportTemplateScopeMapper.class);
         templateMapper = mock(CvReportTemplateMapper.class);
-        customerMapper = mock(CvCustomerMapper.class);
-        licenseIssueMapper = mock(CvLicenseIssueMapper.class);
         tenantPackageMapper = mock(SysTenantPackageMapper.class);
-        when(customerMapper.selectById(1001L)).thenReturn(activeCustomer());
-        when(licenseIssueMapper.selectOne(any(), any(Boolean.class))).thenReturn(issuedLicense());
-        service = new CvReportTemplateScopeServiceImpl(scopeMapper, templateMapper, customerMapper, licenseIssueMapper, tenantPackageMapper) {
+        when(tenantPackageMapper.selectById(1002L)).thenReturn(activePackage());
+        service = new CvReportTemplateScopeServiceImpl(scopeMapper, templateMapper, tenantPackageMapper) {
             @Override
             protected CvReportTemplateScope toEntity(CvReportTemplateScopeBo bo) {
                 CvReportTemplateScope scope = new CvReportTemplateScope();
                 scope.setId(bo.getId());
                 scope.setTemplateId(bo.getTemplateId());
-                scope.setCustomerId(bo.getCustomerId());
-                scope.setLicenseId(bo.getLicenseId());
-                scope.setEdition(bo.getEdition());
+                scope.setPackageId(bo.getPackageId());
                 scope.setScopeStatus(bo.getScopeStatus());
                 return scope;
             }
@@ -70,7 +58,7 @@ class CvReportTemplateScopeValidationTest {
     }
 
     @Test
-    void insertsDistributionForPublishedTemplateUsingVendorMetadataOnly() {
+    void insertsDistributionForPublishedTemplateUsingPackageOnly() {
         when(templateMapper.selectById(301L)).thenReturn(publishedTemplate());
         when(scopeMapper.selectOne(any(), any(Boolean.class))).thenReturn(null);
 
@@ -80,9 +68,8 @@ class CvReportTemplateScopeValidationTest {
         verify(scopeMapper).insert(insertCaptor.capture());
         CvReportTemplateScope inserted = insertCaptor.getValue();
         assertEquals(301L, inserted.getTemplateId());
-        assertEquals(1001L, inserted.getCustomerId());
-        assertEquals("LIC-001", inserted.getLicenseId());
-        assertEquals("professional", inserted.getEdition());
+        assertEquals(1002L, inserted.getPackageId());
+        assertEquals("专业版", inserted.getPackageName());
         assertEquals("enabled", inserted.getScopeStatus());
     }
 
@@ -97,12 +84,10 @@ class CvReportTemplateScopeValidationTest {
     }
 
     @Test
-    void normalizesBlankLicenseIdToNullOnUpdate() {
+    void normalizesScopeStatusOnUpdate() {
         when(templateMapper.selectById(301L)).thenReturn(publishedTemplate());
         CvReportTemplateScopeBo bo = validScopeBo();
         bo.setId(55L);
-        bo.setLicenseId("   ");
-        bo.setEdition(" GROUP ");
         bo.setScopeStatus(" ENABLED ");
 
         service.updateReportTemplateScope(bo);
@@ -110,87 +95,20 @@ class CvReportTemplateScopeValidationTest {
         ArgumentCaptor<CvReportTemplateScope> updateCaptor = ArgumentCaptor.forClass(CvReportTemplateScope.class);
         verify(scopeMapper).updateById(updateCaptor.capture());
         CvReportTemplateScope updated = updateCaptor.getValue();
-        assertNull(updated.getLicenseId());
-        assertEquals("group", updated.getEdition());
+        assertEquals(1002L, updated.getPackageId());
         assertEquals("enabled", updated.getScopeStatus());
     }
 
     @Test
-    void allowsLicenseOnlyDistributionContractAndPersistsLicenseReference() {
-        when(templateMapper.selectById(301L)).thenReturn(publishedTemplate());
-        when(scopeMapper.selectOne(any(), any(Boolean.class))).thenReturn(null);
-        CvReportTemplateScopeBo bo = validScopeBo();
-        bo.setCustomerId(null);
-
-        Validator validator = Validation.buildDefaultValidatorFactory().getValidator();
-        Set<ConstraintViolation<CvReportTemplateScopeBo>> violations = validator.validate(bo, AddGroup.class);
-        assertTrue(violations.isEmpty());
-
-        service.insertReportTemplateScope(bo);
-
-        ArgumentCaptor<CvReportTemplateScope> insertCaptor = ArgumentCaptor.forClass(CvReportTemplateScope.class);
-        verify(scopeMapper).insert(insertCaptor.capture());
-        CvReportTemplateScope inserted = insertCaptor.getValue();
-        assertNull(inserted.getCustomerId());
-        assertEquals("LIC-001", inserted.getLicenseId());
-    }
-
-    @Test
-    void allowsEditionOnlyDistributionContractAndPersistsEditionReference() {
-        when(templateMapper.selectById(301L)).thenReturn(publishedTemplate());
-        when(scopeMapper.selectOne(any(), any(Boolean.class))).thenReturn(null);
-        CvReportTemplateScopeBo bo = validScopeBo();
-        bo.setCustomerId(null);
-        bo.setLicenseId(" ");
-
-        Validator validator = Validation.buildDefaultValidatorFactory().getValidator();
-        Set<ConstraintViolation<CvReportTemplateScopeBo>> violations = validator.validate(bo, AddGroup.class);
-        assertTrue(violations.isEmpty());
-
-        service.insertReportTemplateScope(bo);
-
-        ArgumentCaptor<CvReportTemplateScope> insertCaptor = ArgumentCaptor.forClass(CvReportTemplateScope.class);
-        verify(scopeMapper).insert(insertCaptor.capture());
-        CvReportTemplateScope inserted = insertCaptor.getValue();
-        assertNull(inserted.getCustomerId());
-        assertNull(inserted.getLicenseId());
-        assertEquals("professional", inserted.getEdition());
-    }
-
-    @Test
-    void rejectsDistributionWithoutCustomerEditionOrLicenseMetadata() {
+    void rejectsDistributionWithoutPackage() {
         when(templateMapper.selectById(301L)).thenReturn(publishedTemplate());
         CvReportTemplateScopeBo bo = validScopeBo();
-        bo.setCustomerId(null);
-        bo.setEdition(" ");
-        bo.setLicenseId(" ");
+        bo.setPackageId(null);
 
         ServiceException exception = assertThrows(ServiceException.class,
             () -> service.insertReportTemplateScope(bo));
 
-        assertEquals("Distribution must reference customer, package, edition, or license entitlement metadata", exception.getMessage());
-    }
-
-    @Test
-    void rejectsUnknownCustomerReference() {
-        when(templateMapper.selectById(301L)).thenReturn(publishedTemplate());
-        when(customerMapper.selectById(1001L)).thenReturn(null);
-
-        ServiceException exception = assertThrows(ServiceException.class,
-            () -> service.insertReportTemplateScope(validScopeBo()));
-
-        assertEquals("Referenced vendor customer does not exist", exception.getMessage());
-    }
-
-    @Test
-    void rejectsUnknownLicenseReference() {
-        when(templateMapper.selectById(301L)).thenReturn(publishedTemplate());
-        when(licenseIssueMapper.selectOne(any(), any(Boolean.class))).thenReturn(null);
-
-        ServiceException exception = assertThrows(ServiceException.class,
-            () -> service.insertReportTemplateScope(validScopeBo()));
-
-        assertEquals("Referenced vendor license entitlement does not exist", exception.getMessage());
+        assertEquals("Distribution must reference a package", exception.getMessage());
     }
 
     @Test
@@ -223,7 +141,7 @@ class CvReportTemplateScopeValidationTest {
     }
 
     @Test
-    void insertRestoresDeletedDistributionScopeWithSameEntitlementKey() {
+    void insertRestoresDeletedDistributionScopeWithSamePackageKey() {
         when(templateMapper.selectById(301L)).thenReturn(publishedTemplate());
         CvReportTemplateScope deletedScope = new CvReportTemplateScope();
         deletedScope.setId(77L);
@@ -240,12 +158,21 @@ class CvReportTemplateScopeValidationTest {
         verify(scopeMapper, never()).insert(any(CvReportTemplateScope.class));
     }
 
+    @Test
+    void addGroupStillRequiresTemplateId() {
+        CvReportTemplateScopeBo bo = validScopeBo();
+        bo.setTemplateId(null);
+
+        Validator validator = Validation.buildDefaultValidatorFactory().getValidator();
+        Set<ConstraintViolation<CvReportTemplateScopeBo>> violations = validator.validate(bo, AddGroup.class);
+
+        assertFalse(violations.isEmpty());
+    }
+
     private CvReportTemplateScopeBo validScopeBo() {
         CvReportTemplateScopeBo bo = new CvReportTemplateScopeBo();
         bo.setTemplateId(301L);
-        bo.setCustomerId(1001L);
-        bo.setLicenseId(" LIC-001 ");
-        bo.setEdition(" Professional ");
+        bo.setPackageId(1002L);
         bo.setScopeStatus(null);
         return bo;
     }
@@ -264,17 +191,12 @@ class CvReportTemplateScopeValidationTest {
         return template;
     }
 
-    private CvCustomer activeCustomer() {
-        CvCustomer customer = new CvCustomer();
-        customer.setId(1001L);
-        customer.setCustomerStatus("active");
-        return customer;
-    }
-
-    private CvLicenseIssue issuedLicense() {
-        CvLicenseIssue licenseIssue = new CvLicenseIssue();
-        licenseIssue.setLicenseId("LIC-001");
-        licenseIssue.setIssueStatus("issued");
-        return licenseIssue;
+    private SysTenantPackage activePackage() {
+        SysTenantPackage tenantPackage = new SysTenantPackage();
+        tenantPackage.setPackageId(1002L);
+        tenantPackage.setPackageName("专业版");
+        tenantPackage.setStatus("0");
+        tenantPackage.setDelFlag("0");
+        return tenantPackage;
     }
 }

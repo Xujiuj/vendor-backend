@@ -27,8 +27,7 @@ public final class VendorManagedTableCatalog {
         "ef-electricity-factor",
         "ef-electricity-version",
         "ef-electricity-scope",
-        "greenhouse-gas",
-        "report-template-download"
+        "greenhouse-gas"
     );
 
     private static final Set<String> FACTOR_TABLE_CODES = Set.of(

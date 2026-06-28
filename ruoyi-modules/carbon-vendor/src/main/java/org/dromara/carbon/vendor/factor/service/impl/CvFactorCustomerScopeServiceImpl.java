@@ -5,17 +5,13 @@ import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.baomidou.mybatisplus.core.toolkit.support.SFunction;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import lombok.RequiredArgsConstructor;
-import org.dromara.carbon.vendor.customer.domain.CvCustomer;
 import org.dromara.carbon.vendor.factor.domain.CvFactorCustomerScope;
 import org.dromara.carbon.vendor.factor.domain.CvFactorVersion;
-import org.dromara.carbon.vendor.license.domain.CvLicenseIssue;
 import org.dromara.carbon.vendor.factor.domain.bo.CvFactorCustomerScopeBo;
 import org.dromara.carbon.vendor.factor.domain.enums.CvFactorVersionLifecycleState;
 import org.dromara.carbon.vendor.factor.domain.vo.CvFactorCustomerScopeVo;
-import org.dromara.carbon.vendor.customer.mapper.CvCustomerMapper;
 import org.dromara.carbon.vendor.factor.mapper.CvFactorCustomerScopeMapper;
 import org.dromara.carbon.vendor.factor.mapper.CvFactorVersionMapper;
-import org.dromara.carbon.vendor.license.mapper.CvLicenseIssueMapper;
 import org.dromara.carbon.vendor.factor.service.ICvFactorCustomerScopeService;
 import org.dromara.common.core.exception.ServiceException;
 import org.dromara.common.core.utils.MapstructUtils;
@@ -38,15 +34,12 @@ import java.util.Map;
 @Service
 public class CvFactorCustomerScopeServiceImpl implements ICvFactorCustomerScopeService {
 
-    private static final String ISSUE_STATUS_REVOKED = "revoked";
     private static final String SCOPE_STATUS_ENABLED = "enabled";
     private static final String SCOPE_STATUS_DISABLED = "disabled";
     private static final String SCOPE_STATUS_DELETED = "deleted";
 
     private final CvFactorCustomerScopeMapper baseMapper;
     private final CvFactorVersionMapper factorVersionMapper;
-    private final CvCustomerMapper customerMapper;
-    private final CvLicenseIssueMapper licenseIssueMapper;
     private final SysTenantPackageMapper tenantPackageMapper;
 
     @Override
@@ -68,8 +61,6 @@ public class CvFactorCustomerScopeServiceImpl implements ICvFactorCustomerScopeS
         validateScope(bo);
         CvFactorCustomerScope factorCustomerScope = toEntity(bo);
         applyPackageSnapshot(factorCustomerScope);
-        factorCustomerScope.setEdition(normalizeEdition(factorCustomerScope.getEdition()));
-        factorCustomerScope.setLicenseId(null);
         factorCustomerScope.setScopeStatus(normalizeScopeStatus(factorCustomerScope.getScopeStatus()));
         CvFactorCustomerScope deletedScope = findDeletedScope(factorCustomerScope);
         if (deletedScope != null) {
@@ -84,42 +75,20 @@ public class CvFactorCustomerScopeServiceImpl implements ICvFactorCustomerScopeS
         validateScope(bo);
         CvFactorCustomerScope factorCustomerScope = toEntity(bo);
         applyPackageSnapshot(factorCustomerScope);
-        factorCustomerScope.setEdition(normalizeEdition(factorCustomerScope.getEdition()));
-        factorCustomerScope.setLicenseId(null);
         factorCustomerScope.setScopeStatus(normalizeScopeStatus(factorCustomerScope.getScopeStatus()));
         return baseMapper.updateById(factorCustomerScope);
     }
 
     @Override
-    public boolean isFactorVersionAuthorized(Long versionId, Long customerId, Long packageId, String edition, String licenseId) {
+    public boolean isFactorVersionAuthorized(Long versionId, Long packageId) {
         CvFactorVersion version = requirePublishedOrFrozenVersion(versionId);
-        String normalizedEdition = normalizeEdition(edition);
-        String normalizedLicenseId = normalizeLicenseId(licenseId);
-        CvLicenseIssue entitlement = findLicenseIssue(normalizedLicenseId);
-        if (entitlement == null) {
+        if (packageId == null) {
             return false;
         }
-        if (isRevokedIssue(entitlement)) {
-            return false;
-        }
-        Long resolvedCustomerId = entitlementCustomerId(entitlement);
-        Long resolvedPackageId = entitlementPackageId(entitlement, packageId);
-        String resolvedEdition = entitlementEdition(entitlement);
-        if ((customerId != null && !customerId.equals(resolvedCustomerId))
-            || (packageId != null && !packageId.equals(resolvedPackageId))
-            || (normalizedEdition != null && !normalizedEdition.equals(resolvedEdition))) {
-            return false;
-        }
-        if (resolvedCustomerId == null && resolvedPackageId == null && resolvedEdition == null) {
-            return false;
-        }
-        List<CvFactorCustomerScope> scopes = baseMapper.selectList(Wrappers.<CvFactorCustomerScope>lambdaQuery()
+        return baseMapper.selectCount(Wrappers.<CvFactorCustomerScope>lambdaQuery()
             .eq(CvFactorCustomerScope::getVersionId, version.getId())
-            .eq(CvFactorCustomerScope::getScopeStatus, SCOPE_STATUS_ENABLED));
-        if (scopes.isEmpty()) {
-            return false;
-        }
-        return scopes.stream().anyMatch(scope -> matchesScope(scope, resolvedCustomerId, resolvedPackageId, resolvedEdition));
+            .eq(CvFactorCustomerScope::getPackageId, packageId)
+            .eq(CvFactorCustomerScope::getScopeStatus, SCOPE_STATUS_ENABLED)) > 0;
     }
 
     @Override
@@ -145,11 +114,8 @@ public class CvFactorCustomerScopeServiceImpl implements ICvFactorCustomerScopeS
         LambdaQueryWrapper<CvFactorCustomerScope> lqw = Wrappers.lambdaQuery();
         lqw.eq(bo.getId() != null, CvFactorCustomerScope::getId, bo.getId());
         lqw.eq(bo.getVersionId() != null, CvFactorCustomerScope::getVersionId, bo.getVersionId());
-        lqw.eq(bo.getCustomerId() != null, CvFactorCustomerScope::getCustomerId, bo.getCustomerId());
         lqw.eq(bo.getPackageId() != null, CvFactorCustomerScope::getPackageId, bo.getPackageId());
         lqw.like(StringUtils.isNotBlank(bo.getPackageName()), CvFactorCustomerScope::getPackageName, bo.getPackageName());
-        lqw.eq(StringUtils.isNotBlank(bo.getEdition()), CvFactorCustomerScope::getEdition, normalizeEdition(bo.getEdition()));
-        lqw.eq(StringUtils.isNotBlank(bo.getLicenseId()), CvFactorCustomerScope::getLicenseId, normalizeLicenseId(bo.getLicenseId()));
         lqw.eq(StringUtils.isNotBlank(bo.getScopeStatus()), CvFactorCustomerScope::getScopeStatus, normalizeScopeStatusFilter(bo.getScopeStatus()));
         lqw.ne(CvFactorCustomerScope::getScopeStatus, SCOPE_STATUS_DELETED);
         lqw.between(params.get("beginTime") != null && params.get("endTime") != null,
@@ -161,19 +127,12 @@ public class CvFactorCustomerScopeServiceImpl implements ICvFactorCustomerScopeS
 
     private void validateScope(CvFactorCustomerScopeBo bo) {
         requirePublishedOrFrozenVersion(bo.getVersionId());
-        String normalizedEdition = normalizeEdition(bo.getEdition());
-        if (bo.getCustomerId() != null) {
-            CvCustomer customer = customerMapper.selectById(bo.getCustomerId());
-            if (customer == null) {
-                throw new ServiceException("Referenced vendor customer does not exist");
-            }
+        if (bo.getPackageId() == null) {
+            throw new ServiceException("Factor scope must reference a package");
         }
         requireActivePackage(bo.getPackageId());
-        if (bo.getPackageId() != null) {
-            normalizedEdition = null;
-        }
-        if (hasDuplicateScope(bo, normalizedEdition)) {
-            throw new ServiceException("Factor scope already exists for this version, customer, and package");
+        if (hasDuplicateScope(bo)) {
+            throw new ServiceException("Factor scope already exists for this version and package");
         }
     }
 
@@ -195,7 +154,6 @@ public class CvFactorCustomerScopeServiceImpl implements ICvFactorCustomerScopeS
         SysTenantPackage tenantPackage = requireActivePackage(scope.getPackageId());
         if (tenantPackage != null) {
             scope.setPackageName(tenantPackage.getPackageName());
-            scope.setEdition(null);
         } else {
             scope.setPackageName(null);
         }
@@ -216,74 +174,13 @@ public class CvFactorCustomerScopeServiceImpl implements ICvFactorCustomerScopeS
         return version;
     }
 
-    private CvLicenseIssue findLicenseIssue(String licenseId) {
-        if (licenseId == null) {
-            return null;
-        }
-        return licenseIssueMapper.selectOne(Wrappers.<CvLicenseIssue>lambdaQuery()
-            .eq(CvLicenseIssue::getLicenseId, licenseId), false);
-    }
-
-    private boolean isRevokedIssue(CvLicenseIssue issue) {
-        return issue.getRevokedTime() != null || ISSUE_STATUS_REVOKED.equals(normalizeStatus(issue.getIssueStatus()));
-    }
-
-    private boolean hasDuplicateScope(CvFactorCustomerScopeBo bo, String normalizedEdition) {
+    private boolean hasDuplicateScope(CvFactorCustomerScopeBo bo) {
         LambdaQueryWrapper<CvFactorCustomerScope> query = Wrappers.lambdaQuery();
         query.eq(CvFactorCustomerScope::getVersionId, bo.getVersionId());
-        query.eq(bo.getCustomerId() != null, CvFactorCustomerScope::getCustomerId, bo.getCustomerId());
-        query.isNull(bo.getCustomerId() == null, CvFactorCustomerScope::getCustomerId);
-        query.eq(bo.getPackageId() != null, CvFactorCustomerScope::getPackageId, bo.getPackageId());
-        query.isNull(bo.getPackageId() == null, CvFactorCustomerScope::getPackageId);
-        query.eq(normalizedEdition != null, CvFactorCustomerScope::getEdition, normalizedEdition);
-        query.isNull(normalizedEdition == null, CvFactorCustomerScope::getEdition);
+        query.eq(CvFactorCustomerScope::getPackageId, bo.getPackageId());
         query.ne(CvFactorCustomerScope::getScopeStatus, SCOPE_STATUS_DELETED);
         query.ne(bo.getId() != null, CvFactorCustomerScope::getId, bo.getId());
         return baseMapper.selectCount(query) > 0;
-    }
-
-    private boolean matchesScope(CvFactorCustomerScope scope, Long customerId, Long packageId, String edition) {
-        return matchesCustomer(scope, customerId) && matchesPackage(scope, packageId) && matchesEdition(scope, edition);
-    }
-
-    private boolean matchesCustomer(CvFactorCustomerScope scope, Long customerId) {
-        return scope.getCustomerId() == null || scope.getCustomerId().equals(customerId);
-    }
-
-    private boolean matchesEdition(CvFactorCustomerScope scope, String edition) {
-        String scopeEdition = normalizeEdition(scope.getEdition());
-        return scopeEdition == null || scopeEdition.equals(edition);
-    }
-
-    private boolean matchesPackage(CvFactorCustomerScope scope, Long packageId) {
-        return scope.getPackageId() == null || scope.getPackageId().equals(packageId);
-    }
-
-    private Long entitlementCustomerId(CvLicenseIssue entitlement) {
-        return entitlement == null ? null : entitlement.getCustomerId();
-    }
-
-    private String entitlementEdition(CvLicenseIssue entitlement) {
-        return entitlement == null ? null : normalizeEdition(entitlement.getEdition());
-    }
-
-    private Long entitlementPackageId(CvLicenseIssue entitlement, Long requestPackageId) {
-        if (entitlement != null && entitlement.getPackageId() != null) {
-            return entitlement.getPackageId();
-        }
-        return requestPackageId;
-    }
-
-    private String normalizeEdition(String edition) {
-        return StringUtils.isBlank(edition) ? null : edition.trim().toLowerCase(Locale.ROOT);
-    }
-
-    private String normalizeStatus(String status) {
-        return StringUtils.isBlank(status) ? null : status.trim().toLowerCase(Locale.ROOT);
-    }
-
-    private String normalizeLicenseId(String licenseId) {
-        return StringUtils.isBlank(licenseId) ? null : licenseId.trim();
     }
 
     private String normalizeScopeStatus(String scopeStatus) {
@@ -306,10 +203,7 @@ public class CvFactorCustomerScopeServiceImpl implements ICvFactorCustomerScopeS
         LambdaQueryWrapper<CvFactorCustomerScope> wrapper = Wrappers.<CvFactorCustomerScope>lambdaQuery()
             .eq(CvFactorCustomerScope::getVersionId, scope.getVersionId())
             .eq(CvFactorCustomerScope::getScopeStatus, SCOPE_STATUS_DELETED);
-        appendNullableEq(wrapper, CvFactorCustomerScope::getCustomerId, scope.getCustomerId());
         appendNullableEq(wrapper, CvFactorCustomerScope::getPackageId, scope.getPackageId());
-        appendNullableEq(wrapper, CvFactorCustomerScope::getEdition, scope.getEdition());
-        appendNullableEq(wrapper, CvFactorCustomerScope::getLicenseId, scope.getLicenseId());
         return baseMapper.selectOne(wrapper, false);
     }
 

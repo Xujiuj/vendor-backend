@@ -4,7 +4,6 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import lombok.RequiredArgsConstructor;
-import org.dromara.carbon.vendor.dimension.domain.CvDimensionRecord;
 import org.dromara.carbon.vendor.license.domain.CvLicenseIssue;
 import org.dromara.carbon.vendor.dimension.domain.CvAdminDivision;
 import org.dromara.carbon.vendor.dimension.domain.CvBaseYear;
@@ -16,7 +15,6 @@ import org.dromara.carbon.vendor.dimension.domain.CvGreenhouseGas;
 import org.dromara.carbon.vendor.openapi.domain.CvOpenDimensionListResponse;
 import org.dromara.carbon.vendor.openapi.domain.CvOpenDimensionRecordVo;
 import org.dromara.carbon.vendor.openapi.domain.CvOpenDimensionRequest;
-import org.dromara.carbon.vendor.dimension.mapper.CvDimensionRecordMapper;
 import org.dromara.carbon.vendor.license.mapper.CvLicenseIssueMapper;
 import org.dromara.carbon.vendor.license.service.impl.CvLicenseInstallBindingSupport;
 import org.dromara.carbon.vendor.dimension.mapper.CvAdminDivisionMapper;
@@ -39,8 +37,6 @@ import java.util.List;
 
 /**
  * Vendor open dimension service implementation.
- * <p>Routes dimension queries to strong-typed tables for 7 dimensions,
- * falls back to cv_dimension_record for report-template-download.</p>
  */
 @RequiredArgsConstructor
 @Service
@@ -53,7 +49,6 @@ public class CvOpenDimensionServiceImpl implements ICvOpenDimensionService {
     private static final int DEFAULT_PAGE_SIZE = 100;
     private static final int MAX_PAGE_SIZE = 500;
     private final CvLicenseIssueMapper licenseIssueMapper;
-    private final CvDimensionRecordMapper dimensionRecordMapper;
     private final CvAdminDivisionMapper adminDivisionMapper;
     private final CvEmissionSourceCategoryMapper emissionSourceCategoryMapper;
     private final CvBaseYearMapper baseYearMapper;
@@ -80,18 +75,9 @@ public class CvOpenDimensionServiceImpl implements ICvOpenDimensionService {
             List<CvOpenDimensionRecordVo> records;
             long total;
 
-            if ("report-template-download".equals(dimensionCode)) {
-                // Legacy path: query cv_dimension_record
-                Page<CvDimensionRecord> page = dimensionRecordMapper.selectPage(
-                    new Page<>(pageNum, pageSize), buildLegacyQueryWrapper(request));
-                records = toOpenRecordsFromLegacy(page.getRecords());
-                total = page.getTotal();
-            } else {
-                // New path: query strong-typed tables
-                var result = queryStrongTyped(dimensionCode, request, pageNum, pageSize);
-                records = result.records;
-                total = result.total;
-            }
+            var result = queryStrongTyped(dimensionCode, request, pageNum, pageSize);
+            records = result.records;
+            total = result.total;
 
             CvOpenDimensionListResponse response = new CvOpenDimensionListResponse();
             response.setLicenseId(entitlement.getLicenseId());
@@ -156,13 +142,19 @@ public class CvOpenDimensionServiceImpl implements ICvOpenDimensionService {
         Page<CvEmissionSourceCategory> page = emissionSourceCategoryMapper.selectPage(new Page<>(pageNum, pageSize), qw);
         List<CvOpenDimensionRecordVo> records = page.getRecords().stream().map(e -> {
             CvOpenDimensionRecordVo vo = baseVo(e.getId(), "emission-source-category", e.getCategoryCode(), e.getCategoryName(), e.getParentCode());
+            vo.setCategorySk(e.getCategoryCode());
             vo.setBusinessKey(e.getBusinessKey());
             vo.setCategoryNameEn(e.getCategoryNameEn());
             vo.setGhgScope(e.getGhgScope());
+            vo.setGhgScopeCategorySort(e.getSortOrder());
             vo.setGhgScopeCategory(e.getGhgScopeCategory());
+            vo.setGhgScopeEn(null);
+            vo.setGhgScopeCategoryEn(null);
             vo.setIsoCategory(e.getIsoCategory());
             vo.setIsoCategoryEn(e.getIsoCategoryEn());
             vo.setIsoCategoryDescription(e.getIsoCategoryDescription());
+            vo.setIsoCategoryDescriptionEn(null);
+            vo.setIsoCustomSubcategory(null);
             vo.setGbScopeCategory(e.getGbScopeCategory());
             vo.setGbSubcategory(e.getGbSubcategory());
             vo.setEffectiveDate(e.getEffectiveDate());
@@ -298,61 +290,6 @@ public class CvOpenDimensionServiceImpl implements ICvOpenDimensionService {
             return vo;
         }).toList();
         return new QueryResult(records, page.getTotal());
-    }
-
-    // ==================== Legacy cv_dimension_record path ====================
-
-    private LambdaQueryWrapper<CvDimensionRecord> buildLegacyQueryWrapper(CvOpenDimensionRequest request) {
-        String dimensionCode = normalizeRequired(request.getDimensionCode(), "dimensionCode cannot be blank");
-        return new LambdaQueryWrapper<CvDimensionRecord>()
-            .eq(CvDimensionRecord::getDimensionCode, dimensionCode)
-            .like(StringUtils.isNotBlank(request.getRecordCode()), CvDimensionRecord::getRecordCode, request.getRecordCode())
-            .like(StringUtils.isNotBlank(request.getRecordName()), CvDimensionRecord::getRecordName, request.getRecordName())
-            .eq(StringUtils.isNotBlank(request.getParentCode()), CvDimensionRecord::getParentCode, request.getParentCode())
-            .eq(CvDimensionRecord::getStatus, "0")
-            .orderByAsc(CvDimensionRecord::getSortOrder)
-            .orderByAsc(CvDimensionRecord::getId);
-    }
-
-    private List<CvOpenDimensionRecordVo> toOpenRecordsFromLegacy(List<CvDimensionRecord> records) {
-        return records.stream().map(this::toOpenRecordFromLegacy).toList();
-    }
-
-    private CvOpenDimensionRecordVo toOpenRecordFromLegacy(CvDimensionRecord record) {
-        CvOpenDimensionRecordVo vo = new CvOpenDimensionRecordVo();
-        vo.setId(record.getId());
-        vo.setDimensionCode(record.getDimensionCode());
-        vo.setRecordCode(record.getRecordCode());
-        vo.setRecordName(record.getRecordName());
-        vo.setParentCode(record.getParentCode());
-        vo.setField01(record.getField01());
-        vo.setField02(record.getField02());
-        vo.setField03(record.getField03());
-        vo.setField04(record.getField04());
-        vo.setField05(record.getField05());
-        vo.setField06(record.getField06());
-        vo.setField07(record.getField07());
-        vo.setField08(record.getField08());
-        vo.setField09(record.getField09());
-        vo.setField10(record.getField10());
-        vo.setField11(record.getField11());
-        vo.setField12(record.getField12());
-        vo.setField13(record.getField13());
-        vo.setField14(record.getField14());
-        vo.setField15(record.getField15());
-        vo.setField16(record.getField16());
-        vo.setField17(record.getField17());
-        vo.setField18(record.getField18());
-        vo.setField19(record.getField19());
-        vo.setField20(record.getField20());
-        vo.setField21(record.getField21());
-        vo.setField22(record.getField22());
-        vo.setSortOrder(record.getSortOrder());
-        vo.setStatus(record.getStatus());
-        vo.setCreateTime(record.getCreateTime());
-        vo.setUpdateTime(record.getUpdateTime());
-        vo.setRemark(record.getRemark());
-        return vo;
     }
 
     // ==================== Helpers ====================

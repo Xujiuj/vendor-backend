@@ -17,10 +17,7 @@ public class CvFactorCustomerScopeBo extends BaseEntity {
     @NotNull(message = "versionId cannot be null", groups = AddGroup.class)
     private Long versionId;
 
-    private Long customerId;
     private Long packageId;
     private String packageName;
-    private String edition;
-    private String licenseId;
     private String scopeStatus;
 }
