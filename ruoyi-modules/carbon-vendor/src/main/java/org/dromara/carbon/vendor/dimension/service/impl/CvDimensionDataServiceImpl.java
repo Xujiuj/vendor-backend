@@ -22,6 +22,9 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import javax.sql.DataSource;
+import java.sql.Connection;
+import java.sql.SQLException;
 import java.sql.Timestamp;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -54,6 +57,7 @@ public class CvDimensionDataServiceImpl implements ICvDimensionDataService {
     private final CvElectricityFactorScopeMapper electricityFactorScopeMapper;
     private final CvGreenhouseGasMapper greenhouseGasMapper;
     private final JdbcTemplate jdbcTemplate;
+    private Boolean mysqlDatabase;
 
     @Override
     public TableDataInfo<?> queryPageList(String dimensionCode, PageQuery pageQuery) {
@@ -62,12 +66,8 @@ public class CvDimensionDataServiceImpl implements ICvDimensionDataService {
         int pageSize = pageQuery.getPageSize() == null || pageQuery.getPageSize() <= 0 ? PageQuery.DEFAULT_PAGE_SIZE : pageQuery.getPageSize();
         long offset = (long) (pageNum - 1) * pageSize;
         String tableName = dimension.tableName();
-        Long total = jdbcTemplate.queryForObject("SELECT COUNT(*) FROM " + quoteTable(tableName) + " WHERE [status] = '0'", Long.class);
-        List<Map<String, Object>> rows = jdbcTemplate.queryForList(
-            "SELECT * FROM " + quoteTable(tableName) + " WHERE [status] = '0' ORDER BY [sort_order] ASC, [id] ASC OFFSET ? ROWS FETCH NEXT ? ROWS ONLY",
-            offset,
-            pageSize
-        );
+        Long total = jdbcTemplate.queryForObject("SELECT COUNT(*) FROM " + quoteTable(tableName) + " WHERE " + quoteIdentifier("status") + " = '0'", Long.class);
+        List<Map<String, Object>> rows = queryPageRows(tableName, offset, pageSize);
         TableDataInfo<Map<String, Object>> dataInfo = new TableDataInfo<>();
         dataInfo.setCode(200);
         dataInfo.setMsg("查询成功");
@@ -79,7 +79,7 @@ public class CvDimensionDataServiceImpl implements ICvDimensionDataService {
     @Override
     public Map<String, Object> queryById(String dimensionCode, Long id) {
         ManagedDimension dimension = managedDimension(dimensionCode);
-        List<Map<String, Object>> rows = jdbcTemplate.queryForList("SELECT * FROM " + quoteTable(dimension.tableName()) + " WHERE [id] = ?", id);
+        List<Map<String, Object>> rows = jdbcTemplate.queryForList("SELECT * FROM " + quoteTable(dimension.tableName()) + " WHERE " + quoteIdentifier("id") + " = ?", id);
         return rows.isEmpty() ? null : toRecordMap(dimensionCode, rows.get(0));
     }
 
@@ -130,7 +130,7 @@ public class CvDimensionDataServiceImpl implements ICvDimensionDataService {
     @Override
     public List<Map<String, Object>> queryList(String dimensionCode) {
         ManagedDimension dimension = managedDimension(dimensionCode);
-        return jdbcTemplate.queryForList("SELECT * FROM " + quoteTable(dimension.tableName()) + " WHERE [status] = '0' ORDER BY [sort_order] ASC, [id] ASC")
+        return jdbcTemplate.queryForList("SELECT * FROM " + quoteTable(dimension.tableName()) + " WHERE " + quoteIdentifier("status") + " = '0' ORDER BY " + quoteIdentifier("sort_order") + " ASC, " + quoteIdentifier("id") + " ASC")
             .stream()
             .map(row -> toRecordMap(dimensionCode, row))
             .toList();
@@ -207,11 +207,11 @@ public class CvDimensionDataServiceImpl implements ICvDimensionDataService {
         if (factorVersion == null || StringUtils.isBlank(String.valueOf(factorVersion))) {
             throw new ServiceException("版本号不能为空");
         }
-        String sql = "SELECT COUNT(*) FROM " + quoteTable(tableName) + " WHERE [factor_version] = ?";
+        String sql = "SELECT COUNT(*) FROM " + quoteTable(tableName) + " WHERE " + quoteIdentifier("factor_version") + " = ?";
         List<Object> args = new ArrayList<>();
         args.add(String.valueOf(factorVersion).trim());
         if (currentId != null) {
-            sql += " AND [id] <> ?";
+            sql += " AND " + quoteIdentifier("id") + " <> ?";
             args.add(currentId);
         }
         Long count = jdbcTemplate.queryForObject(sql, Long.class, args.toArray());
@@ -306,7 +306,34 @@ public class CvDimensionDataServiceImpl implements ICvDimensionDataService {
         return new ManagedDimension(dimensionCode, tableName);
     }
 
+    private List<Map<String, Object>> queryPageRows(String tableName, long offset, int pageSize) {
+        String orderSql = " ORDER BY " + quoteIdentifier("sort_order") + " ASC, " + quoteIdentifier("id") + " ASC";
+        if (isMysql()) {
+            return jdbcTemplate.queryForList(
+                "SELECT * FROM " + quoteTable(tableName) + " WHERE " + quoteIdentifier("status") + " = '0'" + orderSql + " LIMIT ? OFFSET ?",
+                pageSize,
+                offset
+            );
+        }
+        return jdbcTemplate.queryForList(
+            "SELECT * FROM " + quoteTable(tableName) + " WHERE " + quoteIdentifier("status") + " = '0'" + orderSql + " OFFSET ? ROWS FETCH NEXT ? ROWS ONLY",
+            offset,
+            pageSize
+        );
+    }
+
     private List<String> physicalColumns(String tableName) {
+        if (isMysql()) {
+            return jdbcTemplate.queryForList("""
+                SELECT column_name
+                FROM information_schema.columns
+                WHERE table_schema = DATABASE()
+                  AND table_name = ?
+                  AND COALESCE(generation_expression, '') = ''
+                  AND extra NOT LIKE '%GENERATED%'
+                ORDER BY ordinal_position
+                """, String.class, tableName);
+        }
         return jdbcTemplate.queryForList("""
             SELECT column_name
             FROM information_schema.columns
@@ -357,7 +384,7 @@ public class CvDimensionDataServiceImpl implements ICvDimensionDataService {
         String setSql = columns.stream().map(column -> quoteIdentifier(column) + " = ?").reduce((left, right) -> left + ", " + right).orElse("");
         List<Object> args = new ArrayList<>(columns.stream().map(values::get).toList());
         args.add(id);
-        return jdbcTemplate.update("UPDATE " + quoteTable(tableName) + " SET " + setSql + " WHERE [id] = ?", args.toArray());
+        return jdbcTemplate.update("UPDATE " + quoteTable(tableName) + " SET " + setSql + " WHERE " + quoteIdentifier("id") + " = ?", args.toArray());
     }
 
     private Object normalizeValue(Object value) {
@@ -374,11 +401,36 @@ public class CvDimensionDataServiceImpl implements ICvDimensionDataService {
     }
 
     private String quoteTable(String tableName) {
+        if (isMysql()) {
+            return quoteIdentifier(tableName);
+        }
         return "dbo." + quoteIdentifier(tableName);
     }
 
     private String quoteIdentifier(String identifier) {
+        if (isMysql()) {
+            return "`" + identifier.replace("`", "``") + "`";
+        }
         return "[" + identifier.replace("]", "]]") + "]";
+    }
+
+    private boolean isMysql() {
+        if (mysqlDatabase != null) {
+            return mysqlDatabase;
+        }
+        DataSource dataSource = jdbcTemplate.getDataSource();
+        if (dataSource == null) {
+            mysqlDatabase = false;
+            return false;
+        }
+        try (Connection connection = dataSource.getConnection()) {
+            String productName = connection.getMetaData().getDatabaseProductName();
+            String normalizedProductName = productName == null ? "" : productName.toLowerCase();
+            mysqlDatabase = normalizedProductName.contains("mysql") || normalizedProductName.contains("mariadb");
+            return mysqlDatabase;
+        } catch (SQLException e) {
+            throw new ServiceException("failed to detect vendor database type");
+        }
     }
 
     private record ManagedDimension(String dimensionCode, String tableName) {
