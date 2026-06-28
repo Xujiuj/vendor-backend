@@ -1,6 +1,7 @@
 package org.dromara.carbon.vendor.factor;
 
 import org.dromara.carbon.vendor.factor.domain.CvFactorVersion;
+import org.dromara.carbon.vendor.factor.domain.bo.CvFactorVersionBo;
 import org.dromara.carbon.vendor.factor.mapper.CvFactorVersionMapper;
 import org.dromara.carbon.vendor.factor.service.impl.CvFactorVersionServiceImpl;
 import org.dromara.common.core.exception.ServiceException;
@@ -58,6 +59,34 @@ class CvFactorVersionLifecycleTest {
             () -> service.releaseFactorVersion(101L, "vendor-admin"));
 
         assertEquals("仅草稿状态的因子版本允许发布", exception.getMessage());
+    }
+
+    @Test
+    void updatesPublishedVersionMetadataWithoutChangingLifecycle() {
+        CvFactorVersion existing = publishedVersion();
+        Date publishedTime = existing.getPublishedTime();
+        when(factorVersionMapper.selectById(101L)).thenReturn(existing);
+        when(factorVersionMapper.selectCount(org.mockito.ArgumentMatchers.any())).thenReturn(0L);
+        when(factorVersionMapper.updateById(org.mockito.ArgumentMatchers.any(CvFactorVersion.class))).thenReturn(1);
+
+        CvFactorVersionBo bo = new CvFactorVersionBo();
+        bo.setId(101L);
+        bo.setVersionCode("FACTOR-2026-01-UPDATED");
+        bo.setVersionName("Updated published factor");
+        bo.setRemark("updated remark");
+
+        assertTrue(service.updateFactorVersion(bo));
+
+        ArgumentCaptor<CvFactorVersion> updateCaptor = ArgumentCaptor.forClass(CvFactorVersion.class);
+        verify(factorVersionMapper).updateById(updateCaptor.capture());
+        CvFactorVersion updated = updateCaptor.getValue();
+        assertEquals("FACTOR-2026-01-UPDATED", updated.getVersionCode());
+        assertEquals("Updated published factor", updated.getVersionName());
+        assertEquals("updated remark", updated.getRemark());
+        assertEquals("published", updated.getPublishStatus());
+        assertFalse(updated.getFrozenFlag());
+        assertEquals("release-user", updated.getPublishedBy());
+        assertEquals(publishedTime, updated.getPublishedTime());
     }
 
     @Test

@@ -13,7 +13,6 @@ import org.dromara.carbon.vendor.factor.service.ICvFactorVersionService;
 import org.dromara.common.core.enums.FormatsType;
 import org.dromara.common.core.exception.ServiceException;
 import org.dromara.common.core.utils.DateUtils;
-import org.dromara.common.core.utils.MapstructUtils;
 import org.dromara.common.core.utils.StringUtils;
 import org.dromara.common.mybatis.core.page.PageQuery;
 import org.dromara.common.mybatis.core.page.TableDataInfo;
@@ -48,7 +47,7 @@ public class CvFactorVersionServiceImpl implements ICvFactorVersionService {
     public Boolean insertFactorVersion(CvFactorVersionBo bo) {
         normalizeEditableFields(bo, true);
         ensureVersionCodeUnique(bo);
-        CvFactorVersion add = MapstructUtils.convert(bo, CvFactorVersion.class);
+        CvFactorVersion add = toEntity(bo);
         boolean flag = baseMapper.insert(add) > 0;
         if (flag) {
             bo.setId(add.getId());
@@ -59,14 +58,9 @@ public class CvFactorVersionServiceImpl implements ICvFactorVersionService {
     @Override
     public Boolean updateFactorVersion(CvFactorVersionBo bo) {
         CvFactorVersion existing = requireFactorVersion(bo.getId());
-        CvFactorVersionLifecycleState currentState = CvFactorVersionLifecycleState.fromVersion(existing);
-        if (currentState != CvFactorVersionLifecycleState.DRAFT
-            && currentState != CvFactorVersionLifecycleState.RETIRED) {
-            throw new ServiceException("仅草稿或已退役的因子版本允许编辑");
-        }
         normalizeEditableFields(bo, false);
         ensureVersionCodeUnique(bo);
-        CvFactorVersion update = MapstructUtils.convert(bo, CvFactorVersion.class);
+        CvFactorVersion update = toEntity(bo);
         update.setPublishStatus(existing.getPublishStatus());
         update.setFrozenFlag(existing.getFrozenFlag());
         update.setPublishedBy(existing.getPublishedBy());
@@ -192,6 +186,18 @@ public class CvFactorVersionServiceImpl implements ICvFactorVersionService {
             bo.setPublishStatus(CvFactorVersionLifecycleState.DRAFT.getStatus());
             bo.setFrozenFlag(Boolean.FALSE);
         }
+    }
+
+    private CvFactorVersion toEntity(CvFactorVersionBo bo) {
+        CvFactorVersion version = new CvFactorVersion();
+        version.setId(bo.getId());
+        version.setVersionCode(bo.getVersionCode());
+        version.setVersionName(bo.getVersionName());
+        version.setPublishStatus(bo.getPublishStatus());
+        version.setFrozenFlag(bo.getFrozenFlag());
+        version.setPublishedBy(bo.getPublishedBy());
+        version.setRemark(bo.getRemark());
+        return version;
     }
 
     private void ensureVersionCodeUnique(CvFactorVersionBo bo) {
