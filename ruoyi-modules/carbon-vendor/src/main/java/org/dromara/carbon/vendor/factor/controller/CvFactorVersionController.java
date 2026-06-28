@@ -92,6 +92,15 @@ public class CvFactorVersionController extends BaseController {
         return R.ok();
     }
 
+    @Log(title = "因子版本解冻", businessType = BusinessType.UPDATE)
+    @RepeatSubmit
+    @SaCheckPermission("vendor:factorVersion:freeze")
+    @PostMapping("/{id}/unfreeze")
+    public R<Void> unfreeze(@NotNull(message = "id cannot be null") @PathVariable Long id) {
+        factorVersionService.unfreezeFactorVersion(id, resolveOperator());
+        return R.ok();
+    }
+
     @Log(title = "因子版本退役", businessType = BusinessType.UPDATE)
     @RepeatSubmit
     @SaCheckPermission("vendor:factorVersion:retire")

@@ -90,6 +90,29 @@ class CvFactorVersionLifecycleTest {
     }
 
     @Test
+    void updatesLifecycleMetadataFromEditForm() {
+        CvFactorVersion existing = publishedVersion();
+        when(factorVersionMapper.selectById(101L)).thenReturn(existing);
+        when(factorVersionMapper.selectCount(org.mockito.ArgumentMatchers.any())).thenReturn(0L);
+        when(factorVersionMapper.updateById(org.mockito.ArgumentMatchers.any(CvFactorVersion.class))).thenReturn(1);
+
+        CvFactorVersionBo bo = new CvFactorVersionBo();
+        bo.setId(101L);
+        bo.setVersionCode("FACTOR-2026-01");
+        bo.setVersionName("Factor 2026.01");
+        bo.setPublishStatus("frozen");
+        bo.setFrozenFlag(Boolean.TRUE);
+
+        assertTrue(service.updateFactorVersion(bo));
+
+        ArgumentCaptor<CvFactorVersion> updateCaptor = ArgumentCaptor.forClass(CvFactorVersion.class);
+        verify(factorVersionMapper).updateById(updateCaptor.capture());
+        CvFactorVersion updated = updateCaptor.getValue();
+        assertEquals("frozen", updated.getPublishStatus());
+        assertTrue(updated.getFrozenFlag());
+    }
+
+    @Test
     void freezesPublishedVersionAndAppendsAuditRemark() {
         when(factorVersionMapper.selectById(101L)).thenReturn(publishedVersion());
 
@@ -103,6 +126,32 @@ class CvFactorVersionLifecycleTest {
         assertTrue(updated.getRemark().contains("existing remark"));
         assertTrue(updated.getRemark().contains("factor-version-freeze"));
         assertTrue(updated.getRemark().contains("auditor"));
+    }
+
+    @Test
+    void unfreezesFrozenVersionAndAppendsAuditRemark() {
+        when(factorVersionMapper.selectById(101L)).thenReturn(frozenVersion());
+
+        service.unfreezeFactorVersion(101L, "auditor");
+
+        ArgumentCaptor<CvFactorVersion> updateCaptor = ArgumentCaptor.forClass(CvFactorVersion.class);
+        verify(factorVersionMapper).updateById(updateCaptor.capture());
+        CvFactorVersion updated = updateCaptor.getValue();
+        assertFalse(updated.getFrozenFlag());
+        assertEquals("published", updated.getPublishStatus());
+        assertTrue(updated.getRemark().contains("existing remark"));
+        assertTrue(updated.getRemark().contains("factor-version-unfreeze"));
+        assertTrue(updated.getRemark().contains("auditor"));
+    }
+
+    @Test
+    void rejectsUnfreezeFromPublishedState() {
+        when(factorVersionMapper.selectById(101L)).thenReturn(publishedVersion());
+
+        ServiceException exception = assertThrows(ServiceException.class,
+            () -> service.unfreezeFactorVersion(101L, "auditor"));
+
+        assertEquals("仅已冻结的因子版本允许解冻", exception.getMessage());
     }
 
     @Test

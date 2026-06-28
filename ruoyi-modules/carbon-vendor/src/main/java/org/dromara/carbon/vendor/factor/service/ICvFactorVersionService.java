@@ -68,6 +68,14 @@ public interface ICvFactorVersionService {
     void freezeFactorVersion(Long id, String operatedBy);
 
     /**
+     * Unfreeze a frozen factor version back to published.
+     *
+     * @param id primary key
+     * @param operatedBy operator identifier for audit metadata
+     */
+    void unfreezeFactorVersion(Long id, String operatedBy);
+
+    /**
      * Retire a published or frozen factor version.
      *
      * @param id primary key

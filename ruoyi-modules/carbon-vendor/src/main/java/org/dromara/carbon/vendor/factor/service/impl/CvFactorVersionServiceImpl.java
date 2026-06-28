@@ -46,6 +46,7 @@ public class CvFactorVersionServiceImpl implements ICvFactorVersionService {
     @Override
     public Boolean insertFactorVersion(CvFactorVersionBo bo) {
         normalizeEditableFields(bo, true);
+        normalizeLifecycleFields(bo, null);
         ensureVersionCodeUnique(bo);
         CvFactorVersion add = toEntity(bo);
         boolean flag = baseMapper.insert(add) > 0;
@@ -59,10 +60,9 @@ public class CvFactorVersionServiceImpl implements ICvFactorVersionService {
     public Boolean updateFactorVersion(CvFactorVersionBo bo) {
         CvFactorVersion existing = requireFactorVersion(bo.getId());
         normalizeEditableFields(bo, false);
+        normalizeLifecycleFields(bo, existing);
         ensureVersionCodeUnique(bo);
         CvFactorVersion update = toEntity(bo);
-        update.setPublishStatus(existing.getPublishStatus());
-        update.setFrozenFlag(existing.getFrozenFlag());
         update.setPublishedBy(existing.getPublishedBy());
         update.setPublishedTime(existing.getPublishedTime());
         update.setCreateTime(existing.getCreateTime());
@@ -112,6 +112,20 @@ public class CvFactorVersionServiceImpl implements ICvFactorVersionService {
         version.setPublishStatus(CvFactorVersionLifecycleState.FROZEN.getStatus());
         version.setFrozenFlag(Boolean.TRUE);
         version.setRemark(appendAuditRemark(version.getRemark(), "freeze", operatedBy, operationTime));
+        baseMapper.updateById(version);
+    }
+
+    @Override
+    public void unfreezeFactorVersion(Long id, String operatedBy) {
+        CvFactorVersion version = requireFactorVersion(id);
+        CvFactorVersionLifecycleState currentState = CvFactorVersionLifecycleState.fromVersion(version);
+        if (currentState != CvFactorVersionLifecycleState.FROZEN) {
+            throw new ServiceException("仅已冻结的因子版本允许解冻");
+        }
+        Date operationTime = DateUtils.getNowDate();
+        version.setPublishStatus(CvFactorVersionLifecycleState.PUBLISHED.getStatus());
+        version.setFrozenFlag(Boolean.FALSE);
+        version.setRemark(appendAuditRemark(version.getRemark(), "unfreeze", operatedBy, operationTime));
         baseMapper.updateById(version);
     }
 
@@ -186,6 +200,22 @@ public class CvFactorVersionServiceImpl implements ICvFactorVersionService {
             bo.setPublishStatus(CvFactorVersionLifecycleState.DRAFT.getStatus());
             bo.setFrozenFlag(Boolean.FALSE);
         }
+    }
+
+    private void normalizeLifecycleFields(CvFactorVersionBo bo, CvFactorVersion existing) {
+        String status = StringUtils.isBlank(bo.getPublishStatus())
+            ? (existing == null ? CvFactorVersionLifecycleState.DRAFT.getStatus() : existing.getPublishStatus())
+            : CvFactorVersionLifecycleState.normalizeStatus(bo.getPublishStatus());
+        Boolean frozen = bo.getFrozenFlag() == null
+            ? (existing == null ? Boolean.FALSE : existing.getFrozenFlag())
+            : bo.getFrozenFlag();
+
+        CvFactorVersion candidate = new CvFactorVersion();
+        candidate.setPublishStatus(status);
+        candidate.setFrozenFlag(frozen);
+        CvFactorVersionLifecycleState state = CvFactorVersionLifecycleState.fromVersion(candidate);
+        bo.setPublishStatus(state.getStatus());
+        bo.setFrozenFlag(state == CvFactorVersionLifecycleState.FROZEN);
     }
 
     private CvFactorVersion toEntity(CvFactorVersionBo bo) {

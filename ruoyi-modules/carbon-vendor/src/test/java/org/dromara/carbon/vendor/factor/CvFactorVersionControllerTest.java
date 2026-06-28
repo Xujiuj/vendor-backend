@@ -42,6 +42,17 @@ class CvFactorVersionControllerTest {
     }
 
     @Test
+    void unfreezeDelegatesToServiceWithServerSideOperator() {
+        ICvFactorVersionService service = mock(ICvFactorVersionService.class);
+        CvFactorVersionController controller = new CvFactorVersionController(service);
+
+        R<Void> response = controller.unfreeze(101L);
+
+        assertEquals(R.SUCCESS, response.getCode());
+        verify(service).unfreezeFactorVersion(101L, "vendor-system");
+    }
+
+    @Test
     void retireEndpointUsesDedicatedPermissionAndPostMapping() throws Exception {
         Method method = CvFactorVersionController.class.getMethod("retire", Long.class);
         PostMapping postMapping = method.getAnnotation(PostMapping.class);
@@ -63,5 +74,17 @@ class CvFactorVersionControllerTest {
         assertNotNull(permission);
         assertArrayEquals(new String[] {"/{id}/restore"}, postMapping.value());
         assertArrayEquals(new String[] {"vendor:factorVersion:restore"}, permission.value());
+    }
+
+    @Test
+    void unfreezeEndpointUsesFreezePermissionAndPostMapping() throws Exception {
+        Method method = CvFactorVersionController.class.getMethod("unfreeze", Long.class);
+        PostMapping postMapping = method.getAnnotation(PostMapping.class);
+        SaCheckPermission permission = method.getAnnotation(SaCheckPermission.class);
+
+        assertNotNull(postMapping);
+        assertNotNull(permission);
+        assertArrayEquals(new String[] {"/{id}/unfreeze"}, postMapping.value());
+        assertArrayEquals(new String[] {"vendor:factorVersion:freeze"}, permission.value());
     }
 }
