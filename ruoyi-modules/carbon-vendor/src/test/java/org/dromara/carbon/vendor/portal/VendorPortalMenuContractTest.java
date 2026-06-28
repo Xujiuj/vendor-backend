@@ -77,12 +77,18 @@ class VendorPortalMenuContractTest {
 
     @Test
     void vendorStartupMenuSyncUsesTheSameSqlAsPortalScript() throws Exception {
-        String portalSql = Files.readString(resolveProjectFile(MENU_SQL_RELATIVE_PATH));
-        String startupSql = Files.readString(resolveProjectFile(MENU_SYNC_SQL_RELATIVE_PATH));
+        Path portalSqlPath = resolveProjectFile(MENU_SQL_RELATIVE_PATH);
+        Path startupSqlPath = resolveProjectFile(MENU_SYNC_SQL_RELATIVE_PATH);
+        String portalSql = Files.readString(portalSqlPath);
+        String startupSql = Files.readString(startupSqlPath);
         String runner = Files.readString(resolveProjectFile(SYSTEM_RUNNER_RELATIVE_PATH));
 
         assertEquals(portalSql, startupSql,
             "Startup menu sync SQL must match the manually executable vendor portal menu SQL");
+        assertDoesNotStartWithUtf8Bom(portalSqlPath);
+        assertDoesNotStartWithUtf8Bom(startupSqlPath);
+        assertContainsAll(startupSql, List.of("sysdate()"));
+        assertContainsNone(startupSql, List.of("SYSDATETIME()"));
         assertContainsAll(runner, List.of(
             "syncVendorPortalMenu()",
             "sql/vendor_portal_menu_sync.sql",
@@ -243,6 +249,15 @@ class VendorPortalMenuContractTest {
         for (String forbiddenFragment : forbiddenFragments) {
             assertFalse(text.contains(forbiddenFragment), "Expected SQL not to contain: " + forbiddenFragment);
         }
+    }
+
+    private static void assertDoesNotStartWithUtf8Bom(Path path) throws Exception {
+        byte[] bytes = Files.readAllBytes(path);
+        boolean startsWithBom = bytes.length >= 3
+            && bytes[0] == (byte) 0xEF
+            && bytes[1] == (byte) 0xBB
+            && bytes[2] == (byte) 0xBF;
+        assertFalse(startsWithBom, "SQL scripts executed during startup must not start with a UTF-8 BOM");
     }
 
     private static Path resolveProjectFile(String relativePath) {
