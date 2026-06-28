@@ -182,7 +182,7 @@ class CvLicenseIssueServiceTest {
 
         assertFalse(result.isIssued());
         assertEquals("REVOKED_LICENSE_REISSUE_BLOCKED", result.getStatus());
-        assertTrue(result.getMessage().contains("manual review"));
+        assertTrue(result.getMessage().contains("人工复核"));
         verify(licenseIssueMapper, never()).insert(any(CvLicenseIssue.class));
     }
 
@@ -288,6 +288,8 @@ class CvLicenseIssueServiceTest {
         tenantPackage.setPackageName("标准版");
         tenantPackage.setStatus("0");
         tenantPackage.setDelFlag("0");
+        tenantPackage.setLicenseFeatureCodes("factor_api,report_template");
+        tenantPackage.setLicenseTemplateEntitlements("[{\"templateCode\":\"TPL-001\",\"templateVersion\":\"v1\",\"scope\":\"download\"}]");
         return tenantPackage;
     }
 

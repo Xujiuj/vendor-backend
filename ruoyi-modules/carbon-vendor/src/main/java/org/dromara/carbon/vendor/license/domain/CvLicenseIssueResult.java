@@ -23,7 +23,7 @@ public class CvLicenseIssueResult {
         CvLicenseIssueResult result = new CvLicenseIssueResult();
         result.setIssued(true);
         result.setStatus("ISSUED");
-        result.setMessage("license issued");
+        result.setMessage("授权签发成功");
         result.setLicenseContent(licenseContent);
         result.setLicenseIssue(licenseIssue);
         return result;

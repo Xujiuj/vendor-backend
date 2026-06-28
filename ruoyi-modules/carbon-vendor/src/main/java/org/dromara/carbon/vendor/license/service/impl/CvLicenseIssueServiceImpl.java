@@ -3,6 +3,7 @@ package org.dromara.carbon.vendor.license.service.impl;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -16,6 +17,7 @@ import org.dromara.carbon.vendor.license.domain.CvLicenseIssueResult;
 import org.dromara.carbon.vendor.license.domain.CvLicensePayload;
 import org.dromara.carbon.vendor.license.domain.CvLicenseReissueRequest;
 import org.dromara.carbon.vendor.license.domain.CvLicenseRevokeRequest;
+import org.dromara.carbon.vendor.license.domain.CvTemplateEntitlement;
 import org.dromara.carbon.vendor.license.domain.vo.CvLicenseIssueVo;
 import org.dromara.carbon.vendor.customer.mapper.CvCustomerMapper;
 import org.dromara.carbon.vendor.license.mapper.CvLicenseIssueMapper;
@@ -40,6 +42,8 @@ import java.time.Instant;
 import java.time.ZoneOffset;
 import java.time.format.DateTimeFormatter;
 import java.util.Base64;
+import java.util.Arrays;
+import java.util.Collections;
 import java.util.Date;
 import java.util.List;
 import java.util.Map;
@@ -95,37 +99,37 @@ public class CvLicenseIssueServiceImpl implements ICvLicenseIssueService {
     @Override
     public CvLicenseIssueResult reissueRevokedLicense(CvLicenseReissueRequest request) {
         if (request == null) {
-            return CvLicenseIssueResult.failed("MALFORMED_REQUEST", "reissue request is empty");
+            return CvLicenseIssueResult.failed("MALFORMED_REQUEST", "重签请求不能为空");
         }
         if (StringUtils.isBlank(request.getSourceLicenseId())) {
-            return CvLicenseIssueResult.failed("MALFORMED_REQUEST", "reissue request misses sourceLicenseId");
+            return CvLicenseIssueResult.failed("MALFORMED_REQUEST", "重签请求缺少原授权编号");
         }
 
         CvLicenseIssue sourceIssue = findIssueByLicenseId(request.getSourceLicenseId());
         if (sourceIssue == null) {
-            return CvLicenseIssueResult.failed("SOURCE_LICENSE_NOT_FOUND", "revoked source license does not exist");
+            return CvLicenseIssueResult.failed("SOURCE_LICENSE_NOT_FOUND", "原撤销授权不存在");
         }
         if (!isRevokedIssue(sourceIssue)) {
-            return CvLicenseIssueResult.failed("SOURCE_LICENSE_NOT_REVOKED", "source license is not revoked");
+            return CvLicenseIssueResult.failed("SOURCE_LICENSE_NOT_REVOKED", "原授权尚未撤销，不能重签");
         }
         if (request.getCustomerId() != null && !Objects.equals(request.getCustomerId(), sourceIssue.getCustomerId())) {
-            return CvLicenseIssueResult.failed("SOURCE_LICENSE_CUSTOMER_MISMATCH", "source license does not belong to this customer");
+            return CvLicenseIssueResult.failed("SOURCE_LICENSE_CUSTOMER_MISMATCH", "原授权不属于当前客户");
         }
         if (request.getPackageId() == null) {
             request.setPackageId(sourceIssue.getPackageId());
         }
         if (StringUtils.equals(request.getLicenseId(), sourceIssue.getLicenseId())) {
-            return CvLicenseIssueResult.failed("DUPLICATE_LICENSE_ID", "reissued license must use a new licenseId");
+            return CvLicenseIssueResult.failed("DUPLICATE_LICENSE_ID", "重签授权必须使用新的授权编号");
         }
         if (hasReissueFromSource(sourceIssue.getLicenseId())) {
-            return CvLicenseIssueResult.failed("SOURCE_LICENSE_ALREADY_REISSUED", "revoked source license has already been reissued");
+            return CvLicenseIssueResult.failed("SOURCE_LICENSE_ALREADY_REISSUED", "原撤销授权已重签，不能重复重签");
         }
 
         String effectiveInstallId = resolveReissueInstallId(request, sourceIssue);
         if (effectiveInstallId == null) {
             return CvLicenseIssueResult.failed(
                 "INSTALL_ID_CHANGE_NOT_ALLOWED",
-                "reissue installId must match revoked source license unless installId change is explicitly allowed");
+                "重签部署指纹必须与原撤销授权一致，除非明确允许变更部署指纹");
         }
 
         request.setInstallId(effectiveInstallId);
@@ -136,14 +140,14 @@ public class CvLicenseIssueServiceImpl implements ICvLicenseIssueService {
     @Override
     public int revokeLicense(CvLicenseRevokeRequest request) {
         if (request == null || StringUtils.isBlank(request.getLicenseId())) {
-            throw new ServiceException("licenseId cannot be blank");
+            throw new ServiceException("授权编号不能为空");
         }
         CvLicenseIssue issue = findIssueByLicenseId(request.getLicenseId());
         if (issue == null) {
-            throw new ServiceException("Vendor license issue record does not exist");
+            throw new ServiceException("厂商端授权签发记录不存在");
         }
         if (isRevokedIssue(issue)) {
-            throw new ServiceException("Vendor license is already revoked");
+            throw new ServiceException("授权已撤销，不能重复撤销");
         }
         CvLicenseIssue update = new CvLicenseIssue();
         update.setId(issue.getId());
@@ -162,10 +166,10 @@ public class CvLicenseIssueServiceImpl implements ICvLicenseIssueService {
 
         CvCustomer customer = customerMapper.selectById(request.getCustomerId());
         if (customer == null) {
-            return CvLicenseIssueResult.failed("CUSTOMER_NOT_FOUND", "vendor customer does not exist");
+            return CvLicenseIssueResult.failed("CUSTOMER_NOT_FOUND", "厂商客户不存在");
         }
         if (isDisabledCustomer(customer.getCustomerStatus())) {
-            return CvLicenseIssueResult.failed("CUSTOMER_DISABLED", "disabled customer cannot issue license");
+            return CvLicenseIssueResult.failed("CUSTOMER_DISABLED", "客户已停用，不能签发授权");
         }
         SysTenantPackage tenantPackage;
         try {
@@ -179,29 +183,34 @@ public class CvLicenseIssueServiceImpl implements ICvLicenseIssueService {
         request.setPackageId(tenantPackage.getPackageId());
         request.setPackageName(tenantPackage.getPackageName());
         request.setEdition(tenantPackage.getPackageName());
+        try {
+            applyLicensePackageEntitlements(request, tenantPackage);
+        } catch (ServiceException e) {
+            return CvLicenseIssueResult.failed("PACKAGE_ENTITLEMENT_INVALID", e.getMessage());
+        }
         applyIssueDefaults(request, tenantPackage);
 
         List<CvLicenseIssue> existingIssues = findIssuesForCustomerInstall(request.getCustomerId(), request.getInstallId());
         if (!allowRevokedHistory && hasRevokedHistory(existingIssues)) {
             return CvLicenseIssueResult.failed(
                 "REVOKED_LICENSE_REISSUE_BLOCKED",
-                "revoked license history exists for this customer and installId; manual review is required");
+                "该客户与部署指纹存在撤销历史，需人工复核后重签");
         }
         if (hasExactDuplicate(existingIssues, request, !allowRevokedHistory)) {
             return CvLicenseIssueResult.failed(
                 "DUPLICATE_LICENSE_ISSUE",
-                "license already issued for the same customer, installId, and validity window");
+                "相同客户、部署指纹和有效期已存在授权，不能重复签发");
         }
 
         Date issuedTime = Objects.requireNonNullElseGet(request.getIssuedAt(), Date::new);
         CvSigningKey signingKey = findActiveSigningKey(request, issuedTime);
         if (signingKey == null) {
-            return CvLicenseIssueResult.failed("SIGNING_KEY_UNAVAILABLE", "no active signing key is available");
+            return CvLicenseIssueResult.failed("SIGNING_KEY_UNAVAILABLE", "没有可用的启用签名密钥");
         }
 
         String signingKeyMaterial = privateKeyProvider.resolvePrivateKeyPem(signingKey.getPrivateKeyRef());
         if (StringUtils.isBlank(signingKeyMaterial)) {
-            return CvLicenseIssueResult.failed("PRIVATE_KEY_UNAVAILABLE", "private key reference cannot be resolved");
+            return CvLicenseIssueResult.failed("PRIVATE_KEY_UNAVAILABLE", "签名私钥不可用");
         }
 
         try {
@@ -220,7 +229,7 @@ public class CvLicenseIssueServiceImpl implements ICvLicenseIssueService {
                     log.warn("Rejected duplicate reissue for revoked sourceLicenseId={}", issue.getSourceLicenseId());
                     return CvLicenseIssueResult.failed(
                         "SOURCE_LICENSE_ALREADY_REISSUED",
-                        "revoked source license has already been reissued");
+                        "原撤销授权已重签，不能重复重签");
                 }
                 throw e;
             }
@@ -228,7 +237,7 @@ public class CvLicenseIssueServiceImpl implements ICvLicenseIssueService {
         } catch (Exception e) {
             log.error("Failed to issue vendor license for customerId={}, installId={}, keyId={}",
                 request.getCustomerId(), request.getInstallId(), request.getKeyId(), e);
-            return CvLicenseIssueResult.failed("ISSUE_FAILED", "license issue failed");
+            return CvLicenseIssueResult.failed("ISSUE_FAILED", "授权签发失败");
         }
     }
 
@@ -259,26 +268,24 @@ public class CvLicenseIssueServiceImpl implements ICvLicenseIssueService {
 
     private CvLicenseIssueResult validateIssueRequest(CvLicenseIssueRequest request) {
         if (request == null) {
-            return CvLicenseIssueResult.failed("MALFORMED_REQUEST", "issue request is empty");
+            return CvLicenseIssueResult.failed("MALFORMED_REQUEST", "签发请求不能为空");
         }
         if (request.getCustomerId() == null
             || request.getPackageId() == null
             || StringUtils.isBlank(request.getIssuedBy())
-            || request.getFeatures() == null || request.getFeatures().isEmpty()
-            || request.getTemplateEntitlements() == null || request.getTemplateEntitlements().isEmpty()
             || request.getValidFrom() == null || request.getValidTo() == null) {
-            return CvLicenseIssueResult.failed("MALFORMED_REQUEST", "issue request misses required fields");
+            return CvLicenseIssueResult.failed("MALFORMED_REQUEST", "签发请求缺少必要字段");
         }
         String schemaVersion = Objects.requireNonNullElse(request.getSchemaVersion(), SCHEMA_VERSION);
         String algorithm = Objects.requireNonNullElse(request.getAlgorithm(), ALGORITHM);
         if (!SCHEMA_VERSION.equals(schemaVersion)) {
-            return CvLicenseIssueResult.failed("UNSUPPORTED_SCHEMA", "unsupported license schemaVersion");
+            return CvLicenseIssueResult.failed("UNSUPPORTED_SCHEMA", "授权文件版本不受支持");
         }
         if (!ALGORITHM.equals(algorithm)) {
-            return CvLicenseIssueResult.failed("UNSUPPORTED_ALGORITHM", "unsupported license algorithm");
+            return CvLicenseIssueResult.failed("UNSUPPORTED_ALGORITHM", "授权签名算法不受支持");
         }
         if (!request.getValidFrom().before(request.getValidTo())) {
-            return CvLicenseIssueResult.failed("INVALID_VALIDITY_WINDOW", "validFrom must be before validTo");
+            return CvLicenseIssueResult.failed("INVALID_VALIDITY_WINDOW", "有效期开始日期必须早于结束日期");
         }
         return CvLicenseIssueResult.issued(null, null);
     }
@@ -286,15 +293,51 @@ public class CvLicenseIssueServiceImpl implements ICvLicenseIssueService {
     private SysTenantPackage resolveTenantPackage(CvLicenseIssueRequest request) {
         SysTenantPackage tenantPackage = tenantPackageMapper.selectById(request.getPackageId());
         if (tenantPackage == null || "1".equals(tenantPackage.getDelFlag())) {
-            throw new ServiceException("套餐不存在，不能签发 License");
+            throw new ServiceException("授权套餐不存在，不能签发授权");
         }
         if (!"0".equals(tenantPackage.getStatus())) {
-            throw new ServiceException("套餐已停用，不能签发 License");
+            throw new ServiceException("授权套餐已停用，不能签发授权");
         }
         if (StringUtils.isBlank(tenantPackage.getPackageName())) {
-            throw new ServiceException("套餐名称为空，不能签发 License");
+            throw new ServiceException("授权套餐名称为空，不能签发授权");
         }
         return tenantPackage;
+    }
+
+    private void applyLicensePackageEntitlements(CvLicenseIssueRequest request, SysTenantPackage tenantPackage) {
+        List<String> features = parseFeatureCodes(tenantPackage.getLicenseFeatureCodes());
+        if (features.isEmpty()) {
+            throw new ServiceException("授权套餐未配置功能码，不能签发授权");
+        }
+        List<CvTemplateEntitlement> entitlements = parseTemplateEntitlements(tenantPackage.getLicenseTemplateEntitlements());
+        if (entitlements.isEmpty()) {
+            throw new ServiceException("授权套餐未配置模板授权，不能签发授权");
+        }
+        request.setFeatures(features);
+        request.setTemplateEntitlements(entitlements);
+    }
+
+    private List<String> parseFeatureCodes(String featureCodes) {
+        if (StringUtils.isBlank(featureCodes)) {
+            return Collections.emptyList();
+        }
+        return Arrays.stream(featureCodes.split("[,;\\s]+"))
+            .map(String::trim)
+            .filter(StringUtils::isNotBlank)
+            .distinct()
+            .toList();
+    }
+
+    private List<CvTemplateEntitlement> parseTemplateEntitlements(String value) {
+        if (StringUtils.isBlank(value)) {
+            return Collections.emptyList();
+        }
+        try {
+            return objectMapper.readValue(value, new TypeReference<List<CvTemplateEntitlement>>() {
+            });
+        } catch (Exception e) {
+            throw new ServiceException("授权套餐模板授权 JSON 无效");
+        }
     }
 
     private void applyIssueDefaults(CvLicenseIssueRequest request, SysTenantPackage tenantPackage) {

@@ -24,7 +24,7 @@ public final class CvLicenseInstallBindingSupport {
             return;
         }
         if (!installId.equals(issue.getInstallId())) {
-            throw new ServiceException("license installId does not match");
+            throw new ServiceException("授权文件的部署指纹与本机不匹配");
         }
     }
 }

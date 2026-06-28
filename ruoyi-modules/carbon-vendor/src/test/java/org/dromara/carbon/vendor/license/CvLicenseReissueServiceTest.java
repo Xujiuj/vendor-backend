@@ -207,7 +207,7 @@ class CvLicenseReissueServiceTest {
 
         assertFalse(result.isIssued());
         assertEquals("SOURCE_LICENSE_ALREADY_REISSUED", result.getStatus());
-        assertEquals("revoked source license has already been reissued", result.getMessage());
+        assertEquals("原撤销授权已重签，不能重复重签", result.getMessage());
     }
 
     @Test
@@ -230,7 +230,7 @@ class CvLicenseReissueServiceTest {
 
         assertFalse(result.isIssued());
         assertEquals("ISSUE_FAILED", result.getStatus());
-        assertEquals("license issue failed", result.getMessage());
+        assertEquals("授权签发失败", result.getMessage());
         assertNull(result.getLicenseContent());
     }
 
@@ -317,6 +317,8 @@ class CvLicenseReissueServiceTest {
         tenantPackage.setPackageName("标准版");
         tenantPackage.setStatus("0");
         tenantPackage.setDelFlag("0");
+        tenantPackage.setLicenseFeatureCodes("factor_api,report_template");
+        tenantPackage.setLicenseTemplateEntitlements("[{\"templateCode\":\"TPL-001\",\"templateVersion\":\"v1\",\"scope\":\"download\"}]");
         return tenantPackage;
     }
 

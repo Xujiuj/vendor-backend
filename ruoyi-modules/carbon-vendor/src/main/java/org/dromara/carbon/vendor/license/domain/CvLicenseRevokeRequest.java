@@ -14,7 +14,7 @@ public class CvLicenseRevokeRequest {
     /**
      * Issued license identifier to revoke.
      */
-    @NotBlank(message = "licenseId cannot be blank")
+    @NotBlank(message = "授权编号不能为空")
     private String licenseId;
 
     /**
