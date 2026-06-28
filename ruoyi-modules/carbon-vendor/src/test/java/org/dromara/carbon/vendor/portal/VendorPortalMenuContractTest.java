@@ -134,7 +134,8 @@ class VendorPortalMenuContractTest {
 
         assertContainsAll(sql, List.of(
             "Superadmin routing uses all enabled M/C menus",
-            "set visible = '1',\n    status = '1'",
+            "set visible = '1'",
+            "status = '1'",
             "menu_id in (2, 3, 4, 5, 6, 115, 116, 121)",
             "'tenant', 'demo'",
             "'oss', 'oss-config/index', 'client'",
