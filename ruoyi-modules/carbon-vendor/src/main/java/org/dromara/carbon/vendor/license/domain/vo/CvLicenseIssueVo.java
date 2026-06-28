@@ -124,7 +124,12 @@ public class CvLicenseIssueVo implements Serializable {
     private String revokeReason;
 
     /**
-     * Serialized license payload.
+     * Complete .lic envelope content.
+     */
+    private String licenseContent;
+
+    /**
+     * Serialized license payload used for signing.
      */
     private String licensePayload;
 

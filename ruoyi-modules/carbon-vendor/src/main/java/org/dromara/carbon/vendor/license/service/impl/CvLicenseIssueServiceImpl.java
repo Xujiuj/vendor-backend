@@ -84,14 +84,14 @@ public class CvLicenseIssueServiceImpl implements ICvLicenseIssueService {
     public TableDataInfo<CvLicenseIssueVo> selectPageLicenseIssueList(CvLicenseIssueBo bo, PageQuery pageQuery) {
         LambdaQueryWrapper<CvLicenseIssue> lqw = buildQueryWrapper(bo);
         Page<CvLicenseIssueVo> page = baseMapper.selectVoPage(pageQuery.build(), lqw);
-        page.getRecords().forEach(this::normalizePackageSnapshot);
+        page.getRecords().forEach(this::prepareIssueView);
         return TableDataInfo.build(page);
     }
 
     @Override
     public CvLicenseIssueVo selectLicenseIssueById(Long id) {
         CvLicenseIssueVo issue = baseMapper.selectVoById(id);
-        normalizePackageSnapshot(issue);
+        prepareIssueView(issue);
         return issue;
     }
 
@@ -462,6 +462,30 @@ public class CvLicenseIssueServiceImpl implements ICvLicenseIssueService {
         if (StringUtils.isNotBlank(packageName)) {
             issue.setPackageName(packageName);
             issue.setEdition(packageName);
+        }
+    }
+
+    private void prepareIssueView(CvLicenseIssueVo issue) {
+        normalizePackageSnapshot(issue);
+        populateLicenseContent(issue);
+    }
+
+    private void populateLicenseContent(CvLicenseIssueVo issue) {
+        if (issue == null
+            || StringUtils.isAnyBlank(issue.getSchemaVersion(), issue.getAlgorithm(), issue.getKeyId(),
+            issue.getLicensePayload(), issue.getSignatureText())) {
+            return;
+        }
+        try {
+            CvLicenseEnvelope envelope = new CvLicenseEnvelope();
+            envelope.setSchemaVersion(issue.getSchemaVersion());
+            envelope.setAlgorithm(issue.getAlgorithm());
+            envelope.setKeyId(issue.getKeyId());
+            envelope.setPayload(objectMapper.readValue(issue.getLicensePayload(), CvLicensePayload.class));
+            envelope.setSignature(issue.getSignatureText());
+            issue.setLicenseContent(objectMapper.writeValueAsString(envelope));
+        } catch (Exception e) {
+            log.warn("Failed to rebuild license content for licenseId={}", issue.getLicenseId(), e);
         }
     }
 

@@ -9,6 +9,7 @@ import org.dromara.carbon.vendor.license.domain.CvLicenseIssueRequest;
 import org.dromara.carbon.vendor.license.domain.CvLicenseIssueResult;
 import org.dromara.carbon.vendor.license.domain.CvLicenseRevokeRequest;
 import org.dromara.carbon.vendor.license.domain.CvTemplateEntitlement;
+import org.dromara.carbon.vendor.license.domain.vo.CvLicenseIssueVo;
 import org.dromara.carbon.vendor.customer.mapper.CvCustomerMapper;
 import org.dromara.carbon.vendor.license.mapper.CvLicenseIssueMapper;
 import org.dromara.carbon.vendor.license.mapper.CvSigningKeyMapper;
@@ -112,6 +113,29 @@ class CvLicenseIssueServiceTest {
         assertEquals("CUST-001", persistedPayload.get("customerId").asText());
         assertEquals("Test Manufacturing Co", persistedPayload.get("customerName").asText());
         assertTrue(verifySignature(issuedPayload.toString(), envelope.get("signature").asText()));
+    }
+
+    @Test
+    void rebuildsDownloadableLicenseContentForStoredIssueView() throws Exception {
+        CvLicenseIssueServiceImpl service = newService(signingKeyMaterial());
+        CvLicenseIssueVo storedIssue = new CvLicenseIssueVo();
+        storedIssue.setId(1L);
+        storedIssue.setLicenseId("LIC-STORED-001");
+        storedIssue.setSchemaVersion("license.v1");
+        storedIssue.setAlgorithm("RS256");
+        storedIssue.setKeyId("test-key-2026-01");
+        storedIssue.setLicensePayload("{\"licenseId\":\"LIC-STORED-001\",\"customerId\":\"CUST-001\"}");
+        storedIssue.setSignatureText("stored-signature");
+        when(licenseIssueMapper.selectVoById(eq(1L))).thenReturn(storedIssue);
+
+        CvLicenseIssueVo issue = service.selectLicenseIssueById(1L);
+
+        JsonNode envelope = objectMapper.readTree(issue.getLicenseContent());
+        assertEquals("license.v1", envelope.get("schemaVersion").asText());
+        assertEquals("RS256", envelope.get("algorithm").asText());
+        assertEquals("test-key-2026-01", envelope.get("keyId").asText());
+        assertEquals("LIC-STORED-001", envelope.get("payload").get("licenseId").asText());
+        assertEquals("stored-signature", envelope.get("signature").asText());
     }
 
     @Test
