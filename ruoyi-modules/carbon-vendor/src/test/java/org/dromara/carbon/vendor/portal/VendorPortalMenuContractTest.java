@@ -234,12 +234,12 @@ class VendorPortalMenuContractTest {
 
         assertContainsAll(devConfig, List.of(
             "com.microsoft.sqlserver.jdbc.SQLServerDriver",
-            "jdbc:sqlserver://${VENDOR_DB_HOST:127.0.0.1}:${VENDOR_DB_PORT:1433};databaseName=${VENDOR_DB_NAME:vendor}",
+            "jdbc:sqlserver://127.0.0.1:1433;databaseName=vendor",
             "${VENDOR_DB_URL:"
         ));
         assertContainsAll(prodConfig, List.of(
             "com.microsoft.sqlserver.jdbc.SQLServerDriver",
-            "jdbc:sqlserver://${VENDOR_DB_HOST:127.0.0.1}:${VENDOR_DB_PORT:1433};databaseName=${VENDOR_DB_NAME:vendor}",
+            "jdbc:sqlserver://127.0.0.1:1433;databaseName=vendor",
             "${VENDOR_DB_URL:"
         ));
         assertContainsAll(factorImportService, List.of(

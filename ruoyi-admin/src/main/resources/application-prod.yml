@@ -35,8 +35,8 @@ spring:
         master:
           type: ${spring.datasource.type}
           driverClassName: com.microsoft.sqlserver.jdbc.SQLServerDriver
-          # SQL Server JDBC 参数通过 VENDOR_DB_URL 统一覆盖。
-          url: ${VENDOR_DB_URL:jdbc:sqlserver://${VENDOR_DB_HOST:127.0.0.1}:${VENDOR_DB_PORT:1433};databaseName=${VENDOR_DB_NAME:vendor};encrypt=${VENDOR_DB_ENCRYPT:false};trustServerCertificate=${VENDOR_DB_TRUST_SERVER_CERTIFICATE:true}}
+          # SQL Server JDBC 参数通过 VENDOR_DB_URL 统一配置。
+          url: ${VENDOR_DB_URL:jdbc:sqlserver://127.0.0.1:1433;databaseName=vendor;encrypt=false;trustServerCertificate=true}
           username: ${VENDOR_DB_USERNAME:sa}
           password: ${VENDOR_DB_PASSWORD:}
       hikari:
