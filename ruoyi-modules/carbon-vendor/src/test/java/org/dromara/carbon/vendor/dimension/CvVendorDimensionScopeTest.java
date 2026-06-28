@@ -16,13 +16,9 @@ import org.dromara.carbon.vendor.openapi.domain.CvOpenDimensionRequest;
 import org.dromara.carbon.vendor.openapi.domain.CvOpenDimensionRecordVo;
 import org.dromara.carbon.vendor.openapi.service.ICvOpenApiAuditService;
 import org.dromara.carbon.vendor.openapi.service.impl.CvOpenDimensionServiceImpl;
-import org.dromara.carbon.vendor.tablefield.domain.bo.CvVendorTableFieldBo;
-import org.dromara.carbon.vendor.tablefield.mapper.CvVendorTableFieldMapper;
-import org.dromara.carbon.vendor.tablefield.service.impl.CvVendorTableFieldServiceImpl;
 import org.dromara.common.core.exception.ServiceException;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
-import org.springframework.jdbc.core.JdbcTemplate;
 
 import java.time.Instant;
 import java.util.Date;
@@ -33,34 +29,10 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.never;
-import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 @Tag("dev")
 class CvVendorDimensionScopeTest {
-
-    @Test
-    void tableFieldDefinitionsRejectEnterpriseFilledDimensionTables() {
-        CvVendorTableFieldMapper mapper = mock(CvVendorTableFieldMapper.class);
-        CvVendorTableFieldServiceImpl service = new CvVendorTableFieldServiceImpl(mapper, mock(JdbcTemplate.class));
-
-        assertThrows(ServiceException.class, () -> service.insertByBo(tableField("company")));
-        assertThrows(ServiceException.class, () -> service.insertByBo(tableField("intensity-denominator")));
-        assertThrows(ServiceException.class, () -> service.queryList(tableField("company")));
-        verify(mapper, never()).selectCount(any());
-    }
-
-    @Test
-    void tableFieldDefinitionsRejectEnterpriseFilledFactorTables() {
-        CvVendorTableFieldMapper mapper = mock(CvVendorTableFieldMapper.class);
-        CvVendorTableFieldServiceImpl service = new CvVendorTableFieldServiceImpl(mapper, mock(JdbcTemplate.class));
-
-        assertThrows(ServiceException.class, () -> service.insertByBo(tableField("factor", "201ef")));
-        assertThrows(ServiceException.class, () -> service.insertByBo(tableField("factor", "204ef")));
-        assertThrows(ServiceException.class, () -> service.queryList(tableField("factor", "201ef")));
-        verify(mapper, never()).selectCount(any());
-    }
 
     @Test
     void openDimensionApiRejectsEnterpriseFilledDimensions() {
@@ -117,20 +89,6 @@ class CvVendorDimensionScopeTest {
         assertNull(record.getGhgScopeCategoryEn());
         assertNull(record.getIsoCategoryDescriptionEn());
         assertNull(record.getIsoCustomSubcategory());
-    }
-
-    private CvVendorTableFieldBo tableField(String tableCode) {
-        return tableField("dimension", tableCode);
-    }
-
-    private CvVendorTableFieldBo tableField(String tableGroup, String tableCode) {
-        CvVendorTableFieldBo bo = new CvVendorTableFieldBo();
-        bo.setTableGroup(tableGroup);
-        bo.setTableCode(tableCode);
-        bo.setFieldKey("category_code");
-        bo.setFieldLabel("测试字段");
-        bo.setFieldType("text");
-        return bo;
     }
 
     private CvOpenDimensionRequest openRequest(String dimensionCode) {

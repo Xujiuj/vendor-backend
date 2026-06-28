@@ -465,21 +465,6 @@ BEGIN TRY
         (1, N'1', N'组织与边界', N'1.1', N'组织概览', N'["组织边界","排放边界"]', 1, N'0', @createDept, @createBy, @now, NULL, NULL, N'初始化报表目录'),
         (2, N'2', N'排放核算', N'2.1', N'范围二电力', N'["外购电力排放"]', 2, N'0', @createDept, @createBy, @now, NULL, NULL, N'初始化报表目录');
 
-    INSERT INTO dbo.cv_vendor_table_field
-        (id, table_group, table_code, field_key, field_label, field_type, field_precision, field_width, field_options,
-         required_flag, sort_order, status, create_time, update_time, remark)
-    VALUES
-        (2069717047359856642, N'dimension', N'admin-division', N'field01', N'行政区划级别', N'text', NULL, NULL, NULL, 1, 1, N'0', @now, NULL, N'初始化维表字段'),
-        (2069717047649263618, N'dimension', N'admin-division', N'field02', N'所属电网', N'text', NULL, NULL, NULL, 0, 2, N'0', @now, NULL, N'初始化维表字段'),
-        (2069717342383005697, N'dimension', N'base-year', N'field01', N'基准年', N'number', 0, NULL, NULL, 1, 1, N'0', @now, NULL, N'初始化维表字段'),
-        (2069717342664024066, N'dimension', N'base-year', N'field02', N'适用说明', N'text', NULL, NULL, NULL, 0, 2, N'0', @now, NULL, N'初始化维表字段'),
-        (2069717166469701634, N'dimension', N'emission-source-category', N'field01', N'GHG Protocol范围', N'text', NULL, NULL, NULL, 1, 1, N'0', @now, NULL, N'初始化维表字段'),
-        (2069717166759108610, N'dimension', N'emission-source-category', N'field02', N'计量单位', N'text', NULL, NULL, NULL, 0, 2, N'0', @now, NULL, N'初始化维表字段'),
-        (2069717400000000001, N'dimension', N'ef-electricity-factor', N'field01', N'行政区划代码', N'text', NULL, NULL, NULL, 1, 1, N'0', @now, NULL, N'初始化维表字段'),
-        (2069717400000000002, N'dimension', N'ef-electricity-factor', N'field02', N'排放因子', N'decimal', 10, NULL, NULL, 1, 2, N'0', @now, NULL, N'初始化维表字段'),
-        (2069717500000000001, N'dimension', N'greenhouse-gas', N'field01', N'GWP', N'decimal', 10, NULL, NULL, 1, 1, N'0', @now, NULL, N'初始化维表字段'),
-        (2069717600000000001, N'dimension', N'report-template-download', N'field01', N'模板类型', N'text', NULL, NULL, NULL, 1, 1, N'0', @now, NULL, N'初始化维表字段');
-
     COMMIT TRANSACTION;
 
     SELECT N'carbon_vendor_init_ok' AS result;
