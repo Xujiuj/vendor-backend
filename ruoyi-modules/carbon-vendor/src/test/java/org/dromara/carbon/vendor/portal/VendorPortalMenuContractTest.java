@@ -203,27 +203,29 @@ class VendorPortalMenuContractTest {
     }
 
     @Test
-    void vendorRuntimeConfigurationUsesSqlServerOnly() throws Exception {
+    void vendorRuntimeConfigurationUsesVendorMysqlDefaults() throws Exception {
         String devConfig = Files.readString(resolveProjectFile("ruoyi-admin/src/main/resources/application-dev.yml"));
         String prodConfig = Files.readString(resolveProjectFile("ruoyi-admin/src/main/resources/application-prod.yml"));
         String factorImportService = Files.readString(resolveProjectFile(
             "ruoyi-modules/carbon-vendor/src/main/java/org/dromara/carbon/vendor/factor/service/impl/CvSourceAFactorImportServiceImpl.java"));
 
         assertContainsAll(devConfig, List.of(
-            "com.microsoft.sqlserver.jdbc.SQLServerDriver",
-            "jdbc:sqlserver://127.0.0.1:1433;DatabaseName=vendor"
+            "com.mysql.cj.jdbc.Driver",
+            "jdbc:mysql://${VENDOR_DB_HOST:127.0.0.1}:${VENDOR_DB_PORT:3306}/${VENDOR_DB_NAME:vendor}",
+            "${VENDOR_DB_URL:"
         ));
         assertContainsAll(prodConfig, List.of(
-            "com.microsoft.sqlserver.jdbc.SQLServerDriver",
-            "jdbc:sqlserver://127.0.0.1:1433;DatabaseName=vendor"
+            "com.mysql.cj.jdbc.Driver",
+            "jdbc:mysql://${VENDOR_DB_HOST:127.0.0.1}:${VENDOR_DB_PORT:3306}/${VENDOR_DB_NAME:vendor}",
+            "${VENDOR_DB_URL:"
         ));
         assertContainsAll(factorImportService, List.of(
             "SYSDATETIME()",
             "MERGE INTO cv_electricity_factor_version"
         ));
 
-        assertContainsNone(devConfig, List.of("com." + "my" + "sql", "jdbc:" + "my" + "sql"));
-        assertContainsNone(prodConfig, List.of("com." + "my" + "sql", "jdbc:" + "my" + "sql"));
+        assertContainsNone(devConfig, List.of("jdbc:" + "sqlserver://127.0.0.1:1433;DatabaseName=vendor"));
+        assertContainsNone(prodConfig, List.of("jdbc:" + "sqlserver://127.0.0.1:1433;DatabaseName=vendor"));
         assertContainsNone(factorImportService, List.of(
             "ON DUPLICATE " + "KEY UPDATE",
             "VAL" + "UES(" + "effective_year)",
