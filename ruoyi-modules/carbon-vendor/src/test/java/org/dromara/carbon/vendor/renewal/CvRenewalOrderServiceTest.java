@@ -1,7 +1,9 @@
 package org.dromara.carbon.vendor.renewal;
 
 import com.baomidou.mybatisplus.core.conditions.AbstractWrapper;
+import com.baomidou.mybatisplus.core.conditions.Wrapper;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
+import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.core.metadata.TableInfoHelper;
 import org.dromara.carbon.vendor.customer.domain.CvCustomer;
 import org.dromara.carbon.vendor.license.domain.CvLicenseIssue;
@@ -87,6 +89,15 @@ class CvRenewalOrderServiceTest {
         assertThrows(ServiceException.class, () -> service.insertRenewalOrder(validOrderBo()));
 
         verify(renewalOrderMapper, never()).insert(any(CvRenewalOrder.class));
+    }
+
+    @Test
+    void mapsCurrencyWhenCreatingRenewalMetadata() {
+        service.insertRenewalOrder(validOrderBo());
+
+        ArgumentCaptor<CvRenewalOrder> orderCaptor = ArgumentCaptor.forClass(CvRenewalOrder.class);
+        verify(renewalOrderMapper).insert(orderCaptor.capture());
+        assertEquals("CNY", orderCaptor.getValue().getCurrency());
     }
 
     @Test
@@ -318,6 +329,36 @@ class CvRenewalOrderServiceTest {
             () -> service.applyRenewalCallback(callback));
 
         assertEquals("Issued renewal license package name does not match renewal order", exception.getMessage());
+        verify(renewalOrderMapper, never()).updateById(any(CvRenewalOrder.class));
+    }
+
+    @Test
+    void rejectsManualBindingWhenIssuedLicenseValidityOverlapsExistingCustomerLicense() {
+        CvRenewalOrder order = existingOrder();
+        order.setInstallId("INSTALL-001");
+        order.setRequestedPackageId(1001L);
+        order.setRequestedPackageName("标准版");
+        order.setRequestedEdition("标准版");
+        CvLicenseIssue original = activeLicense("LIC-ORIGINAL-001");
+        original.setValidFrom(Date.from(Instant.parse("2026-01-01T00:00:00Z")));
+        original.setValidTo(Date.from(Instant.parse("2026-07-01T00:00:00Z")));
+        CvLicenseIssue renewed = activeLicense("LIC-RENEWED-001");
+        renewed.setInstallId("INSTALL-001");
+        renewed.setPackageId(1001L);
+        renewed.setPackageName("标准版");
+        renewed.setEdition("标准版");
+        renewed.setValidFrom(Date.from(Instant.parse("2026-06-01T00:00:00Z")));
+        renewed.setValidTo(Date.from(Instant.parse("2027-06-01T00:00:00Z")));
+        stubRenewalOrdersByOrderNo(order);
+        stubLicenseIssuesByLicenseId(original, renewed);
+        when(licenseIssueMapper.selectOne(any(), eq(false))).thenReturn(original);
+        CvRenewalCallbackRequest callback = validPaidCallback();
+        callback.setIssuedLicenseId("LIC-RENEWED-001");
+
+        ServiceException exception = assertThrows(ServiceException.class,
+            () -> service.applyRenewalCallback(callback));
+
+        assertEquals("Issued renewal license validity overlaps existing customer license", exception.getMessage());
         verify(renewalOrderMapper, never()).updateById(any(CvRenewalOrder.class));
     }
 
@@ -578,6 +619,7 @@ class CvRenewalOrderServiceTest {
         bo.setCustomerId(1001L);
         bo.setLicenseId("LIC-ORIGINAL-001");
         bo.setAmount(new BigDecimal("12800.00"));
+        bo.setCurrency("CNY");
         return bo;
     }
 
@@ -609,6 +651,7 @@ class CvRenewalOrderServiceTest {
 
     private void stubRenewalOrdersByOrderNo(CvRenewalOrder... orders) {
         when(renewalOrderMapper.selectList(any())).thenAnswer(invocation -> List.of(orders));
+        when(renewalOrderMapper.selectList(any(IPage.class), any(Wrapper.class))).thenAnswer(invocation -> List.of(orders));
     }
 
     private void stubLicenseIssuesByLicenseId(CvLicenseIssue... issues) {
@@ -623,8 +666,11 @@ class CvRenewalOrderServiceTest {
                 return combinedIssues;
             });
         }
-        when(licenseIssueMapper.selectList(any())).thenAnswer(invocation -> {
-            Object wrapper = invocation.getArgument(0);
+        when(licenseIssueMapper.selectList(any())).thenAnswer(invocation -> matchingIssues(invocation.getArgument(0), issuesByLicenseId));
+        when(licenseIssueMapper.selectList(any(IPage.class), any(Wrapper.class))).thenAnswer(invocation -> matchingIssues(invocation.getArgument(1), issuesByLicenseId));
+    }
+
+    private List<CvLicenseIssue> matchingIssues(Object wrapper, Map<String, List<CvLicenseIssue>> issuesByLicenseId) {
             if (wrapper instanceof AbstractWrapper<?, ?, ?> queryWrapper) {
                 queryWrapper.getSqlSegment();
                 for (Object value : queryWrapper.getParamNameValuePairs().values()) {
@@ -635,7 +681,6 @@ class CvRenewalOrderServiceTest {
                 }
             }
             return List.of();
-        });
     }
 
     private CvRenewalOrder existingOrder() {

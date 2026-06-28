@@ -9,6 +9,7 @@ import lombok.RequiredArgsConstructor;
 import org.dromara.carbon.vendor.renewal.config.VendorPaymentProperties;
 import org.dromara.carbon.vendor.customer.domain.CvCustomer;
 import org.dromara.carbon.vendor.renewal.domain.CvRenewalOrder;
+import org.dromara.carbon.vendor.license.domain.CvLicenseIssue;
 import org.dromara.carbon.vendor.renewal.domain.bo.OnlinePurchaseCreateBo;
 import org.dromara.carbon.vendor.renewal.domain.bo.PaymentNotifyBo;
 import org.dromara.carbon.vendor.license.domain.CvLicenseIssueRequest;
@@ -16,6 +17,7 @@ import org.dromara.carbon.vendor.license.domain.CvLicenseIssueResult;
 import org.dromara.carbon.vendor.license.domain.CvTemplateEntitlement;
 import org.dromara.carbon.vendor.renewal.domain.vo.OnlinePurchaseOrderVo;
 import org.dromara.carbon.vendor.customer.mapper.CvCustomerMapper;
+import org.dromara.carbon.vendor.license.mapper.CvLicenseIssueMapper;
 import org.dromara.carbon.vendor.renewal.mapper.CvRenewalOrderMapper;
 import org.dromara.carbon.vendor.license.service.ICvLicenseIssueService;
 import org.dromara.carbon.vendor.renewal.service.IOnlinePurchaseService;
@@ -48,12 +50,14 @@ public class OnlinePurchaseServiceImpl implements IOnlinePurchaseService {
     private static final String ISSUE_READY = "ready_to_issue";
     private static final String ISSUE_ISSUED = "issued";
     private static final String ISSUE_FAILED = "issue_failed";
+    private static final String ISSUE_REVOKED = "revoked";
     private static final String CHANNEL_WECHAT = "WECHAT";
     private static final String CHANNEL_ALIPAY = "ALIPAY";
     private static final String ONLINE_ISSUER = "online-purchase";
 
     private final CvRenewalOrderMapper renewalOrderMapper;
     private final CvCustomerMapper customerMapper;
+    private final CvLicenseIssueMapper licenseIssueMapper;
     private final SysTenantPackageMapper tenantPackageMapper;
     private final VendorPaymentProperties paymentProperties;
     private final ICvLicenseIssueService licenseIssueService;
@@ -203,7 +207,7 @@ public class OnlinePurchaseServiceImpl implements IOnlinePurchaseService {
             throw new ServiceException("套餐未配置 License 模板授权");
         }
 
-        Date validFrom = Objects.requireNonNullElseGet(order.getPaidTime(), Date::new);
+        Date validFrom = resolveNextValidFrom(order);
         Date validTo = Date.from(validFrom.toInstant().plus(resolveValidityDays(tenantPackage), ChronoUnit.DAYS));
         CvLicenseIssueRequest request = new CvLicenseIssueRequest();
         request.setCustomerId(order.getCustomerId());
@@ -219,6 +223,24 @@ public class OnlinePurchaseServiceImpl implements IOnlinePurchaseService {
         request.setIssuedAt(Date.from(Instant.now()));
         request.setIssuedBy(ONLINE_ISSUER);
         return request;
+    }
+
+    private Date resolveNextValidFrom(CvRenewalOrder order) {
+        Date paidTime = Objects.requireNonNullElseGet(order.getPaidTime(), Date::new);
+        CvLicenseIssue latestIssue = licenseIssueMapper.selectOne(new LambdaQueryWrapper<CvLicenseIssue>()
+            .eq(CvLicenseIssue::getCustomerId, order.getCustomerId())
+            .gt(CvLicenseIssue::getValidTo, paidTime)
+            .and(wrapper -> wrapper.isNull(CvLicenseIssue::getRevokedTime)
+                .and(statusWrapper -> statusWrapper.isNull(CvLicenseIssue::getIssueStatus)
+                    .or()
+                    .ne(CvLicenseIssue::getIssueStatus, ISSUE_REVOKED)))
+            .orderByDesc(CvLicenseIssue::getValidTo)
+            .orderByDesc(CvLicenseIssue::getId),
+            false);
+        if (latestIssue == null || latestIssue.getValidTo() == null) {
+            return paidTime;
+        }
+        return latestIssue.getValidTo();
     }
 
     private CvCustomer resolveCustomer(OnlinePurchaseCreateBo bo) {

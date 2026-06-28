@@ -39,6 +39,7 @@ import static org.mockito.Mockito.when;
 class OnlinePurchaseServiceImplTest {
 
     private CvRenewalOrderMapper renewalOrderMapper;
+    private CvLicenseIssueMapper licenseIssueMapper;
     private SysTenantPackageMapper tenantPackageMapper;
     private ICvLicenseIssueService licenseIssueService;
     private OnlinePurchaseServiceImpl service;
@@ -48,12 +49,14 @@ class OnlinePurchaseServiceImplTest {
         renewalOrderMapper = mock(CvRenewalOrderMapper.class);
         CvCustomerMapper customerMapper = mock(CvCustomerMapper.class);
         tenantPackageMapper = mock(SysTenantPackageMapper.class);
+        licenseIssueMapper = mock(CvLicenseIssueMapper.class);
         licenseIssueService = mock(ICvLicenseIssueService.class);
         VendorPaymentProperties paymentProperties = new VendorPaymentProperties();
         paymentProperties.setRequireSignature(false);
         service = new OnlinePurchaseServiceImpl(
             renewalOrderMapper,
             customerMapper,
+            licenseIssueMapper,
             tenantPackageMapper,
             paymentProperties,
             licenseIssueService,
@@ -101,6 +104,33 @@ class OnlinePurchaseServiceImplTest {
         CvRenewalOrder issueUpdate = updateCaptor.getAllValues().get(1);
         assertEquals("issued", issueUpdate.getIssueStatus());
         assertEquals("LIC-AUTO-001", issueUpdate.getIssuedLicenseId());
+    }
+
+    @Test
+    void paidOnlineOrderStartsRenewalAfterExistingCustomerLicense() {
+        CvRenewalOrder order = pendingOrder();
+        order.setPaidTime(Date.from(java.time.Instant.parse("2026-06-01T00:00:00Z")));
+        SysTenantPackageVo tenantPackage = autoIssuePackage();
+        tenantPackage.setLicenseValidityDays(30);
+        CvLicenseIssue existingIssue = new CvLicenseIssue();
+        existingIssue.setId(1L);
+        existingIssue.setCustomerId(10L);
+        existingIssue.setValidTo(Date.from(java.time.Instant.parse("2026-07-01T00:00:00Z")));
+        CvLicenseIssue issuedIssue = new CvLicenseIssue();
+        issuedIssue.setLicenseId("LIC-AUTO-002");
+        when(renewalOrderMapper.selectOne(any(LambdaQueryWrapper.class))).thenReturn(order);
+        when(tenantPackageMapper.selectVoById(1001L)).thenReturn(tenantPackage);
+        when(licenseIssueMapper.selectOne(any(LambdaQueryWrapper.class), any(Boolean.class))).thenReturn(existingIssue);
+        when(licenseIssueService.issueManualLicense(any(CvLicenseIssueRequest.class)))
+            .thenReturn(CvLicenseIssueResult.issued("{}", issuedIssue));
+
+        service.markPaid(paidNotify());
+
+        ArgumentCaptor<CvLicenseIssueRequest> requestCaptor = ArgumentCaptor.forClass(CvLicenseIssueRequest.class);
+        verify(licenseIssueService).issueManualLicense(requestCaptor.capture());
+        CvLicenseIssueRequest request = requestCaptor.getValue();
+        assertEquals(existingIssue.getValidTo(), request.getValidFrom());
+        assertEquals(Date.from(java.time.Instant.parse("2026-07-31T00:00:00Z")), request.getValidTo());
     }
 
     @Test

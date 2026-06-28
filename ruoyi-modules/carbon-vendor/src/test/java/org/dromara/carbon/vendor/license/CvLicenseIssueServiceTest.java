@@ -174,6 +174,39 @@ class CvLicenseIssueServiceTest {
     }
 
     @Test
+    void rejectsOverlappingIssueForSameCustomerAcrossPackages() {
+        when(licenseIssueMapper.selectOne(any(), eq(false))).thenReturn(existingIssuedRecord());
+        CvLicenseIssueServiceImpl service = newService(signingKeyMaterial());
+
+        CvLicenseIssueResult result = service.issueManualLicense(validRequest());
+
+        assertFalse(result.isIssued());
+        assertEquals("CUSTOMER_LICENSE_PERIOD_OVERLAP", result.getStatus());
+        verify(licenseIssueMapper, never()).insert(any(CvLicenseIssue.class));
+    }
+
+    @Test
+    void listNormalizesLegacyStandardEditionToPackageDisplayName() {
+        com.baomidou.mybatisplus.extension.plugins.pagination.Page<org.dromara.carbon.vendor.license.domain.vo.CvLicenseIssueVo> page =
+            new com.baomidou.mybatisplus.extension.plugins.pagination.Page<>();
+        org.dromara.carbon.vendor.license.domain.vo.CvLicenseIssueVo row =
+            new org.dromara.carbon.vendor.license.domain.vo.CvLicenseIssueVo();
+        row.setPackageId(1001L);
+        row.setEdition("standard");
+        page.setRecords(List.of(row));
+        page.setTotal(1);
+        when(licenseIssueMapper.selectVoPage(any(), any())).thenReturn(page);
+        CvLicenseIssueServiceImpl service = newService(signingKeyMaterial());
+
+        org.dromara.common.mybatis.core.page.TableDataInfo<org.dromara.carbon.vendor.license.domain.vo.CvLicenseIssueVo> result =
+            service.selectPageLicenseIssueList(new org.dromara.carbon.vendor.license.domain.bo.CvLicenseIssueBo(),
+                new org.dromara.common.mybatis.core.page.PageQuery(1, 10));
+
+        assertEquals("标准版", result.getRows().get(0).getPackageName());
+        assertEquals("标准版", result.getRows().get(0).getEdition());
+    }
+
+    @Test
     void blocksReissueWhenRevokedHistoryExistsForCustomerInstall() {
         when(licenseIssueMapper.selectList(any())).thenReturn(List.of(existingRevokedRecord()));
         CvLicenseIssueServiceImpl service = newService(signingKeyMaterial());

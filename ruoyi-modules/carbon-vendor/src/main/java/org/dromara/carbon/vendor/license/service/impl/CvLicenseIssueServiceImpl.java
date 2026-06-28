@@ -83,12 +83,15 @@ public class CvLicenseIssueServiceImpl implements ICvLicenseIssueService {
     public TableDataInfo<CvLicenseIssueVo> selectPageLicenseIssueList(CvLicenseIssueBo bo, PageQuery pageQuery) {
         LambdaQueryWrapper<CvLicenseIssue> lqw = buildQueryWrapper(bo);
         Page<CvLicenseIssueVo> page = baseMapper.selectVoPage(pageQuery.build(), lqw);
+        page.getRecords().forEach(this::normalizePackageSnapshot);
         return TableDataInfo.build(page);
     }
 
     @Override
     public CvLicenseIssueVo selectLicenseIssueById(Long id) {
-        return baseMapper.selectVoById(id);
+        CvLicenseIssueVo issue = baseMapper.selectVoById(id);
+        normalizePackageSnapshot(issue);
+        return issue;
     }
 
     @Override
@@ -200,6 +203,12 @@ public class CvLicenseIssueServiceImpl implements ICvLicenseIssueService {
             return CvLicenseIssueResult.failed(
                 "DUPLICATE_LICENSE_ISSUE",
                 "相同客户、部署指纹和有效期已存在授权，不能重复签发");
+        }
+        CvLicenseIssue overlap = findOverlappingCustomerIssue(request);
+        if (overlap != null) {
+            return CvLicenseIssueResult.failed(
+                "CUSTOMER_LICENSE_PERIOD_OVERLAP",
+                "同一客户已存在有效期重叠的授权，不能为多个套餐签发重叠生效时间");
         }
 
         Date issuedTime = Objects.requireNonNullElseGet(request.getIssuedAt(), Date::new);
@@ -387,6 +396,19 @@ public class CvLicenseIssueServiceImpl implements ICvLicenseIssueService {
                 && Objects.equals(issue.getValidTo(), request.getValidTo()));
     }
 
+    private CvLicenseIssue findOverlappingCustomerIssue(CvLicenseIssueRequest request) {
+        return baseMapper.selectOne(new LambdaQueryWrapper<CvLicenseIssue>()
+            .eq(CvLicenseIssue::getCustomerId, request.getCustomerId())
+            .ne(StringUtils.isNotBlank(request.getLicenseId()), CvLicenseIssue::getLicenseId, request.getLicenseId())
+            .lt(CvLicenseIssue::getValidFrom, request.getValidTo())
+            .gt(CvLicenseIssue::getValidTo, request.getValidFrom())
+            .and(wrapper -> wrapper.isNull(CvLicenseIssue::getRevokedTime)
+                .and(statusWrapper -> statusWrapper.isNull(CvLicenseIssue::getIssueStatus)
+                    .or()
+                    .ne(CvLicenseIssue::getIssueStatus, ISSUE_STATUS_REVOKED))),
+            false);
+    }
+
     private boolean isRevokedIssue(CvLicenseIssue issue) {
         return issue.getRevokedTime() != null || ISSUE_STATUS_REVOKED.equals(normalizeStatus(issue.getIssueStatus()));
     }
@@ -408,6 +430,37 @@ public class CvLicenseIssueServiceImpl implements ICvLicenseIssueService {
 
     private String normalizeStatus(String status) {
         return StringUtils.isBlank(status) ? null : status.trim().toLowerCase();
+    }
+
+    private void normalizePackageSnapshot(CvLicenseIssueVo issue) {
+        if (issue == null) {
+            return;
+        }
+        if (StringUtils.isBlank(issue.getPackageName()) && issue.getPackageId() != null) {
+            SysTenantPackage tenantPackage = tenantPackageMapper.selectById(issue.getPackageId());
+            if (tenantPackage != null && StringUtils.isNotBlank(tenantPackage.getPackageName())) {
+                issue.setPackageName(tenantPackage.getPackageName());
+            }
+        }
+        String packageName = StringUtils.blankToDefault(issue.getPackageName(), displayNameForLegacyEdition(issue.getEdition()));
+        if (StringUtils.isNotBlank(packageName)) {
+            issue.setPackageName(packageName);
+            issue.setEdition(packageName);
+        }
+    }
+
+    private String displayNameForLegacyEdition(String edition) {
+        String normalized = normalizeStatus(edition);
+        if ("standard".equals(normalized)) {
+            return "标准版";
+        }
+        if ("professional".equals(normalized) || "pro".equals(normalized)) {
+            return "专业版";
+        }
+        if ("enterprise".equals(normalized) || "group".equals(normalized)) {
+            return "集团版";
+        }
+        return StringUtils.isBlank(edition) ? null : edition.trim();
     }
 
     private CvSigningKey findActiveSigningKey(CvLicenseIssueRequest request, Date issuedTime) {

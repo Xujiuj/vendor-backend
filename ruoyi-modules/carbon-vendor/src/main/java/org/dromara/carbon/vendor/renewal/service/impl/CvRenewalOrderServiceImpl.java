@@ -16,7 +16,6 @@ import org.dromara.carbon.vendor.license.mapper.CvLicenseIssueMapper;
 import org.dromara.carbon.vendor.renewal.mapper.CvRenewalOrderMapper;
 import org.dromara.carbon.vendor.renewal.service.ICvRenewalOrderService;
 import org.dromara.common.core.exception.ServiceException;
-import org.dromara.common.core.utils.MapstructUtils;
 import org.dromara.common.core.utils.StringUtils;
 import org.dromara.common.mybatis.core.page.PageQuery;
 import org.dromara.common.mybatis.core.page.TableDataInfo;
@@ -71,14 +70,14 @@ public class CvRenewalOrderServiceImpl implements ICvRenewalOrderService {
     @Override
     public int insertRenewalOrder(CvRenewalOrderBo bo) {
         validateRenewalMetadata(bo);
-        CvRenewalOrder renewalOrder = MapstructUtils.convert(bo, CvRenewalOrder.class);
+        CvRenewalOrder renewalOrder = toEntity(bo);
         return baseMapper.insert(renewalOrder);
     }
 
     @Override
     public int updateRenewalOrder(CvRenewalOrderBo bo) {
         validateRenewalMetadata(bo);
-        CvRenewalOrder renewalOrder = MapstructUtils.convert(bo, CvRenewalOrder.class);
+        CvRenewalOrder renewalOrder = toEntity(bo);
         return baseMapper.updateById(renewalOrder);
     }
 
@@ -184,6 +183,34 @@ public class CvRenewalOrderServiceImpl implements ICvRenewalOrderService {
         return lqw;
     }
 
+    private CvRenewalOrder toEntity(CvRenewalOrderBo bo) {
+        CvRenewalOrder renewalOrder = new CvRenewalOrder();
+        renewalOrder.setId(bo.getId());
+        renewalOrder.setOrderNo(bo.getOrderNo());
+        renewalOrder.setCustomerId(bo.getCustomerId());
+        renewalOrder.setLicenseId(bo.getLicenseId());
+        renewalOrder.setInstallId(bo.getInstallId());
+        renewalOrder.setRequestedPackageId(bo.getRequestedPackageId());
+        renewalOrder.setRequestedPackageName(bo.getRequestedPackageName());
+        renewalOrder.setRequestedEdition(bo.getRequestedEdition());
+        renewalOrder.setRenewalPeriod(bo.getRenewalPeriod());
+        renewalOrder.setContactName(bo.getContactName());
+        renewalOrder.setContactEmail(bo.getContactEmail());
+        renewalOrder.setContactPhone(bo.getContactPhone());
+        renewalOrder.setIdempotencyKey(bo.getIdempotencyKey());
+        renewalOrder.setRequestSource(bo.getRequestSource());
+        renewalOrder.setOrderStatus(bo.getOrderStatus());
+        renewalOrder.setIssueStatus(bo.getIssueStatus());
+        renewalOrder.setPayChannel(bo.getPayChannel());
+        renewalOrder.setAmount(bo.getAmount());
+        renewalOrder.setCurrency(bo.getCurrency());
+        renewalOrder.setPaidTime(bo.getPaidTime());
+        renewalOrder.setIssuedLicenseId(bo.getIssuedLicenseId());
+        renewalOrder.setCreateTime(bo.getCreateTime());
+        renewalOrder.setUpdateTime(bo.getUpdateTime());
+        return renewalOrder;
+    }
+
     private void validateRenewalMetadata(CvRenewalOrderBo bo) {
         if (bo == null) {
             throw new ServiceException("Renewal order metadata cannot be empty");
@@ -264,6 +291,9 @@ public class CvRenewalOrderServiceImpl implements ICvRenewalOrderService {
         if (StringUtils.isNotBlank(order.getRequestedPackageName()) && !Objects.equals(order.getRequestedPackageName(), issue.getPackageName())) {
             throw new ServiceException("Issued renewal license package name does not match renewal order");
         }
+        if (findOverlappingIssuedLicense(issue) != null) {
+            throw new ServiceException("Issued renewal license validity overlaps existing customer license");
+        }
     }
 
     private CvRenewalOrder findRenewalOrderForCallback(CvRenewalCallbackRequest request) {
@@ -274,9 +304,10 @@ public class CvRenewalOrderServiceImpl implements ICvRenewalOrderService {
             return baseMapper.selectById(request.getId());
         }
         if (StringUtils.isNotBlank(request.getOrderNo())) {
-            List<CvRenewalOrder> orders = baseMapper.selectList(new LambdaQueryWrapper<CvRenewalOrder>()
-                .eq(CvRenewalOrder::getOrderNo, request.getOrderNo())
-                .last("limit 2"));
+            List<CvRenewalOrder> orders = baseMapper.selectList(new Page<>(1, 2, false),
+                new LambdaQueryWrapper<CvRenewalOrder>()
+                    .eq(CvRenewalOrder::getOrderNo, request.getOrderNo())
+                    .orderByAsc(CvRenewalOrder::getId));
             if (orders.size() > 1) {
                 throw new ServiceException("Duplicate renewal order metadata");
             }
@@ -361,13 +392,30 @@ public class CvRenewalOrderServiceImpl implements ICvRenewalOrderService {
     }
 
     private CvLicenseIssue findIssueByLicenseId(String licenseId) {
-        List<CvLicenseIssue> issues = licenseIssueMapper.selectList(new LambdaQueryWrapper<CvLicenseIssue>()
-            .eq(CvLicenseIssue::getLicenseId, licenseId)
-            .last("limit 2"));
+        List<CvLicenseIssue> issues = licenseIssueMapper.selectList(new Page<>(1, 2, false),
+            new LambdaQueryWrapper<CvLicenseIssue>()
+                .eq(CvLicenseIssue::getLicenseId, licenseId)
+                .orderByAsc(CvLicenseIssue::getId));
         if (issues.size() > 1) {
             throw new ServiceException("Duplicate license issue metadata");
         }
         return issues.isEmpty() ? null : issues.get(0);
+    }
+
+    private CvLicenseIssue findOverlappingIssuedLicense(CvLicenseIssue issue) {
+        if (issue == null || issue.getCustomerId() == null || issue.getValidFrom() == null || issue.getValidTo() == null) {
+            return null;
+        }
+        return licenseIssueMapper.selectOne(new LambdaQueryWrapper<CvLicenseIssue>()
+            .eq(CvLicenseIssue::getCustomerId, issue.getCustomerId())
+            .ne(StringUtils.isNotBlank(issue.getLicenseId()), CvLicenseIssue::getLicenseId, issue.getLicenseId())
+            .lt(CvLicenseIssue::getValidFrom, issue.getValidTo())
+            .gt(CvLicenseIssue::getValidTo, issue.getValidFrom())
+            .and(wrapper -> wrapper.isNull(CvLicenseIssue::getRevokedTime)
+                .and(statusWrapper -> statusWrapper.isNull(CvLicenseIssue::getIssueStatus)
+                    .or()
+                    .ne(CvLicenseIssue::getIssueStatus, ISSUE_STATUS_REVOKED))),
+            false);
     }
 
     private boolean isRevokedIssue(CvLicenseIssue issue) {

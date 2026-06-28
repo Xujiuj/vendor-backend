@@ -116,6 +116,12 @@ public class CvRenewalOrderBo extends BaseEntity {
     private BigDecimal amount;
 
     /**
+     * Payment currency.
+     */
+    @NotBlank(message = "currency cannot be blank", groups = { AddGroup.class, EditGroup.class })
+    private String currency;
+
+    /**
      * Payment timestamp.
      */
     private Date paidTime;
