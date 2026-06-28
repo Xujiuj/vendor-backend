@@ -327,15 +327,15 @@ BEGIN TRY
          license_template_entitlements, status, del_flag, create_dept, create_by, create_time, update_by, update_time)
     VALUES
         (1001, N'基础套餐', @menuIds, N'适用于单组织基础填报和 Source(A) 模板下载。', 1, 1999.00, N'CNY', N'YEAR',
-         1, 0, NULL, NULL, N'capture,report-template-download',
+         1, 0, N'local-key-2026-06-08', NULL, N'capture,report-template-download',
          N'[{"templateCode":"source-a-emission-source-identification","templateVersion":"source(A)","scope":"download"},{"templateCode":"source-a-emission-factor","templateVersion":"source(A)","scope":"download"},{"templateCode":"source-a-report-content","templateVersion":"source(A)","scope":"download"},{"templateCode":"source-a-activity-10101","templateVersion":"source(A)","scope":"download"},{"templateCode":"source-a-activity-10102","templateVersion":"source(A)","scope":"download"},{"templateCode":"source-a-activity-10103","templateVersion":"source(A)","scope":"download"},{"templateCode":"source-a-activity-10104","templateVersion":"source(A)","scope":"download"},{"templateCode":"source-a-green-power","templateVersion":"source(A)","scope":"download"},{"templateCode":"source-a-intensity-dimension","templateVersion":"source(A)","scope":"download"},{"templateCode":"source-a-denominator-fact","templateVersion":"source(A)","scope":"download"}]',
          N'0', N'0', @createDept, @createBy, @now, NULL, NULL),
         (1002, N'专业套餐', @menuIds, N'适用于多部门协同、因子同步和 Source(A) 报表模板同步。', 1, 0.00, N'CNY', N'YEAR',
-         0, 0, NULL, NULL, N'capture,factor-sync,report-template-sync,report-template-download',
+         0, 0, N'local-key-2026-06-08', NULL, N'capture,factor-sync,report-template-sync,report-template-download',
          N'[{"templateCode":"source-a-emission-source-identification","templateVersion":"source(A)","scope":"download"},{"templateCode":"source-a-emission-factor","templateVersion":"source(A)","scope":"download"},{"templateCode":"source-a-report-content","templateVersion":"source(A)","scope":"download"},{"templateCode":"source-a-activity-10101","templateVersion":"source(A)","scope":"download"},{"templateCode":"source-a-activity-10102","templateVersion":"source(A)","scope":"download"},{"templateCode":"source-a-activity-10103","templateVersion":"source(A)","scope":"download"},{"templateCode":"source-a-activity-10104","templateVersion":"source(A)","scope":"download"},{"templateCode":"source-a-green-power","templateVersion":"source(A)","scope":"download"},{"templateCode":"source-a-intensity-dimension","templateVersion":"source(A)","scope":"download"},{"templateCode":"source-a-denominator-fact","templateVersion":"source(A)","scope":"download"}]',
          N'0', N'0', @createDept, @createBy, @now, NULL, NULL),
         (1003, N'集团套餐', @menuIds, N'适用于集团客户、报表门禁和 Source(A) 全量模板能力。', 1, 0.00, N'CNY', N'YEAR',
-         0, 0, NULL, NULL, N'capture,factor-sync,report-template-sync,report-template-download,report-gate,premium-support',
+         0, 0, N'local-key-2026-06-08', NULL, N'capture,factor-sync,report-template-sync,report-template-download,report-gate,premium-support',
          N'[{"templateCode":"source-a-emission-source-identification","templateVersion":"source(A)","scope":"download"},{"templateCode":"source-a-emission-factor","templateVersion":"source(A)","scope":"download"},{"templateCode":"source-a-report-content","templateVersion":"source(A)","scope":"download"},{"templateCode":"source-a-activity-10101","templateVersion":"source(A)","scope":"download"},{"templateCode":"source-a-activity-10102","templateVersion":"source(A)","scope":"download"},{"templateCode":"source-a-activity-10103","templateVersion":"source(A)","scope":"download"},{"templateCode":"source-a-activity-10104","templateVersion":"source(A)","scope":"download"},{"templateCode":"source-a-green-power","templateVersion":"source(A)","scope":"download"},{"templateCode":"source-a-intensity-dimension","templateVersion":"source(A)","scope":"download"},{"templateCode":"source-a-denominator-fact","templateVersion":"source(A)","scope":"download"}]',
          N'0', N'0', @createDept, @createBy, @now, NULL, NULL);
 
@@ -343,8 +343,8 @@ BEGIN TRY
         (id, key_id, algorithm, public_key_pem, private_key_ref, key_status, valid_from, valid_to, create_time)
     VALUES
         (1, N'local-key-2026-06-08', N'RS256',
-         N'MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEArb/hTFPic/UB/Y8FCyyTJe/Qqi822swUHsp8auQjYpzsq+DS0CYeAl8gFVaeOfjRx3PlaTJKP3DvYXi3+gyDQ165EcrNceQoOn7jeEr0Sy35pr5S7PlvDmk8AiL3e5MfU/jTjjQO+ueAQXstf4m6cf3p1jYsGvwYLJG5Qse1lfw6m9bU2XlkkaSAq6pUkvngSqSp1ai9B8lk6YsMv6zK',
-         N'env:LOCAL_VENDOR_LICENSE_PRIVATE_KEY', N'active', '2026-01-01T00:00:00', NULL, @now);
+         N'MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA8//eDDZSHROkF3uJdVTnjuV5ZSeQ2gpgLJVGSAt7jKb9YPgX5gENaFftwOEapBwZ6a45olIVfk4V+lsElpx7mAaXn/n7/q0Du1hevMcI3f4xVBP4b8JsTHnTbbl3CJ2Sgz7kYlllwvubbBZuI/K7/BU8ZwMW7a2xSo0tlEJgEhRZ0Psd0j696OOGnrbcWWX80wPRP7L5QUdwawC67DSmA1YEOZj7ksF8KMavJVSHTFIt5um4SLbdsNHSA6R4ebyFfwkrp3bcDsgM780Y/NaImCqLKR5OUdDKVL0e+cA5qqASLYnUw/dYPLprEmCSG+QzXoOwSMXRul3QJISlGZpTXwIDAQAB',
+         N'file:/opt/fx/secrets/vendor-license-private-key.pem', N'active', '2026-01-01T00:00:00', NULL, @now);
 
     INSERT INTO dbo.cv_admin_division
         (id, division_code, division_name, parent_code, level_type, sort_order, status, create_dept, create_by, create_time, update_by, update_time, remark)

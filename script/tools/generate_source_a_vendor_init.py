@@ -232,15 +232,15 @@ def package_block() -> str:
          license_template_entitlements, status, del_flag, create_dept, create_by, create_time, update_by, update_time)
     VALUES
         (1001, N'基础套餐', @menuIds, N'适用于单组织基础填报和 Source(A) 模板下载。', 1, 1999.00, N'CNY', N'YEAR',
-         1, 0, NULL, NULL, N'capture,report-template-download',
+         1, 0, N'local-key-2026-06-08', NULL, N'capture,report-template-download',
          {q(entitlements)},
          N'0', N'0', @createDept, @createBy, @now, NULL, NULL),
         (1002, N'专业套餐', @menuIds, N'适用于多部门协同、因子同步和 Source(A) 报表模板同步。', 1, 0.00, N'CNY', N'YEAR',
-         0, 0, NULL, NULL, N'capture,factor-sync,report-template-sync,report-template-download',
+         0, 0, N'local-key-2026-06-08', NULL, N'capture,factor-sync,report-template-sync,report-template-download',
          {q(entitlements)},
          N'0', N'0', @createDept, @createBy, @now, NULL, NULL),
         (1003, N'集团套餐', @menuIds, N'适用于集团客户、报表门禁和 Source(A) 全量模板能力。', 1, 0.00, N'CNY', N'YEAR',
-         0, 0, NULL, NULL, N'capture,factor-sync,report-template-sync,report-template-download,report-gate,premium-support',
+         0, 0, N'local-key-2026-06-08', NULL, N'capture,factor-sync,report-template-sync,report-template-download,report-gate,premium-support',
          {q(entitlements)},
          N'0', N'0', @createDept, @createBy, @now, NULL, NULL);
 """
