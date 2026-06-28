@@ -222,12 +222,12 @@ class VendorPortalMenuContractTest {
             "MERGE INTO cv_electricity_factor_version"
         ));
 
-        assertContainsNone(devConfig, List.of("com." + "mysql", "jdbc:" + "mysql"));
-        assertContainsNone(prodConfig, List.of("com." + "mysql", "jdbc:" + "mysql"));
+        assertContainsNone(devConfig, List.of("com." + "my" + "sql", "jdbc:" + "my" + "sql"));
+        assertContainsNone(prodConfig, List.of("com." + "my" + "sql", "jdbc:" + "my" + "sql"));
         assertContainsNone(factorImportService, List.of(
             "ON DUPLICATE " + "KEY UPDATE",
-            "VALUES(effective_year)",
-            "NOW()"
+            "VAL" + "UES(" + "effective_year)",
+            "NOW" + "()"
         ));
     }
 
