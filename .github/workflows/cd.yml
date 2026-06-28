@@ -59,20 +59,30 @@ jobs:
           fi
           sudo apt-get update
           sudo apt-get install -y default-mysql-client
-          mysql \
-            --connect-timeout=20 \
-            --host="$DB_HOST" \
-            --port="$DB_PORT" \
-            --user="$DB_USERNAME" \
-            --password="$DB_PASSWORD" \
-            --default-character-set=utf8mb4 \
-            "$DB_NAME" \
-            < script/sql/mysql/carbon_vendor_schema_v1.sql
+          migration_count=0
+          if [ -f script/sql/mysql/carbon_vendor_schema_v1.sql ]; then
+            mysql \
+              --connect-timeout=20 \
+              --host="$DB_HOST" \
+              --port="$DB_PORT" \
+              --user="$DB_USERNAME" \
+              --password="$DB_PASSWORD" \
+              --default-character-set=utf8mb4 \
+              "$DB_NAME" \
+              < script/sql/mysql/carbon_vendor_schema_v1.sql
+            migration_count=$((migration_count + 1))
+          else
+            echo "Vendor base schema file is not present in this repository; skipping base schema sync."
+          fi
           for sql_file in \
             script/sql/update/vendor_tenant_package_purchase_fields.sql \
             script/sql/update/vendor_online_purchase_payment_fields.sql \
             script/sql/update/vendor_tenant_package_license_fields.sql \
             script/sql/update/vendor_tenant_package_permission_seed.sql; do
+            if [ ! -f "$sql_file" ]; then
+              echo "Migration file not present, skipping: $sql_file"
+              continue
+            fi
             echo "Executing vendor database migration from runner: $(basename "$sql_file")"
             mysql \
               --connect-timeout=20 \
@@ -82,18 +92,23 @@ jobs:
               --password="$DB_PASSWORD" \
               --default-character-set=utf8mb4 \
               "$DB_NAME" < "$sql_file"
+            migration_count=$((migration_count + 1))
           done
-          mysql \
-            --connect-timeout=20 \
-            --host="$DB_HOST" \
-            --port="$DB_PORT" \
-            --user="$DB_USERNAME" \
-            --password="$DB_PASSWORD" \
-            --default-character-set=utf8mb4 \
-            --batch \
-            --skip-column-names \
-            "$DB_NAME" \
-            -e "select count(*) from information_schema.tables where table_schema = '$DB_NAME' and table_name like 'cv\\_%';"
+          if [ "$migration_count" -gt 0 ]; then
+            mysql \
+              --connect-timeout=20 \
+              --host="$DB_HOST" \
+              --port="$DB_PORT" \
+              --user="$DB_USERNAME" \
+              --password="$DB_PASSWORD" \
+              --default-character-set=utf8mb4 \
+              --batch \
+              --skip-column-names \
+              "$DB_NAME" \
+              -e "select count(*) from information_schema.tables where table_schema = '$DB_NAME' and table_name like 'cv\\_%';"
+          else
+            echo "No vendor database migration files found; continuing with application deploy."
+          fi
           echo "status=success" >> "$GITHUB_OUTPUT"
 
       - name: Deploy over SSH
@@ -142,20 +157,21 @@ jobs:
           set -euo pipefail
           echo "$SUDO_PASSWORD" | sudo -S apt-get update
           echo "$SUDO_PASSWORD" | sudo -S apt-get install -y default-mysql-client
-          mysql \
-            --connect-timeout=20 \
-            --host="$DB_HOST" \
-            --port="$DB_PORT" \
-            --user="$DB_USERNAME" \
-            --password="$DB_PASSWORD" \
-            --default-character-set=utf8mb4 \
-            "$DB_NAME" \
-            < "$REMOTE_SCHEMA"
-          for sql_file in \
-            "$REMOTE_UPDATE_DIR/vendor_tenant_package_purchase_fields.sql" \
-            "$REMOTE_UPDATE_DIR/vendor_online_purchase_payment_fields.sql" \
-            "$REMOTE_UPDATE_DIR/vendor_tenant_package_license_fields.sql" \
-            "$REMOTE_UPDATE_DIR/vendor_tenant_package_permission_seed.sql"; do
+          migration_count=0
+          if [ -f "$REMOTE_SCHEMA" ]; then
+            mysql \
+              --connect-timeout=20 \
+              --host="$DB_HOST" \
+              --port="$DB_PORT" \
+              --user="$DB_USERNAME" \
+              --password="$DB_PASSWORD" \
+              --default-character-set=utf8mb4 \
+              "$DB_NAME" \
+              < "$REMOTE_SCHEMA"
+            migration_count=$((migration_count + 1))
+          fi
+          shopt -s nullglob
+          for sql_file in "$REMOTE_UPDATE_DIR"/*.sql; do
             echo "Executing vendor database migration from target host: $(basename "$sql_file")"
             mysql \
               --connect-timeout=20 \
@@ -165,7 +181,11 @@ jobs:
               --password="$DB_PASSWORD" \
               --default-character-set=utf8mb4 \
               "$DB_NAME" < "$sql_file"
+            migration_count=$((migration_count + 1))
           done
+          if [ "$migration_count" -eq 0 ]; then
+            echo "No vendor database migration files found on target host; continuing with application deploy."
+          fi
           rm -f "$REMOTE_SCHEMA"
           rm -rf "$REMOTE_UPDATE_DIR"
           EOF
@@ -234,13 +254,29 @@ jobs:
           EOF
           if [ "${{ steps.sync_business_runner.outputs.status }}" != "success" ]; then
             timeout 60 sshpass -p "$DEPLOY_PASSWORD" ssh "${SSH_OPTS[@]}" "$DEPLOY_USER@$DEPLOY_HOST" "rm -rf '$REMOTE_UPDATE_DIR' && mkdir -p '$REMOTE_UPDATE_DIR'"
-            timeout 60 sshpass -p "$DEPLOY_PASSWORD" scp -P "$DEPLOY_PORT" -o StrictHostKeyChecking=accept-new "$VENDOR_SCHEMA_FILE" "$DEPLOY_USER@$DEPLOY_HOST:$REMOTE_SCHEMA"
-            timeout 60 sshpass -p "$DEPLOY_PASSWORD" scp -P "$DEPLOY_PORT" -o StrictHostKeyChecking=accept-new script/sql/update/vendor_tenant_package_purchase_fields.sql "$DEPLOY_USER@$DEPLOY_HOST:$REMOTE_UPDATE_DIR/"
-            timeout 60 sshpass -p "$DEPLOY_PASSWORD" scp -P "$DEPLOY_PORT" -o StrictHostKeyChecking=accept-new script/sql/update/vendor_online_purchase_payment_fields.sql "$DEPLOY_USER@$DEPLOY_HOST:$REMOTE_UPDATE_DIR/"
-            timeout 60 sshpass -p "$DEPLOY_PASSWORD" scp -P "$DEPLOY_PORT" -o StrictHostKeyChecking=accept-new script/sql/update/vendor_tenant_package_license_fields.sql "$DEPLOY_USER@$DEPLOY_HOST:$REMOTE_UPDATE_DIR/"
-            timeout 60 sshpass -p "$DEPLOY_PASSWORD" scp -P "$DEPLOY_PORT" -o StrictHostKeyChecking=accept-new script/sql/update/vendor_tenant_package_permission_seed.sql "$DEPLOY_USER@$DEPLOY_HOST:$REMOTE_UPDATE_DIR/"
-            timeout 300 sshpass -p "$DEPLOY_PASSWORD" ssh "${SSH_OPTS[@]}" "$DEPLOY_USER@$DEPLOY_HOST" \
-              "DB_NAME='$DB_NAME' DB_HOST='$DB_HOST' DB_PORT='$DB_PORT' DB_USERNAME='$DB_USERNAME' DB_PASSWORD='$DB_PASSWORD' REMOTE_SCHEMA='$REMOTE_SCHEMA' REMOTE_UPDATE_DIR='$REMOTE_UPDATE_DIR' SUDO_PASSWORD='$DEPLOY_PASSWORD' timeout 240 bash -s" < sync-business-db.sh
+            copied_migration_count=0
+            if [ -f "$VENDOR_SCHEMA_FILE" ]; then
+              timeout 60 sshpass -p "$DEPLOY_PASSWORD" scp -P "$DEPLOY_PORT" -o StrictHostKeyChecking=accept-new "$VENDOR_SCHEMA_FILE" "$DEPLOY_USER@$DEPLOY_HOST:$REMOTE_SCHEMA"
+              copied_migration_count=$((copied_migration_count + 1))
+            fi
+            for sql_file in \
+              script/sql/update/vendor_tenant_package_purchase_fields.sql \
+              script/sql/update/vendor_online_purchase_payment_fields.sql \
+              script/sql/update/vendor_tenant_package_license_fields.sql \
+              script/sql/update/vendor_tenant_package_permission_seed.sql; do
+              if [ ! -f "$sql_file" ]; then
+                echo "Migration file not present for target sync, skipping: $sql_file"
+                continue
+              fi
+              timeout 60 sshpass -p "$DEPLOY_PASSWORD" scp -P "$DEPLOY_PORT" -o StrictHostKeyChecking=accept-new "$sql_file" "$DEPLOY_USER@$DEPLOY_HOST:$REMOTE_UPDATE_DIR/"
+              copied_migration_count=$((copied_migration_count + 1))
+            done
+            if [ "$copied_migration_count" -gt 0 ]; then
+              timeout 300 sshpass -p "$DEPLOY_PASSWORD" ssh "${SSH_OPTS[@]}" "$DEPLOY_USER@$DEPLOY_HOST" \
+                "DB_NAME='$DB_NAME' DB_HOST='$DB_HOST' DB_PORT='$DB_PORT' DB_USERNAME='$DB_USERNAME' DB_PASSWORD='$DB_PASSWORD' REMOTE_SCHEMA='$REMOTE_SCHEMA' REMOTE_UPDATE_DIR='$REMOTE_UPDATE_DIR' SUDO_PASSWORD='$DEPLOY_PASSWORD' timeout 240 bash -s" < sync-business-db.sh
+            else
+              echo "No local vendor database migration files found for target sync; continuing with application deploy."
+            fi
           fi
           timeout 300 sshpass -p "$DEPLOY_PASSWORD" scp "${SCP_OPTS[@]}" "$LOCAL_SOURCE_ARCHIVE" "$DEPLOY_USER@$DEPLOY_HOST:$REMOTE_SOURCE_ARCHIVE"
           timeout 900 sshpass -p "$DEPLOY_PASSWORD" ssh "${SSH_OPTS[@]}" "$DEPLOY_USER@$DEPLOY_HOST" \
