@@ -73,7 +73,7 @@ public class DataBaseHelper {
      */
     public static String findInSet(Object var1, String var2) {
         String var = Convert.toStr(var1);
-        return "find_in_set('%s' , %s) <> 0".formatted(var, var2);
+        return "charindex(',%s,' , ','+%s+',') <> 0".formatted(var, var2);
     }
 
     /**

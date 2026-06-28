@@ -52,13 +52,15 @@ class CvVendorTableFieldServiceImplTest {
         CvVendorTableFieldMapper mapper = mock(CvVendorTableFieldMapper.class);
         JdbcTemplate jdbcTemplate = mock(JdbcTemplate.class);
         when(jdbcTemplate.queryForObject(any(String.class), eq(Integer.class), eq("cv_admin_division"), eq("custom_level"))).thenReturn(0);
+        when(jdbcTemplate.queryForObject(any(String.class), eq(Integer.class), eq("dbo.cv_admin_division"), eq("custom_level"))).thenReturn(0);
         when(mapper.insert(any(CvVendorTableField.class))).thenReturn(1);
         CvVendorTableFieldServiceImpl service = new CvVendorTableFieldServiceImpl(mapper, jdbcTemplate);
 
         boolean inserted = service.insertByBo(validBo());
 
         assertEquals(true, inserted);
-        verify(jdbcTemplate).execute("ALTER TABLE `cv_admin_division` ADD COLUMN `custom_level` VARCHAR(255) NULL COMMENT '自定义层级'");
+        verify(jdbcTemplate).execute("ALTER TABLE dbo.[cv_admin_division] ADD [custom_level] NVARCHAR(255) NULL");
+        verify(jdbcTemplate).update(any(String.class), eq("自定义层级"), eq("cv_admin_division"), eq("custom_level"));
         verify(mapper).insert(any(CvVendorTableField.class));
     }
 
@@ -66,7 +68,7 @@ class CvVendorTableFieldServiceImplTest {
     void insertExistingPhysicalColumnOnlyCreatesMetadata() {
         CvVendorTableFieldMapper mapper = mock(CvVendorTableFieldMapper.class);
         JdbcTemplate jdbcTemplate = mock(JdbcTemplate.class);
-        when(jdbcTemplate.queryForObject(any(String.class), eq(Integer.class), eq("cv_admin_division"), eq("custom_level"))).thenReturn(1);
+        when(jdbcTemplate.queryForObject(any(String.class), eq(Integer.class), eq("dbo.cv_admin_division"), eq("custom_level"))).thenReturn(1);
         when(mapper.insert(any(CvVendorTableField.class))).thenReturn(1);
         CvVendorTableFieldServiceImpl service = new CvVendorTableFieldServiceImpl(mapper, jdbcTemplate);
 

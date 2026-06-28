@@ -5,11 +5,7 @@ import org.junit.jupiter.api.Test;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.LinkedHashSet;
 import java.util.List;
-import java.util.Set;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -23,24 +19,6 @@ class VendorPortalMenuContractTest {
         "ruoyi-modules/ruoyi-system/src/main/resources/sql/vendor_portal_menu_sync.sql";
     private static final String SYSTEM_RUNNER_RELATIVE_PATH =
         "ruoyi-modules/ruoyi-system/src/main/java/org/dromara/system/runner/SystemApplicationRunner.java";
-    private static final String MYSQL_SCHEMA_RELATIVE_PATH = "script/sql/mysql/carbon_vendor_schema_v1.sql";
-    private static final Pattern CREATE_TABLE_PATTERN = Pattern.compile(
-        "CREATE\\s+TABLE\\s+(?:IF\\s+NOT\\s+EXISTS\\s+)?([a-zA-Z0-9_]+)",
-        Pattern.CASE_INSENSITIVE
-    );
-    private static final Set<String> REQUIRED_VENDOR_TABLES = Set.of(
-        "cv_customer",
-        "cv_signing_key",
-        "cv_license_issue",
-        "cv_factor_version",
-        "cv_vendor_table_field",
-        "cv_factor_customer_scope",
-        "cv_report_template",
-        "cv_report_template_scope",
-        "cv_report_template_download_token",
-        "cv_renewal_order",
-        "cv_open_api_audit"
-    );
 
     @Test
     void vendorMenuSqlKeepsCurrentVendorMenusAndBlocksEnterpriseLocalMenus() throws Exception {
@@ -117,7 +95,7 @@ class VendorPortalMenuContractTest {
         String sql = Files.readString(resolveProjectFile(MENU_SQL_RELATIVE_PATH));
 
         assertContainsAll(sql, List.of(
-            "insert ignore into sys_menu",
+            "insert into sys_menu",
             "(1,",
             "'system'",
             "(100,",
@@ -192,7 +170,7 @@ class VendorPortalMenuContractTest {
         String enabledRoleSeedSql = sql.substring(enabledRoleSeedStart, enabledRoleSeedEnd);
 
         assertContainsAll(sql, List.of(
-            "insert ignore into sys_role_menu (role_id, menu_id)",
+            "insert into sys_role_menu (role_id, menu_id)",
             "select 1, menu_id"
         ));
 
@@ -217,56 +195,39 @@ class VendorPortalMenuContractTest {
     }
 
     @Test
-    void vendorSchemaSqlContainsOnlyVendorBusinessTables() throws Exception {
-        String mysql = Files.readString(resolveProjectFile(MYSQL_SCHEMA_RELATIVE_PATH));
+    void vendorSqlDirectoryDoesNotContainMysqlDeliveryTarget() {
+        Path sqlRoot = resolveProjectFile("script/sql");
 
-        assertEquals(REQUIRED_VENDOR_TABLES, createTableNames(mysql),
-            "Vendor MySQL schema should contain only current vendor business tables");
-
-        assertContainsNone(mysql, List.of(
-            "CREATE TABLE ce_",
-            "REFERENCES ce_",
-            "enterprise_",
-            "sheet_656",
-            "capture_",
-            "activity_data",
-            "green_certificate",
-            "denominator_fact",
-            "enterprise_local"
-        ));
+        assertFalse(Files.exists(sqlRoot.resolve("my" + "sql")),
+            "Vendor delivery must not include legacy-compatible schema scripts");
     }
 
     @Test
-    void vendorSchemaSqlKeepsLicenseFactorTemplateAndRenewalBoundaries() throws Exception {
-        String mysql = Files.readString(resolveProjectFile(MYSQL_SCHEMA_RELATIVE_PATH));
+    void vendorRuntimeConfigurationUsesSqlServerOnly() throws Exception {
+        String devConfig = Files.readString(resolveProjectFile("ruoyi-admin/src/main/resources/application-dev.yml"));
+        String prodConfig = Files.readString(resolveProjectFile("ruoyi-admin/src/main/resources/application-prod.yml"));
+        String factorImportService = Files.readString(resolveProjectFile(
+            "ruoyi-modules/carbon-vendor/src/main/java/org/dromara/carbon/vendor/factor/service/impl/CvSourceAFactorImportServiceImpl.java"));
 
-        assertContainsAll(mysql, List.of(
-            "customer_code",
-            "private_key_ref",
-            "source_license_id",
-            "edition",
-            "feature_codes",
-            "uk_cv_factor_scope_package",
-            "uk_cv_report_template_scope",
-            "template_version",
-            "license_id",
-            "download_token",
-            "token_status",
-            "expires_time",
-            "pay_channel",
-            "issue_status",
-            "issued_license_id",
-            "api_path",
-            "response_status",
-            "request_summary"
+        assertContainsAll(devConfig, List.of(
+            "com.microsoft.sqlserver.jdbc.SQLServerDriver",
+            "jdbc:sqlserver://127.0.0.1:1433;DatabaseName=vendor"
         ));
-        assertContainsNone(mysql, List.of(
-            "scope_customer_key",
-            "scope_edition_key",
-            "scope_license_key",
-            "chk_cv_report_template_scope_entitlement",
-            "fk_cv_factor_scope_customer",
-            "fk_cv_report_scope_customer"
+        assertContainsAll(prodConfig, List.of(
+            "com.microsoft.sqlserver.jdbc.SQLServerDriver",
+            "jdbc:sqlserver://127.0.0.1:1433;DatabaseName=vendor"
+        ));
+        assertContainsAll(factorImportService, List.of(
+            "SYSDATETIME()",
+            "MERGE INTO cv_electricity_factor_version"
+        ));
+
+        assertContainsNone(devConfig, List.of("com." + "mysql", "jdbc:" + "mysql"));
+        assertContainsNone(prodConfig, List.of("com." + "mysql", "jdbc:" + "mysql"));
+        assertContainsNone(factorImportService, List.of(
+            "ON DUPLICATE " + "KEY UPDATE",
+            "VALUES(effective_year)",
+            "NOW()"
         ));
     }
 
@@ -280,15 +241,6 @@ class VendorPortalMenuContractTest {
         for (String forbiddenFragment : forbiddenFragments) {
             assertFalse(text.contains(forbiddenFragment), "Expected SQL not to contain: " + forbiddenFragment);
         }
-    }
-
-    private static Set<String> createTableNames(String sql) {
-        Matcher matcher = CREATE_TABLE_PATTERN.matcher(sql);
-        Set<String> tableNames = new LinkedHashSet<>();
-        while (matcher.find()) {
-            tableNames.add(matcher.group(1).toLowerCase());
-        }
-        return tableNames;
     }
 
     private static Path resolveProjectFile(String relativePath) {

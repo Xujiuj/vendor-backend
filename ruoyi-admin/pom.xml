@@ -17,10 +17,10 @@
 
     <dependencies>
 
-        <!-- Mysql驱动包 -->
+        <!-- SQL Server driver -->
         <dependency>
-            <groupId>com.mysql</groupId>
-            <artifactId>mysql-connector-j</artifactId>
+            <groupId>com.microsoft.sqlserver</groupId>
+            <artifactId>mssql-jdbc</artifactId>
         </dependency>
 
         <dependency>

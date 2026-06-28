@@ -62,8 +62,12 @@ public class CvDimensionDataServiceImpl implements ICvDimensionDataService {
         int pageSize = pageQuery.getPageSize() == null || pageQuery.getPageSize() <= 0 ? PageQuery.DEFAULT_PAGE_SIZE : pageQuery.getPageSize();
         long offset = (long) (pageNum - 1) * pageSize;
         String tableName = dimension.tableName();
-        Long total = jdbcTemplate.queryForObject("SELECT COUNT(*) FROM `" + tableName + "` WHERE status = '0'", Long.class);
-        List<Map<String, Object>> rows = jdbcTemplate.queryForList("SELECT * FROM `" + tableName + "` WHERE status = '0' ORDER BY sort_order ASC, id ASC LIMIT ? OFFSET ?", pageSize, offset);
+        Long total = jdbcTemplate.queryForObject("SELECT COUNT(*) FROM " + quoteTable(tableName) + " WHERE [status] = '0'", Long.class);
+        List<Map<String, Object>> rows = jdbcTemplate.queryForList(
+            "SELECT * FROM " + quoteTable(tableName) + " WHERE [status] = '0' ORDER BY [sort_order] ASC, [id] ASC OFFSET ? ROWS FETCH NEXT ? ROWS ONLY",
+            offset,
+            pageSize
+        );
         TableDataInfo<Map<String, Object>> dataInfo = new TableDataInfo<>();
         dataInfo.setCode(200);
         dataInfo.setMsg("查询成功");
@@ -75,7 +79,7 @@ public class CvDimensionDataServiceImpl implements ICvDimensionDataService {
     @Override
     public Map<String, Object> queryById(String dimensionCode, Long id) {
         ManagedDimension dimension = managedDimension(dimensionCode);
-        List<Map<String, Object>> rows = jdbcTemplate.queryForList("SELECT * FROM `" + dimension.tableName() + "` WHERE id = ?", id);
+        List<Map<String, Object>> rows = jdbcTemplate.queryForList("SELECT * FROM " + quoteTable(dimension.tableName()) + " WHERE [id] = ?", id);
         return rows.isEmpty() ? null : toRecordMap(dimensionCode, rows.get(0));
     }
 
@@ -126,7 +130,7 @@ public class CvDimensionDataServiceImpl implements ICvDimensionDataService {
     @Override
     public List<Map<String, Object>> queryList(String dimensionCode) {
         ManagedDimension dimension = managedDimension(dimensionCode);
-        return jdbcTemplate.queryForList("SELECT * FROM `" + dimension.tableName() + "` WHERE status = '0' ORDER BY sort_order ASC, id ASC")
+        return jdbcTemplate.queryForList("SELECT * FROM " + quoteTable(dimension.tableName()) + " WHERE [status] = '0' ORDER BY [sort_order] ASC, [id] ASC")
             .stream()
             .map(row -> toRecordMap(dimensionCode, row))
             .toList();
@@ -203,11 +207,11 @@ public class CvDimensionDataServiceImpl implements ICvDimensionDataService {
         if (factorVersion == null || StringUtils.isBlank(String.valueOf(factorVersion))) {
             throw new ServiceException("版本号不能为空");
         }
-        String sql = "SELECT COUNT(*) FROM `" + tableName + "` WHERE factor_version = ?";
+        String sql = "SELECT COUNT(*) FROM " + quoteTable(tableName) + " WHERE [factor_version] = ?";
         List<Object> args = new ArrayList<>();
         args.add(String.valueOf(factorVersion).trim());
         if (currentId != null) {
-            sql += " AND id <> ?";
+            sql += " AND [id] <> ?";
             args.add(currentId);
         }
         Long count = jdbcTemplate.queryForObject(sql, Long.class, args.toArray());
@@ -306,7 +310,8 @@ public class CvDimensionDataServiceImpl implements ICvDimensionDataService {
         return jdbcTemplate.queryForList("""
             SELECT column_name
             FROM information_schema.columns
-            WHERE table_schema = DATABASE() AND table_name = ? AND extra NOT LIKE '%GENERATED%'
+            WHERE table_schema = 'dbo' AND table_name = ?
+              AND COLUMNPROPERTY(OBJECT_ID(table_schema + '.' + table_name), column_name, 'IsComputed') = 0
             ORDER BY ordinal_position
             """, String.class, tableName);
     }
@@ -338,9 +343,9 @@ public class CvDimensionDataServiceImpl implements ICvDimensionDataService {
             throw new ServiceException("没有可写入字段");
         }
         List<String> columns = new ArrayList<>(values.keySet());
-        String columnSql = columns.stream().map(column -> "`" + column + "`").reduce((left, right) -> left + ", " + right).orElse("");
+        String columnSql = columns.stream().map(this::quoteIdentifier).reduce((left, right) -> left + ", " + right).orElse("");
         String placeholderSql = String.join(", ", columns.stream().map(column -> "?").toList());
-        return jdbcTemplate.update("INSERT INTO `" + tableName + "` (" + columnSql + ") VALUES (" + placeholderSql + ")",
+        return jdbcTemplate.update("INSERT INTO " + quoteTable(tableName) + " (" + columnSql + ") VALUES (" + placeholderSql + ")",
             columns.stream().map(values::get).toArray());
     }
 
@@ -349,10 +354,10 @@ public class CvDimensionDataServiceImpl implements ICvDimensionDataService {
             throw new ServiceException("没有可更新字段");
         }
         List<String> columns = new ArrayList<>(values.keySet());
-        String setSql = columns.stream().map(column -> "`" + column + "` = ?").reduce((left, right) -> left + ", " + right).orElse("");
+        String setSql = columns.stream().map(column -> quoteIdentifier(column) + " = ?").reduce((left, right) -> left + ", " + right).orElse("");
         List<Object> args = new ArrayList<>(columns.stream().map(values::get).toList());
         args.add(id);
-        return jdbcTemplate.update("UPDATE `" + tableName + "` SET " + setSql + " WHERE id = ?", args.toArray());
+        return jdbcTemplate.update("UPDATE " + quoteTable(tableName) + " SET " + setSql + " WHERE [id] = ?", args.toArray());
     }
 
     private Object normalizeValue(Object value) {
@@ -366,6 +371,14 @@ public class CvDimensionDataServiceImpl implements ICvDimensionDataService {
             return value;
         }
         return value;
+    }
+
+    private String quoteTable(String tableName) {
+        return "dbo." + quoteIdentifier(tableName);
+    }
+
+    private String quoteIdentifier(String identifier) {
+        return "[" + identifier.replace("]", "]]") + "]";
     }
 
     private record ManagedDimension(String dimensionCode, String tableName) {

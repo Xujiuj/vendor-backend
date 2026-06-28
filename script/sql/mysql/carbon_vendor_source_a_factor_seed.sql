@@ -1,4 +1,0 @@
--- Source(A) factor data seed.
--- This file is intentionally empty. Factor data is imported at runtime
--- via POST /vendor/source-a-factor/import endpoint using the
--- '2 排放因子表.xlsx' workbook from the source(A) directory.

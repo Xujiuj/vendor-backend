@@ -195,7 +195,7 @@ public class CvSourceAFactorImportServiceImpl implements ICvSourceAFactorImportS
             jdbcTemplate.update("""
                 INSERT INTO cv_factor_version
                 (version_code, version_name, publish_status, frozen_flag, remark, create_time, update_time)
-                VALUES (?, ?, ?, ?, ?, NOW(), NOW())
+                VALUES (?, ?, ?, ?, ?, SYSDATETIME(), SYSDATETIME())
                 """, SOURCE_A_VERSION_CODE, "Source(A) Import", "draft", false, MARK);
         }
         return jdbcTemplate.queryForObject(
@@ -208,7 +208,7 @@ public class CvSourceAFactorImportServiceImpl implements ICvSourceAFactorImportS
             (factor_version, division_code, division_name, region_name,
              province_factor, region_factor, national_factor, non_fossil_excluded_factor,
              national_fossil_power_factor, sort_order, status, remark, create_time, update_time)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 0, '0', ?, NOW(), NOW())
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 0, '0', ?, SYSDATETIME(), SYSDATETIME())
             """;
         List<Object[]> batchArgs = mapRows(rows, row -> {
             String version = text(row.get("因子版本"));
@@ -230,13 +230,19 @@ public class CvSourceAFactorImportServiceImpl implements ICvSourceAFactorImportS
 
     private int insert203Ef(List<Map<String, Object>> rows) {
         String sql = """
-            INSERT INTO cv_electricity_factor_version
-            (factor_version, effective_year, sort_order, status, remark, create_time, update_time)
-            VALUES (?, ?, 0, '0', ?, NOW(), NOW())
-            ON DUPLICATE KEY UPDATE
-                effective_year = LEAST(effective_year, VALUES(effective_year)),
-                remark = VALUES(remark),
-                update_time = NOW()
+            MERGE INTO cv_electricity_factor_version AS target
+            USING (SELECT ? AS factor_version, ? AS effective_year, ? AS remark) AS source
+               ON target.factor_version = source.factor_version
+            WHEN MATCHED THEN
+                UPDATE SET effective_year = CASE
+                        WHEN target.effective_year <= source.effective_year THEN target.effective_year
+                        ELSE source.effective_year
+                    END,
+                    remark = source.remark,
+                    update_time = SYSDATETIME()
+            WHEN NOT MATCHED THEN
+                INSERT (factor_version, effective_year, sort_order, status, remark, create_time, update_time)
+                VALUES (source.factor_version, source.effective_year, 0, '0', source.remark, SYSDATETIME(), SYSDATETIME());
             """;
         Map<String, Integer> versionYears = new LinkedHashMap<>();
         for (Map<String, Object> row : rows) {
@@ -257,7 +263,7 @@ public class CvSourceAFactorImportServiceImpl implements ICvSourceAFactorImportS
         String sql = """
             INSERT INTO cv_electricity_factor_scope
             (scope_key, scope_name, sort_order, status, remark, create_time, update_time)
-            VALUES (?, ?, 0, '0', ?, NOW(), NOW())
+            VALUES (?, ?, 0, '0', ?, SYSDATETIME(), SYSDATETIME())
             """;
         List<Object[]> batchArgs = mapRows(rows, row -> {
             String key = text(row.get("因子口径Key"));
@@ -275,7 +281,7 @@ public class CvSourceAFactorImportServiceImpl implements ICvSourceAFactorImportS
         String sql = """
             INSERT INTO cv_greenhouse_gas
             (gas_code, gas_name, sort_order, status, remark, create_time, update_time)
-            VALUES (?, ?, ?, '0', ?, NOW(), NOW())
+            VALUES (?, ?, ?, '0', ?, SYSDATETIME(), SYSDATETIME())
             """;
         List<Object[]> batchArgs = mapRows(rows, row -> {
             String key = text(row.get("GasKey"));

@@ -19,8 +19,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.Collection;
-import java.util.LinkedHashMap;
 import java.util.Date;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -91,6 +91,7 @@ public class CvVendorTableFieldServiceImpl implements ICvVendorTableFieldService
         normalizeAndValidateField(bo);
         if (!physicalColumnExists(table.physicalTableName(), bo.getFieldKey())) {
             jdbcTemplate.execute(buildAddColumnSql(table.physicalTableName(), bo));
+            upsertColumnComment(table.physicalTableName(), bo.getFieldKey(), bo.getFieldLabel());
         }
         CvVendorTableField entity = copyToEntity(bo);
         entity.setId(null);
@@ -202,28 +203,49 @@ public class CvVendorTableFieldServiceImpl implements ICvVendorTableFieldService
 
     private List<ColumnMeta> queryPhysicalColumns(String tableName) {
         String sql = """
-            SELECT column_name, column_type, data_type, column_comment, is_nullable, extra, ordinal_position
-            FROM information_schema.columns
-            WHERE table_schema = DATABASE() AND table_name = ?
-            ORDER BY ordinal_position
+            SELECT
+                c.name AS column_name,
+                UPPER(t.name) +
+                    CASE
+                        WHEN t.name IN ('varchar', 'char', 'varbinary', 'binary') THEN
+                            '(' + CASE WHEN c.max_length = -1 THEN 'MAX' ELSE CAST(c.max_length AS varchar(10)) END + ')'
+                        WHEN t.name IN ('nvarchar', 'nchar') THEN
+                            '(' + CASE WHEN c.max_length = -1 THEN 'MAX' ELSE CAST(c.max_length / 2 AS varchar(10)) END + ')'
+                        WHEN t.name IN ('decimal', 'numeric') THEN
+                            '(' + CAST(c.precision AS varchar(10)) + ', ' + CAST(c.scale AS varchar(10)) + ')'
+                        ELSE ''
+                    END AS column_type,
+                t.name AS data_type,
+                CAST(ep.value AS nvarchar(4000)) AS column_comment,
+                c.is_nullable,
+                c.is_computed,
+                c.column_id AS ordinal_position
+            FROM sys.columns c
+            JOIN sys.types t ON c.user_type_id = t.user_type_id
+            LEFT JOIN sys.extended_properties ep
+                ON ep.major_id = c.object_id
+                AND ep.minor_id = c.column_id
+                AND ep.name = 'MS_Description'
+            WHERE c.object_id = OBJECT_ID(?)
+            ORDER BY c.column_id
             """;
         return jdbcTemplate.query(sql, (rs, rowNum) -> new ColumnMeta(
             rs.getString("column_name"),
             rs.getString("column_type"),
             rs.getString("data_type"),
             rs.getString("column_comment"),
-            "YES".equalsIgnoreCase(rs.getString("is_nullable")),
-            containsIgnoreCase(rs.getString("extra"), "generated"),
+            rs.getBoolean("is_nullable"),
+            rs.getBoolean("is_computed"),
             rs.getInt("ordinal_position")
-        ), tableName);
+        ), tableObjectName(tableName));
     }
 
     private boolean physicalColumnExists(String tableName, String columnName) {
         Integer count = jdbcTemplate.queryForObject("""
             SELECT COUNT(*)
-            FROM information_schema.columns
-            WHERE table_schema = DATABASE() AND table_name = ? AND column_name = ?
-            """, Integer.class, tableName, columnName);
+            FROM sys.columns
+            WHERE object_id = OBJECT_ID(?) AND name = ?
+            """, Integer.class, tableObjectName(tableName), columnName);
         return count != null && count > 0;
     }
 
@@ -263,7 +285,10 @@ public class CvVendorTableFieldServiceImpl implements ICvVendorTableFieldService
 
     private String inferFieldType(String dataType) {
         String type = dataType == null ? "" : dataType.toLowerCase(Locale.ROOT);
-        if (Set.of("int", "bigint", "decimal", "double", "float", "tinyint").contains(type)) {
+        if ("bit".equals(type)) {
+            return "boolean";
+        }
+        if (Set.of("int", "bigint", "smallint", "tinyint", "decimal", "numeric", "float", "real").contains(type)) {
             return "number";
         }
         if ("date".equals(type)) {
@@ -276,8 +301,7 @@ public class CvVendorTableFieldServiceImpl implements ICvVendorTableFieldService
     }
 
     private String buildAddColumnSql(String tableName, CvVendorTableFieldBo bo) {
-        String definition = columnDefinition(bo);
-        return "ALTER TABLE `" + tableName + "` ADD COLUMN `" + bo.getFieldKey() + "` " + definition;
+        return "ALTER TABLE " + quoteTable(tableName) + " ADD " + quoteIdentifier(bo.getFieldKey()) + " " + columnDefinition(bo);
     }
 
     private void updateColumnComment(String tableName, CvVendorTableFieldBo bo) {
@@ -288,25 +312,39 @@ public class CvVendorTableFieldServiceImpl implements ICvVendorTableFieldService
         if (column.generatedColumn() || IMMUTABLE_COLUMNS.contains(bo.getFieldKey())) {
             return;
         }
-        String comment = escapeSqlComment(defaultIfBlank(bo.getFieldLabel(), column.columnComment()));
-        jdbcTemplate.execute("ALTER TABLE `" + tableName + "` MODIFY COLUMN `" + bo.getFieldKey() + "` "
-            + column.columnType() + (column.nullable() ? " NULL" : " NOT NULL") + " COMMENT '" + comment + "'");
+        upsertColumnComment(tableName, bo.getFieldKey(), defaultIfBlank(bo.getFieldLabel(), column.columnComment()));
     }
 
     private String columnDefinition(CvVendorTableFieldBo bo) {
         String nullClause = " NULL";
-        String comment = " COMMENT '" + escapeSqlComment(bo.getFieldLabel()) + "'";
         return switch (bo.getFieldType()) {
             case "number" -> {
                 int scale = bo.getFieldPrecision() == null ? 4 : bo.getFieldPrecision();
-                yield "DECIMAL(28, " + scale + ")" + nullClause + comment;
+                yield "DECIMAL(28, " + scale + ")" + nullClause;
             }
-            case "date" -> "DATE" + nullClause + comment;
-            case "datetime" -> "DATETIME" + nullClause + comment;
-            case "boolean" -> "TINYINT(1)" + nullClause + comment;
-            case "select", "text" -> "VARCHAR(" + normalizeTextWidth(bo.getFieldWidth()) + ")" + nullClause + comment;
+            case "date" -> "DATE" + nullClause;
+            case "datetime" -> "DATETIME2" + nullClause;
+            case "boolean" -> "BIT" + nullClause;
+            case "select", "text" -> "NVARCHAR(" + normalizeTextWidth(bo.getFieldWidth()) + ")" + nullClause;
             default -> throw new ServiceException("不支持的字段类型: " + bo.getFieldType());
         };
+    }
+
+    private void upsertColumnComment(String tableName, String columnName, String comment) {
+        Integer count = jdbcTemplate.queryForObject("""
+            SELECT COUNT(*)
+            FROM sys.extended_properties ep
+            JOIN sys.columns c ON c.object_id = ep.major_id AND c.column_id = ep.minor_id
+            WHERE ep.name = 'MS_Description'
+              AND c.object_id = OBJECT_ID(?)
+              AND c.name = ?
+            """, Integer.class, tableObjectName(tableName), columnName);
+        String procedure = count != null && count > 0 ? "sys.sp_updateextendedproperty" : "sys.sp_addextendedproperty";
+        jdbcTemplate.update("EXEC " + procedure + " @name=N'MS_Description', @value=?, "
+                + "@level0type=N'SCHEMA', @level0name=N'dbo', "
+                + "@level1type=N'TABLE', @level1name=?, "
+                + "@level2type=N'COLUMN', @level2name=?",
+            defaultIfBlank(comment, ""), tableName, columnName);
     }
 
     private int normalizeTextWidth(Integer width) {
@@ -314,10 +352,6 @@ public class CvVendorTableFieldServiceImpl implements ICvVendorTableFieldService
             return Math.max(1, Math.min(width, 1000));
         }
         return 255;
-    }
-
-    private String escapeSqlComment(String value) {
-        return defaultIfBlank(value, "").replace("'", "''");
     }
 
     private String defaultIfBlank(String value, String defaultValue) {
@@ -329,6 +363,18 @@ public class CvVendorTableFieldServiceImpl implements ICvVendorTableFieldService
             return false;
         }
         return source.toLowerCase(Locale.ROOT).contains(search.toLowerCase(Locale.ROOT));
+    }
+
+    private String tableObjectName(String tableName) {
+        return "dbo." + tableName;
+    }
+
+    private String quoteTable(String tableName) {
+        return "dbo." + quoteIdentifier(tableName);
+    }
+
+    private String quoteIdentifier(String identifier) {
+        return "[" + identifier.replace("]", "]]") + "]";
     }
 
     private record ManagedTable(String tableGroup, String tableCode, String physicalTableName) {

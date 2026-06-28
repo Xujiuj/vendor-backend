@@ -52,7 +52,7 @@ rtk python tools\verify_sql_boundaries.py
 ruoyi-admin/                      Spring Boot application entrypoint
 ruoyi-common/                     Shared RuoYi common modules
 ruoyi-modules/carbon-vendor/      Vendor-owned carbon operations domain
-script/sql/mysql/                 MySQL development schema and seed scripts
+script/sql/portal/                Current SQL Server portal seed scripts
 docs/                             Vendor backend specs and task plans
 ```
 

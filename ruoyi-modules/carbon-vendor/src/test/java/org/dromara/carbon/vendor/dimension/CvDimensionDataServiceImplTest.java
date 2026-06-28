@@ -87,7 +87,7 @@ class CvDimensionDataServiceImplTest {
     void electricityVersionInsertRejectsDuplicateVersionNumber() {
         JdbcTemplate jdbcTemplate = mock(JdbcTemplate.class);
         when(jdbcTemplate.queryForObject(
-            eq("SELECT COUNT(*) FROM `cv_electricity_factor_version` WHERE factor_version = ?"),
+            eq("SELECT COUNT(*) FROM dbo.[cv_electricity_factor_version] WHERE [factor_version] = ?"),
             eq(Long.class),
             any(Object[].class)
         )).thenReturn(1L);
