@@ -133,12 +133,10 @@ class VendorPortalMenuContractTest {
         ));
 
         assertContainsAll(sql, List.of(
-            "Superadmin routing uses all enabled M/C menus",
             "set visible = '1'",
             "status = '1'",
             "menu_id in (2, 3, 4, 5, 6, 115, 116, 121)",
-            "'tenant', 'demo'",
-            "'oss', 'oss-config/index', 'client'",
+            "'tenant', 'menu', 'dict', 'config', 'oss', 'oss-config/index', 'client', 'demo'",
             "component like 'demo/%'",
             "delete from sys_menu",
             "system/menu/index",
@@ -171,7 +169,7 @@ class VendorPortalMenuContractTest {
     void vendorMenuSqlSeedsEveryEnabledVendorRole() throws Exception {
         String sql = Files.readString(resolveProjectFile(MENU_SQL_RELATIVE_PATH));
         int enabledRoleSeedStart = sql.indexOf("where r.status = '0'");
-        int enabledRoleSeedEnd = sql.indexOf("-- Keep the built-in superadmin role");
+        int enabledRoleSeedEnd = sql.indexOf("insert into sys_role_menu (role_id, menu_id)", enabledRoleSeedStart);
         assertTrue(enabledRoleSeedStart >= 0, "Expected enabled-role menu seed block");
         assertTrue(enabledRoleSeedEnd > enabledRoleSeedStart, "Expected superadmin seed block after enabled-role seed block");
         String enabledRoleSeedSql = sql.substring(enabledRoleSeedStart, enabledRoleSeedEnd);
