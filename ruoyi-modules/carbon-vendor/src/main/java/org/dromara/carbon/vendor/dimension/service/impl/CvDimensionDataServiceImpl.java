@@ -267,7 +267,8 @@ public class CvDimensionDataServiceImpl implements ICvDimensionDataService {
 
     private String codeField(String dimensionCode) {
         return switch (dimensionCode) {
-            case "admin-division", "ef-electricity-factor" -> "divisionCode";
+            case "admin-division" -> "divisionCode";
+            case "ef-electricity-factor" -> "versionProvinceCode";
             case "emission-source-category" -> "categoryCode";
             case "base-year" -> "baseYearKey";
             case "ef-electricity-version" -> "factorVersion";

@@ -201,12 +201,13 @@ public class CvOpenDimensionServiceImpl implements ICvOpenDimensionService {
     private QueryResult queryElectricityFactor(CvOpenDimensionRequest req, long pageNum, long pageSize) {
         QueryWrapper<CvElectricityFactor> qw = new QueryWrapper<CvElectricityFactor>()
             .eq("status", "0")
-            .like(StringUtils.isNotBlank(req.getRecordCode()), "division_code", req.getRecordCode())
+            .like(StringUtils.isNotBlank(req.getRecordCode()), "version_province_code", req.getRecordCode())
             .like(StringUtils.isNotBlank(req.getRecordName()), "division_name", req.getRecordName())
             .orderByAsc("sort_order").orderByAsc("id");
         Page<CvElectricityFactor> page = electricityMapper.selectPage(new Page<>(pageNum, pageSize), qw);
         List<CvOpenDimensionRecordVo> records = page.getRecords().stream().map(e -> {
-            CvOpenDimensionRecordVo vo = baseVo(e.getId(), "ef-electricity-factor", e.getDivisionCode(), e.getDivisionName(), null);
+            CvOpenDimensionRecordVo vo = baseVo(e.getId(), "ef-electricity-factor", e.getVersionProvinceCode(), e.getDivisionName(), null);
+            vo.setVersionProvinceCode(e.getVersionProvinceCode());
             vo.setFactorVersion(e.getFactorVersion());
             vo.setDivisionCode(e.getDivisionCode());
             vo.setDivisionName(e.getDivisionName());

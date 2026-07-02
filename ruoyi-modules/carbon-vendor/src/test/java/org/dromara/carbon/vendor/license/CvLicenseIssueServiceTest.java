@@ -198,6 +198,18 @@ class CvLicenseIssueServiceTest {
     }
 
     @Test
+    void rejectsDuplicateLicenseIdBeforeIssuing() {
+        when(licenseIssueMapper.selectCount(any())).thenReturn(1L);
+        CvLicenseIssueServiceImpl service = newService(signingKeyMaterial());
+
+        CvLicenseIssueResult result = service.issueManualLicense(validRequest());
+
+        assertFalse(result.isIssued());
+        assertEquals("DUPLICATE_LICENSE_ID", result.getStatus());
+        verify(licenseIssueMapper, never()).insert(any(CvLicenseIssue.class));
+    }
+
+    @Test
     void rejectsOverlappingIssueForSameCustomerAcrossPackages() {
         when(licenseIssueMapper.selectOne(any(), eq(false))).thenReturn(existingIssuedRecord());
         CvLicenseIssueServiceImpl service = newService(signingKeyMaterial());

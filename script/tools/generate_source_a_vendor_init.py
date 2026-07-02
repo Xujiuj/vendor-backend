@@ -375,11 +375,11 @@ def build_seed_block() -> str:
     } for index, (version, year) in enumerate(version_years.items(), start=1)]))
 
     blocks.append(values_insert("cv_electricity_factor", [
-        "id", "factor_version", "division_code", "division_name", "region_name", "province_factor", "region_factor",
+        "id", "version_province_code", "factor_version", "division_code", "division_name", "region_name", "province_factor", "region_factor",
         "national_factor", "non_fossil_excluded_factor", "national_fossil_power_factor", "sort_order", "status",
         "create_dept", "create_by", "create_time", "update_by", "update_time", "remark"
     ], [{
-        "id": index, "factor_version": row.get("因子版本"), "division_code": text(row.get("行政区划代码")),
+        "id": index, "version_province_code": text(row.get("PK_因子版本省份代码")), "factor_version": row.get("因子版本"), "division_code": text(row.get("行政区划代码")),
         "division_name": row.get("行政区划"), "region_name": row.get("区域划分"),
         "province_factor": row.get("省级因子（kgCO2/kWh)"), "region_factor": row.get("区域因子（kgCO2/kWh)"),
         "national_factor": row.get("全国因子（kgCO2/kWh）"),
@@ -521,18 +521,19 @@ def factor_record_rows(ef201: list[dict[str, Any]], ef202: list[dict[str, Any]])
         next_id += 1
     for row in ef202:
         value = row.get("省级因子（kgCO2/kWh)") or row.get("区域因子（kgCO2/kWh)") or row.get("全国因子（kgCO2/kWh）")
+        version_province_code = text(row.get("PK_因子版本省份代码")) or f"{text(row.get('因子版本'))}{text(row.get('行政区划代码'))}"
         factor_records.append({
             "id": next_id, "version_id": 1, "factor_table_code": "202ef",
-            "factor_code": f"{text(row.get('因子版本'))}:{text(row.get('行政区划代码'))}",
+            "factor_code": version_province_code,
             "factor_name": row.get("行政区划"), "factor_category": "ef-electricity-factor",
             "factor_value": value, "factor_unit": "kgCO2/kWh",
-            "factor_key": f"{text(row.get('因子版本'))}:{text(row.get('行政区划代码'))}",
+            "factor_key": version_province_code,
             "emission_source_name": "电力", "emission_source_name_en": "Electricity",
             "fuel_material_category": "电力", "source_unit": "kWh", "co2": value, "ch4": 0, "n2o": 0,
             "hfcs": None, "pfcs": None, "sf6": None, "nf3": None, "applicable_scope": "电力因子",
             "factor_source": MARK, "gwp_ch4": None, "gwp_n2o": None, "gwp_hfcs": None, "gwp_pfcs": None,
             "gwp_sf6": None, "gwp_nf3": None, "factor_gwp": value,
-            "version_province_code": text(row.get("PK_因子版本省份代码")),
+            "version_province_code": version_province_code,
             "factor_version": text(row.get("因子版本")), "division_code": text(row.get("行政区划代码")),
             "division_name": row.get("行政区划"), "region_name": row.get("区域划分"),
             "province_factor": row.get("省级因子（kgCO2/kWh)"), "region_factor": row.get("区域因子（kgCO2/kWh)"),

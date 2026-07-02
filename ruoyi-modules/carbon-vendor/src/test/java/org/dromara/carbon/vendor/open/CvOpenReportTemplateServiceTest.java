@@ -203,7 +203,7 @@ class CvOpenReportTemplateServiceTest {
 
         ServiceException exception = assertThrows(ServiceException.class, () -> service.listTemplates(request));
 
-        assertEquals("license installId does not match", exception.getMessage());
+        assertEquals("授权文件的部署指纹与本机不匹配", exception.getMessage());
         verify(reportTemplateScopeMapper, never()).selectList(any());
     }
 

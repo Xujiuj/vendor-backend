@@ -84,6 +84,34 @@ class CvDimensionDataServiceImplTest {
     }
 
     @Test
+    void electricityFactorRecordFieldsUseVersionProvinceCodeAsGenericCode() throws Exception {
+        Map<String, Object> bo = new LinkedHashMap<>();
+        bo.put("recordCode", "2023-110000");
+        bo.put("recordName", "北京市");
+
+        applyRecordFields("ef-electricity-factor", bo);
+
+        assertEquals("2023-110000", bo.get("versionProvinceCode"));
+        assertEquals("北京市", bo.get("divisionName"));
+    }
+
+    @Test
+    void electricityFactorRecordMapExposesVersionProvinceCodeAsGenericRecordCode() throws Exception {
+        Map<String, Object> row = new LinkedHashMap<>();
+        row.put("id", 9L);
+        row.put("version_province_code", "2023-110000");
+        row.put("division_code", "110000");
+        row.put("division_name", "北京市");
+        row.put("status", "0");
+
+        Map<String, Object> record = toRecordMap("ef-electricity-factor", row);
+
+        assertEquals("2023-110000", record.get("recordCode"));
+        assertEquals("北京市", record.get("recordName"));
+        assertEquals("110000", record.get("divisionCode"));
+    }
+
+    @Test
     void electricityVersionInsertRejectsDuplicateVersionNumber() {
         JdbcTemplate jdbcTemplate = mock(JdbcTemplate.class);
         when(jdbcTemplate.queryForObject(
@@ -169,9 +197,14 @@ class CvDimensionDataServiceImplTest {
 
     @SuppressWarnings("unchecked")
     private Map<String, Object> toRecordMap(Map<String, Object> baseYear) throws Exception {
+        return toRecordMap("base-year", baseYear);
+    }
+
+    @SuppressWarnings("unchecked")
+    private Map<String, Object> toRecordMap(String dimensionCode, Map<String, Object> row) throws Exception {
         Method method = CvDimensionDataServiceImpl.class.getDeclaredMethod("toRecordMap", String.class, Map.class);
         method.setAccessible(true);
-        return (Map<String, Object>) method.invoke(service(mock(CvBaseYearMapper.class)), "base-year", baseYear);
+        return (Map<String, Object>) method.invoke(service(mock(CvBaseYearMapper.class)), dimensionCode, row);
     }
 
     private CvDimensionDataServiceImpl service(CvBaseYearMapper baseYearMapper) {

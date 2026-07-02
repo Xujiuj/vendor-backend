@@ -201,6 +201,9 @@ public class CvLicenseIssueServiceImpl implements ICvLicenseIssueService {
             return CvLicenseIssueResult.failed("PACKAGE_ENTITLEMENT_INVALID", e.getMessage());
         }
         applyIssueDefaults(request, tenantPackage);
+        if (StringUtils.isNotBlank(request.getLicenseId()) && licenseIdExists(request.getLicenseId())) {
+            return CvLicenseIssueResult.failed("DUPLICATE_LICENSE_ID", "授权编号已存在，不能重复签发");
+        }
 
         List<CvLicenseIssue> existingIssues = findIssuesForCustomerInstall(request.getCustomerId(), request.getInstallId());
         if (!allowRevokedHistory && hasRevokedHistory(existingIssues)) {
@@ -385,6 +388,11 @@ public class CvLicenseIssueServiceImpl implements ICvLicenseIssueService {
     private CvLicenseIssue findIssueByLicenseId(String licenseId) {
         return baseMapper.selectOne(new LambdaQueryWrapper<CvLicenseIssue>()
             .eq(CvLicenseIssue::getLicenseId, licenseId), false);
+    }
+
+    private boolean licenseIdExists(String licenseId) {
+        return baseMapper.selectCount(new LambdaQueryWrapper<CvLicenseIssue>()
+            .eq(CvLicenseIssue::getLicenseId, licenseId)) > 0;
     }
 
     private boolean hasReissueFromSource(String sourceLicenseId) {

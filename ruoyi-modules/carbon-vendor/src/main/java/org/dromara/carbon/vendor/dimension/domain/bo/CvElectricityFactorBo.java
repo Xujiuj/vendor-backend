@@ -31,6 +31,11 @@ public class CvElectricityFactorBo implements Serializable {
     private Long id;
 
     /**
+     * Source(A) 202EF PK_因子版本省份代码.
+     */
+    private String versionProvinceCode;
+
+    /**
      * 因子版本
      */
     @NotBlank(message = "因子版本不能为空", groups = { AddGroup.class, EditGroup.class })

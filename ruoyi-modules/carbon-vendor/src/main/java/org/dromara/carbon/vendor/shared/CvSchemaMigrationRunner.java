@@ -19,6 +19,7 @@ public class CvSchemaMigrationRunner implements CommandLineRunner {
     @Override
     public void run(String... args) {
         createReportContentTableIfMissing();
+        backfillElectricityFactorVersionProvinceCode();
     }
 
     private void createReportContentTableIfMissing() {
@@ -48,6 +49,51 @@ public class CvSchemaMigrationRunner implements CommandLineRunner {
             log.info("[SchemaMigration] created cv_report_content");
         } catch (Exception e) {
             log.warn("[SchemaMigration] cv_report_content creation skipped: {}", e.getMessage());
+        }
+    }
+
+    private void backfillElectricityFactorVersionProvinceCode() {
+        try {
+            Integer tableCount = jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_SCHEMA = SCHEMA_NAME() AND TABLE_NAME = ?",
+                Integer.class, "cv_electricity_factor");
+            if (tableCount == null || tableCount == 0) {
+                return;
+            }
+            Integer columnCount = jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = SCHEMA_NAME() AND TABLE_NAME = ? AND COLUMN_NAME = ?",
+                Integer.class, "cv_electricity_factor", "version_province_code");
+            if (columnCount == null || columnCount == 0) {
+                jdbcTemplate.execute("ALTER TABLE cv_electricity_factor ADD version_province_code NVARCHAR(64) NULL");
+                log.info("[SchemaMigration] added cv_electricity_factor.version_province_code");
+            }
+            jdbcTemplate.update("""
+                UPDATE cv_electricity_factor
+                   SET version_province_code = CONCAT(factor_version, division_code)
+                 WHERE (version_province_code IS NULL OR version_province_code = '')
+                   AND factor_version IS NOT NULL
+                   AND factor_version <> ''
+                   AND division_code IS NOT NULL
+                   AND division_code <> ''
+                """);
+            jdbcTemplate.update("""
+                UPDATE cv_factor_record
+                   SET factor_code = version_province_code,
+                       factor_key = version_province_code
+                 WHERE factor_table_code = '202ef'
+                   AND version_province_code IS NOT NULL
+                   AND version_province_code <> ''
+                   AND (
+                        factor_code IS NULL
+                        OR factor_code = ''
+                        OR factor_code LIKE '%:%'
+                        OR factor_key IS NULL
+                        OR factor_key = ''
+                        OR factor_key LIKE '%:%'
+                   )
+                """);
+        } catch (Exception e) {
+            log.warn("[SchemaMigration] cv_electricity_factor.version_province_code backfill skipped: {}", e.getMessage());
         }
     }
 }

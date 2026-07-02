@@ -150,6 +150,33 @@ class CvOpenLicenseServiceTest {
     }
 
     @Test
+    void bindsPendingLicenseToFirstInstallAtomically() {
+        when(licenseIssueMapper.selectOne(any(), eq(false))).thenReturn(pendingLicense());
+        when(licenseIssueMapper.update(any(CvLicenseIssue.class), any())).thenReturn(1);
+
+        CvOpenLicenseCurrentResponse response = service.currentLicense(currentRequest());
+
+        assertEquals("LIC-001", response.getLicenseId());
+        assertTrue(response.getLicensePayload().contains("\"installId\":\"INSTALL-001\""));
+        verify(licenseIssueMapper).update(any(CvLicenseIssue.class), any());
+        verify(licenseIssueMapper, never()).selectById(any());
+    }
+
+    @Test
+    void rejectsPendingLicenseWhenConcurrentBindingUsedDifferentInstall() {
+        when(licenseIssueMapper.selectOne(any(), eq(false))).thenReturn(pendingLicense());
+        when(licenseIssueMapper.update(any(CvLicenseIssue.class), any())).thenReturn(0);
+        CvLicenseIssue alreadyBound = pendingLicense();
+        alreadyBound.setInstallId("OTHER-INSTALL");
+        when(licenseIssueMapper.selectById(eq(1L))).thenReturn(alreadyBound);
+
+        ServiceException exception = assertThrows(ServiceException.class, () -> service.currentLicense(currentRequest()));
+
+        assertEquals("授权文件的部署指纹与本机不匹配", exception.getMessage());
+        verify(licenseIssueMapper, never()).updateById(any(CvLicenseIssue.class));
+    }
+
+    @Test
     void createsPendingManualRenewalOrderInVendorDatabaseOnly() {
         when(licenseIssueMapper.selectOne(any(), eq(false))).thenReturn(activeLicense());
         when(customerMapper.selectById(eq(1001L))).thenReturn(activeCustomer());
@@ -247,6 +274,7 @@ class CvOpenLicenseServiceTest {
 
     private CvLicenseIssue activeLicense() {
         CvLicenseIssue license = new CvLicenseIssue();
+        license.setId(1L);
         license.setLicenseId("LIC-001");
         license.setCustomerId(1001L);
         license.setPackageId(1001L);
@@ -262,6 +290,12 @@ class CvOpenLicenseServiceTest {
         license.setValidTo(Date.from(Instant.now().plusSeconds(3600)));
         license.setLicensePayload("{\"licenseId\":\"LIC-001\"}");
         license.setSignatureText("signature-text");
+        return license;
+    }
+
+    private CvLicenseIssue pendingLicense() {
+        CvLicenseIssue license = activeLicense();
+        license.setInstallId("__PENDING_ENTERPRISE_ACTIVATION__");
         return license;
     }
 

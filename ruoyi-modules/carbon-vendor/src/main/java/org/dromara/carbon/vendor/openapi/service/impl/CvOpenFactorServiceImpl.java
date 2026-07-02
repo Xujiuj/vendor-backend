@@ -2,34 +2,41 @@ package org.dromara.carbon.vendor.openapi.service.impl;
 
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import lombok.RequiredArgsConstructor;
-import org.dromara.carbon.vendor.factor.domain.CvFactorVersion;
-import org.dromara.carbon.vendor.license.domain.CvLicenseIssue;
 import org.dromara.carbon.vendor.dimension.domain.CvElectricityFactor;
 import org.dromara.carbon.vendor.dimension.domain.CvElectricityFactorScope;
 import org.dromara.carbon.vendor.dimension.domain.CvElectricityFactorVersion;
 import org.dromara.carbon.vendor.dimension.domain.CvGreenhouseGas;
+import org.dromara.carbon.vendor.dimension.mapper.CvElectricityFactorScopeMapper;
+import org.dromara.carbon.vendor.dimension.mapper.CvElectricityFactorVersionMapper;
+import org.dromara.carbon.vendor.dimension.mapper.CvElectricityMapper;
+import org.dromara.carbon.vendor.dimension.mapper.CvGreenhouseGasMapper;
+import org.dromara.carbon.vendor.factor.domain.CvFactorRecord;
+import org.dromara.carbon.vendor.factor.domain.CvFactorVersion;
+import org.dromara.carbon.vendor.license.domain.CvLicenseIssue;
 import org.dromara.carbon.vendor.factor.domain.enums.CvFactorVersionLifecycleState;
+import org.dromara.carbon.vendor.factor.mapper.CvFactorRecordMapper;
 import org.dromara.carbon.vendor.openapi.domain.CvOpenFactorRecordVo;
 import org.dromara.carbon.vendor.openapi.domain.CvOpenFactorSyncRequest;
 import org.dromara.carbon.vendor.openapi.domain.CvOpenFactorSyncResponse;
 import org.dromara.carbon.vendor.factor.mapper.CvFactorVersionMapper;
 import org.dromara.carbon.vendor.license.mapper.CvLicenseIssueMapper;
 import org.dromara.carbon.vendor.license.service.impl.CvLicenseInstallBindingSupport;
-import org.dromara.carbon.vendor.dimension.mapper.CvElectricityFactorScopeMapper;
-import org.dromara.carbon.vendor.dimension.mapper.CvElectricityFactorVersionMapper;
-import org.dromara.carbon.vendor.dimension.mapper.CvElectricityMapper;
-import org.dromara.carbon.vendor.dimension.mapper.CvGreenhouseGasMapper;
 import org.dromara.carbon.vendor.factor.service.ICvFactorCustomerScopeService;
 import org.dromara.carbon.vendor.openapi.service.ICvOpenApiAuditService;
 import org.dromara.carbon.vendor.openapi.service.ICvOpenFactorService;
 import org.dromara.common.core.exception.ServiceException;
 import org.dromara.common.core.utils.StringUtils;
+import org.dromara.common.json.utils.JsonUtils;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
-import java.util.ArrayList;
 import java.util.Date;
+import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Locale;
+import java.util.Map;
+import java.util.Set;
 
 /**
  * Vendor open factor sync service implementation.
@@ -45,6 +52,7 @@ public class CvOpenFactorServiceImpl implements ICvOpenFactorService {
 
     private final CvLicenseIssueMapper licenseIssueMapper;
     private final CvFactorVersionMapper factorVersionMapper;
+    private final CvFactorRecordMapper factorRecordMapper;
     private final CvElectricityMapper electricityMapper;
     private final CvElectricityFactorVersionMapper electricityFactorVersionMapper;
     private final CvElectricityFactorScopeMapper electricityFactorScopeMapper;
@@ -60,7 +68,7 @@ public class CvOpenFactorServiceImpl implements ICvOpenFactorService {
             customerId = entitlement.getCustomerId();
             CvOpenLicenseFeatureSupport.requireFeature(entitlement, FEATURE_FACTOR_SYNC);
             CvFactorVersion version = findLatestAuthorizedVersion(entitlement);
-            List<CvOpenFactorRecordVo> records = querySourceAFactorRecords();
+            List<CvOpenFactorRecordVo> records = querySourceAFactorRecords(version);
 
             CvOpenFactorSyncResponse response = new CvOpenFactorSyncResponse();
             response.setLicenseId(entitlement.getLicenseId());
@@ -121,48 +129,130 @@ public class CvOpenFactorServiceImpl implements ICvOpenFactorService {
         return state == CvFactorVersionLifecycleState.PUBLISHED || state == CvFactorVersionLifecycleState.FROZEN;
     }
 
-    private List<CvOpenFactorRecordVo> querySourceAFactorRecords() {
-        List<CvOpenFactorRecordVo> records = new ArrayList<>();
-        electricityMapper.selectList(Wrappers.<CvElectricityFactor>lambdaQuery()
-                .eq(CvElectricityFactor::getStatus, "0")
-                .orderByAsc(CvElectricityFactor::getSortOrder)
-                .orderByAsc(CvElectricityFactor::getId))
+    private List<CvOpenFactorRecordVo> querySourceAFactorRecords(CvFactorVersion version) {
+        List<CvOpenFactorRecordVo> records = new ArrayList<>(factorRecordMapper.selectList(Wrappers.<CvFactorRecord>lambdaQuery()
+                .eq(CvFactorRecord::getVersionId, version.getId())
+                .eq(CvFactorRecord::getEnabledFlag, Boolean.TRUE)
+                .orderByAsc(CvFactorRecord::getFactorTableCode)
+                .orderByAsc(CvFactorRecord::getRowNo)
+                .orderByAsc(CvFactorRecord::getId))
             .stream()
-            .map(this::toElectricityFactorRecord)
-            .forEach(records::add);
-        electricityFactorVersionMapper.selectList(Wrappers.<CvElectricityFactorVersion>lambdaQuery()
-                .eq(CvElectricityFactorVersion::getStatus, "0")
-                .orderByAsc(CvElectricityFactorVersion::getSortOrder)
-                .orderByAsc(CvElectricityFactorVersion::getId))
-            .stream()
-            .map(this::toElectricityVersionRecord)
-            .forEach(records::add);
-        electricityFactorScopeMapper.selectList(Wrappers.<CvElectricityFactorScope>lambdaQuery()
-                .eq(CvElectricityFactorScope::getStatus, "0")
-                .orderByAsc(CvElectricityFactorScope::getSortOrder)
-                .orderByAsc(CvElectricityFactorScope::getId))
-            .stream()
-            .map(this::toElectricityScopeRecord)
-            .forEach(records::add);
-        greenhouseGasMapper.selectList(Wrappers.<CvGreenhouseGas>lambdaQuery()
-                .eq(CvGreenhouseGas::getStatus, "0")
-                .orderByAsc(CvGreenhouseGas::getSortOrder)
-                .orderByAsc(CvGreenhouseGas::getId))
-            .stream()
-            .map(this::toGreenhouseGasRecord)
-            .forEach(records::add);
+            .map(this::toOpenFactorRecord)
+            .toList());
+        Set<String> tableCodes = new HashSet<>();
+        records.forEach(record -> tableCodes.add(normalizeTableCode(record.getFactorTableCode())));
+        if (!tableCodes.contains("202ef")) {
+            electricityMapper.selectList(Wrappers.<CvElectricityFactor>lambdaQuery()
+                    .eq(CvElectricityFactor::getStatus, "0")
+                    .orderByAsc(CvElectricityFactor::getSortOrder)
+                    .orderByAsc(CvElectricityFactor::getId))
+                .stream()
+                .map(this::toElectricityFactorRecord)
+                .forEach(records::add);
+        }
+        if (!tableCodes.contains("203ef")) {
+            electricityFactorVersionMapper.selectList(Wrappers.<CvElectricityFactorVersion>lambdaQuery()
+                    .eq(CvElectricityFactorVersion::getStatus, "0")
+                    .orderByAsc(CvElectricityFactorVersion::getSortOrder)
+                    .orderByAsc(CvElectricityFactorVersion::getId))
+                .stream()
+                .map(this::toElectricityVersionRecord)
+                .forEach(records::add);
+        }
+        if (!tableCodes.contains("205ef")) {
+            electricityFactorScopeMapper.selectList(Wrappers.<CvElectricityFactorScope>lambdaQuery()
+                    .eq(CvElectricityFactorScope::getStatus, "0")
+                    .orderByAsc(CvElectricityFactorScope::getSortOrder)
+                    .orderByAsc(CvElectricityFactorScope::getId))
+                .stream()
+                .map(this::toElectricityScopeRecord)
+                .forEach(records::add);
+        }
+        if (!tableCodes.contains("206")) {
+            greenhouseGasMapper.selectList(Wrappers.<CvGreenhouseGas>lambdaQuery()
+                    .eq(CvGreenhouseGas::getStatus, "0")
+                    .orderByAsc(CvGreenhouseGas::getSortOrder)
+                    .orderByAsc(CvGreenhouseGas::getId))
+                .stream()
+                .map(this::toGreenhouseGasRecord)
+                .forEach(records::add);
+        }
         return records;
+    }
+
+    private CvOpenFactorRecordVo toOpenFactorRecord(CvFactorRecord record) {
+        CvOpenFactorRecordVo vo = new CvOpenFactorRecordVo();
+        String factorCode = "202ef".equals(normalizeTableCode(record.getFactorTableCode()))
+            && StringUtils.isNotBlank(record.getVersionProvinceCode())
+            ? record.getVersionProvinceCode()
+            : record.getFactorCode();
+        vo.setFactorTableCode(record.getFactorTableCode());
+        vo.setFactorCode(factorCode);
+        vo.setFactorName(record.getFactorName());
+        vo.setFactorCategory(record.getFactorCategory());
+        vo.setFactorValue(record.getFactorValue());
+        vo.setFactorUnit(record.getFactorUnit());
+        vo.setFactorKey("202ef".equals(normalizeTableCode(record.getFactorTableCode())) ? factorCode : record.getFactorKey());
+        vo.setEmissionSourceName(record.getEmissionSourceName());
+        vo.setEmissionSourceNameEn(record.getEmissionSourceNameEn());
+        vo.setFuelMaterialCategory(record.getFuelMaterialCategory());
+        vo.setSourceUnit(record.getSourceUnit());
+        vo.setCo2(record.getCo2());
+        vo.setCh4(record.getCh4());
+        vo.setN2o(record.getN2o());
+        vo.setHfcs(record.getHfcs());
+        vo.setPfcs(record.getPfcs());
+        vo.setSf6(record.getSf6());
+        vo.setNf3(record.getNf3());
+        vo.setApplicableScope(record.getApplicableScope());
+        vo.setFactorSource(record.getFactorSource());
+        vo.setGwpCh4(record.getGwpCh4());
+        vo.setGwpN2o(record.getGwpN2o());
+        vo.setGwpHfcs(record.getGwpHfcs());
+        vo.setGwpPfcs(record.getGwpPfcs());
+        vo.setGwpSf6(record.getGwpSf6());
+        vo.setGwpNf3(record.getGwpNf3());
+        vo.setFactorGwp(record.getFactorGwp());
+        vo.setVersionProvinceCode(record.getVersionProvinceCode());
+        vo.setFactorVersion(record.getFactorVersion());
+        vo.setDivisionCode(record.getDivisionCode());
+        vo.setDivisionName(record.getDivisionName());
+        vo.setRegionName(record.getRegionName());
+        vo.setProvinceFactor(record.getProvinceFactor());
+        vo.setRegionFactor(record.getRegionFactor());
+        vo.setNationalFactor(record.getNationalFactor());
+        vo.setNonFossilExcludedFactor(record.getNonFossilExcludedFactor());
+        vo.setNationalFossilPowerFactor(record.getNationalFossilPowerFactor());
+        vo.setRowNo(record.getRowNo());
+        vo.setFuelLevel1(record.getFuelLevel1());
+        vo.setFuelLevel2(record.getFuelLevel2());
+        vo.setFuelLevel3(record.getFuelLevel3());
+        vo.setFuelLevel4(record.getFuelLevel4());
+        vo.setLowerHeatValue(record.getLowerHeatValue());
+        vo.setLowerHeatValueCv(record.getLowerHeatValueCv());
+        vo.setCo2Factor(record.getCo2Factor());
+        vo.setCo2FactorCv(record.getCo2FactorCv());
+        vo.setGwpValue(record.getGwpValue());
+        vo.setConvertedFactor(record.getConvertedFactor());
+        vo.setSourceRef(record.getSourceRef());
+        vo.setCustomFields(parseCustomFields(record.getCustomFields()));
+        vo.setRemark(record.getRemark());
+        return vo;
     }
 
     private CvOpenFactorRecordVo toElectricityFactorRecord(CvElectricityFactor record) {
         CvOpenFactorRecordVo vo = new CvOpenFactorRecordVo();
+        String versionProvinceCode = StringUtils.isNotBlank(record.getVersionProvinceCode())
+            ? record.getVersionProvinceCode()
+            : record.getFactorVersion() + record.getDivisionCode();
         vo.setFactorTableCode("202ef");
-        vo.setFactorCode(record.getFactorVersion() + ":" + record.getDivisionCode());
+        vo.setFactorCode(versionProvinceCode);
         vo.setFactorName(record.getDivisionName());
         vo.setFactorCategory("ef-electricity-factor");
         vo.setFactorValue(firstNumber(record.getProvinceFactor(), record.getRegionFactor(), record.getNationalFactor()));
         vo.setFactorUnit("kgCO2e/kWh");
-        vo.setVersionProvinceCode(vo.getFactorCode());
+        vo.setFactorKey(vo.getFactorCode());
+        vo.setVersionProvinceCode(versionProvinceCode);
         vo.setFactorVersion(record.getFactorVersion());
         vo.setDivisionCode(record.getDivisionCode());
         vo.setDivisionName(record.getDivisionName());
@@ -231,6 +321,17 @@ public class CvOpenFactorServiceImpl implements ICvOpenFactorService {
             }
         }
         return BigDecimal.ZERO;
+    }
+
+    private Map<String, Object> parseCustomFields(String customFields) {
+        if (StringUtils.isBlank(customFields)) {
+            return null;
+        }
+        return JsonUtils.parseMap(customFields);
+    }
+
+    private String normalizeTableCode(String factorTableCode) {
+        return StringUtils.isBlank(factorTableCode) ? "" : factorTableCode.trim().toLowerCase(Locale.ROOT);
     }
 
     private String normalizeRequired(String value, String message) {

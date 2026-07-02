@@ -205,18 +205,20 @@ public class CvSourceAFactorImportServiceImpl implements ICvSourceAFactorImportS
     private int insert202Ef(List<Map<String, Object>> rows) {
         String sql = """
             INSERT INTO cv_electricity_factor
-            (factor_version, division_code, division_name, region_name,
+            (version_province_code, factor_version, division_code, division_name, region_name,
              province_factor, region_factor, national_factor, non_fossil_excluded_factor,
              national_fossil_power_factor, sort_order, status, remark, create_time, update_time)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 0, '0', ?, SYSDATETIME(), SYSDATETIME())
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, '0', ?, SYSDATETIME(), SYSDATETIME())
             """;
         List<Object[]> batchArgs = mapRows(rows, row -> {
+            String versionProvinceCode = text(row.get("PK_因子版本省份代码"));
             String version = text(row.get("因子版本"));
             String divisionCode = text(row.get("行政区划代码"));
             if (StringUtils.isBlank(version) || StringUtils.isBlank(divisionCode)) {
                 return null;
             }
             return new Object[]{
+                StringUtils.isNotBlank(versionProvinceCode) ? versionProvinceCode : version + divisionCode,
                 version, divisionCode, row.get("行政区划"), row.get("区域划分"),
                 decimal(row.get("省级因子（kgCO2/kWh)")), decimal(row.get("区域因子（kgCO2/kWh)")),
                 decimal(row.get("全国因子（kgCO2/kWh）")),

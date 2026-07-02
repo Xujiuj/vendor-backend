@@ -56,6 +56,7 @@ public class CvOpenDimensionRecordVo implements Serializable {
     private Integer baseYear;
     private Integer isCurrent;
 
+    private String versionProvinceCode;
     private String factorVersion;
     private String divisionCode;
     private String divisionName;
