@@ -16,15 +16,15 @@ spring:
           type: ${spring.datasource.type}
           driverClassName: com.microsoft.sqlserver.jdbc.SQLServerDriver
           # SQL Server JDBC 参数通过 VENDOR_DB_URL 统一配置。
-          url: ${VENDOR_DB_URL:jdbc:sqlserver://127.0.0.1:1433;databaseName=vendor;encrypt=false;trustServerCertificate=true}
-          username: ${VENDOR_DB_USERNAME:sa}
+          url: ${VENDOR_DB_URL:jdbc:sqlserver://rm-0jl12f183yzn87063.sqlserver.rds.aliyuncs.com:1433;databaseName=Fengxingdata;encrypt=false;trustServerCertificate=true}
+          username: ${VENDOR_DB_USERNAME:Fengxingdata}
           password: ${VENDOR_DB_PASSWORD:}
 #        # 从库数据源
 #        slave:
 #          lazy: true
 #          type: ${spring.datasource.type}
 #          driverClassName: com.microsoft.sqlserver.jdbc.SQLServerDriver
-#          url: jdbc:sqlserver://127.0.0.1:1433;databaseName=vendor;encrypt=false;trustServerCertificate=true
+#          url: jdbc:sqlserver://rm-0jl12f183yzn87063.sqlserver.rds.aliyuncs.com:1433;databaseName=Fengxingdata;encrypt=false;trustServerCertificate=true
 #          username:
 #          password:
       hikari:
