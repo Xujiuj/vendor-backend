@@ -8,6 +8,8 @@ import org.dromara.carbon.vendor.dimension.mapper.CvElectricityFactorVersionMapp
 import org.dromara.carbon.vendor.dimension.mapper.CvElectricityMapper;
 import org.dromara.carbon.vendor.dimension.mapper.CvEmissionSourceCategoryMapper;
 import org.dromara.carbon.vendor.dimension.mapper.CvGreenhouseGasMapper;
+import org.dromara.carbon.vendor.dimension.service.ICvEmissionSourcePublicationService;
+import org.dromara.carbon.vendor.dimension.domain.vo.CvEmissionSourcePublicationVo;
 import org.dromara.carbon.vendor.dimension.domain.CvEmissionSourceCategory;
 import org.dromara.carbon.vendor.license.domain.CvLicenseIssue;
 import org.dromara.carbon.vendor.license.mapper.CvLicenseIssueMapper;
@@ -48,6 +50,7 @@ class CvVendorDimensionScopeTest {
             mock(CvElectricityFactorVersionMapper.class),
             mock(CvElectricityFactorScopeMapper.class),
             mock(CvGreenhouseGasMapper.class),
+            publicationService(),
             auditService
         );
 
@@ -63,8 +66,8 @@ class CvVendorDimensionScopeTest {
         when(licenseIssueMapper.selectOne(any(), eq(false))).thenReturn(activeLicense());
 
         Page<CvEmissionSourceCategory> mapperPage = new Page<>(1, 10);
-        mapperPage.setRecords(java.util.List.of(emissionSourceCategory()));
-        mapperPage.setTotal(1);
+        mapperPage.setRecords(java.util.List.of(emissionSourceCategory("1"), emissionSourceCategory("2")));
+        mapperPage.setTotal(2);
         when(categoryMapper.selectPage(any(), any())).thenReturn(mapperPage);
 
         CvOpenDimensionServiceImpl service = new CvOpenDimensionServiceImpl(
@@ -76,12 +79,14 @@ class CvVendorDimensionScopeTest {
             mock(CvElectricityFactorVersionMapper.class),
             mock(CvElectricityFactorScopeMapper.class),
             mock(CvGreenhouseGasMapper.class),
+            publicationService(),
             auditService
         );
 
         CvOpenDimensionListResponse response = service.listDimensions(openRequest("emission-source-category"));
 
-        assertEquals(1, response.getTotal());
+        assertEquals(2, response.getTotal());
+        assertEquals(2, response.getRecords().size());
         CvOpenDimensionRecordVo record = response.getRecords().get(0);
         assertEquals("Category EN", record.getCategoryNameEn());
         assertEquals("ISO EN", record.getIsoCategoryEn());
@@ -89,6 +94,8 @@ class CvVendorDimensionScopeTest {
         assertNull(record.getGhgScopeCategoryEn());
         assertNull(record.getIsoCategoryDescriptionEn());
         assertNull(record.getIsoCustomSubcategory());
+        assertEquals("1", response.getRecords().get(0).getVersionNo());
+        assertEquals("2", response.getRecords().get(1).getVersionNo());
     }
 
     private CvOpenDimensionRequest openRequest(String dimensionCode) {
@@ -99,7 +106,17 @@ class CvVendorDimensionScopeTest {
         return request;
     }
 
-    private CvEmissionSourceCategory emissionSourceCategory() {
+    private ICvEmissionSourcePublicationService publicationService() {
+        ICvEmissionSourcePublicationService service = mock(ICvEmissionSourcePublicationService.class);
+        CvEmissionSourcePublicationVo policy = new CvEmissionSourcePublicationVo();
+        policy.setPublicationId("publication-1");
+        policy.setPublishMode("ALL");
+        policy.setPublishedVersions(java.util.List.of("1", "2"));
+        when(service.queryPolicy()).thenReturn(policy);
+        return service;
+    }
+
+    private CvEmissionSourceCategory emissionSourceCategory(String versionNo) {
         CvEmissionSourceCategory category = new CvEmissionSourceCategory();
         category.setId(1L);
         category.setCategoryCode("CAT-001");
@@ -111,6 +128,7 @@ class CvVendorDimensionScopeTest {
         category.setIsoCategory("ISO");
         category.setIsoCategoryEn("ISO EN");
         category.setIsoCategoryDescription("ISO description CN");
+        category.setVersionNo(versionNo);
         category.setStatus("0");
         return category;
     }

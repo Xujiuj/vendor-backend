@@ -14,6 +14,7 @@ import org.dromara.carbon.vendor.dimension.mapper.CvElectricityFactorVersionMapp
 import org.dromara.carbon.vendor.dimension.mapper.CvEmissionSourceCategoryMapper;
 import org.dromara.carbon.vendor.dimension.mapper.CvGreenhouseGasMapper;
 import org.dromara.carbon.vendor.dimension.service.ICvDimensionDataService;
+import org.dromara.carbon.vendor.dimension.service.ICvEmissionSourcePublicationService;
 import org.dromara.carbon.vendor.shared.VendorManagedTableCatalog;
 import org.dromara.common.core.exception.ServiceException;
 import org.dromara.common.core.utils.StringUtils;
@@ -56,6 +57,7 @@ public class CvDimensionDataServiceImpl implements ICvDimensionDataService {
     private final CvElectricityFactorScopeMapper electricityFactorScopeMapper;
     private final CvGreenhouseGasMapper greenhouseGasMapper;
     private final JdbcTemplate jdbcTemplate;
+    private final ICvEmissionSourcePublicationService publicationService;
 
     @Override
     public TableDataInfo<?> queryPageList(String dimensionCode, PageQuery pageQuery) {
@@ -64,8 +66,9 @@ public class CvDimensionDataServiceImpl implements ICvDimensionDataService {
         int pageSize = pageQuery.getPageSize() == null || pageQuery.getPageSize() <= 0 ? PageQuery.DEFAULT_PAGE_SIZE : pageQuery.getPageSize();
         long offset = (long) (pageNum - 1) * pageSize;
         String tableName = dimension.tableName();
-        Long total = jdbcTemplate.queryForObject("SELECT COUNT(*) FROM " + quoteTable(tableName) + " WHERE " + quoteIdentifier("status") + " = '0'", Long.class);
-        List<Map<String, Object>> rows = queryPageRows(tableName, offset, pageSize);
+        String whereSql = activeRowsWhere(dimensionCode, tableName);
+        Long total = jdbcTemplate.queryForObject("SELECT COUNT(*) FROM " + quoteTable(tableName) + whereSql, Long.class);
+        List<Map<String, Object>> rows = queryPageRows(tableName, whereSql, offset, pageSize);
         TableDataInfo<Map<String, Object>> dataInfo = new TableDataInfo<>();
         dataInfo.setCode(200);
         dataInfo.setMsg("查询成功");
@@ -88,7 +91,10 @@ public class CvDimensionDataServiceImpl implements ICvDimensionDataService {
         applyRecordFields(dimensionCode, bo);
         validateUniqueBusinessKeys(dimensionCode, dimension.tableName(), bo, null);
         Map<String, Object> values = writableValues(dimension.tableName(), bo, false);
-        return insertRow(dimension.tableName(), values);
+        int inserted = insertRow(dimension.tableName(), values);
+        normalizeEmissionSourceCategoryCurrentVersion(dimensionCode, dimension.tableName());
+        touchPublication(dimensionCode);
+        return inserted;
     }
 
     @Override
@@ -102,12 +108,16 @@ public class CvDimensionDataServiceImpl implements ICvDimensionDataService {
             throw new ServiceException("id不能为空");
         }
         validateUniqueBusinessKeys(dimensionCode, dimension.tableName(), bo, id);
-        return updateRow(dimension.tableName(), values, id);
+        int updated = updateRow(dimension.tableName(), values, id);
+        normalizeEmissionSourceCategoryCurrentVersion(dimensionCode, dimension.tableName());
+        touchPublication(dimensionCode);
+        return updated;
     }
 
     @Override
+    @Transactional(rollbackFor = Exception.class)
     public int deleteByIds(String dimensionCode, Collection<Long> ids) {
-        return switch (dimensionCode) {
+        int deleted = switch (dimensionCode) {
             case "admin-division" -> {
                 validateAdminDivisionDelete(ids);
                 yield adminDivisionMapper.deleteByIds(ids);
@@ -123,18 +133,31 @@ public class CvDimensionDataServiceImpl implements ICvDimensionDataService {
             case "greenhouse-gas" -> greenhouseGasMapper.deleteByIds(ids);
             default -> throw new ServiceException("不支持的维度编码: " + dimensionCode);
         };
+        if ("emission-source-category".equals(dimensionCode)) {
+            normalizeEmissionSourceCategoryCurrentVersion(dimensionCode, managedDimension(dimensionCode).tableName());
+            touchPublication(dimensionCode);
+        }
+        return deleted;
     }
 
     @Override
     public List<Map<String, Object>> queryList(String dimensionCode) {
         ManagedDimension dimension = managedDimension(dimensionCode);
-        return jdbcTemplate.queryForList("SELECT * FROM " + quoteTable(dimension.tableName()) + " WHERE " + quoteIdentifier("status") + " = '0' ORDER BY " + quoteIdentifier("sort_order") + " ASC, " + quoteIdentifier("id") + " ASC")
+        return jdbcTemplate.queryForList("SELECT * FROM " + quoteTable(dimension.tableName())
+                + activeRowsWhere(dimensionCode, dimension.tableName())
+                + " ORDER BY " + quoteIdentifier("sort_order") + " ASC, " + quoteIdentifier("id") + " ASC")
             .stream()
             .map(row -> toRecordMap(dimensionCode, row))
             .toList();
     }
 
     // ==================== helpers ====================
+
+    private void touchPublication(String dimensionCode) {
+        if ("emission-source-category".equals(dimensionCode)) {
+            publicationService.touchPublication();
+        }
+    }
 
     private void validateAdminDivisionDelete(Collection<Long> ids) {
         List<CvAdminDivision> records = adminDivisionMapper.selectList(new QueryWrapper<CvAdminDivision>().in("id", ids));
@@ -189,6 +212,20 @@ public class CvDimensionDataServiceImpl implements ICvDimensionDataService {
             applyBaseYearRecordFields(bo, recordCode, recordName);
             return;
         }
+        if ("emission-source-category".equals(dimensionCode)) {
+            Object categoryName = firstNonNull(bo.get("ghgScopeCategory"), recordName);
+            Object categoryNameEn = firstNonNull(bo.get("ghgScopeCategoryEn"), bo.get("categoryNameEn"));
+            if (categoryName != null) {
+                bo.put("categoryName", categoryName);
+                bo.put("recordName", categoryName);
+            }
+            if (categoryNameEn != null) {
+                bo.put("categoryNameEn", categoryNameEn);
+            }
+            bo.put("versionNo", normalizeVersionNo(bo.get("versionNo")));
+            Object currentFlag = bo.get("currentFlag");
+            bo.put("currentFlag", currentFlag == null || Set.of("Y", "1", "TRUE", "是").contains(String.valueOf(currentFlag).trim().toUpperCase()) ? "1" : "0");
+        }
         if (recordCode != null) {
             bo.put(codeField, recordCode);
         }
@@ -198,23 +235,52 @@ public class CvDimensionDataServiceImpl implements ICvDimensionDataService {
     }
 
     private void validateUniqueBusinessKeys(String dimensionCode, String tableName, Map<String, Object> bo, Object currentId) {
+        if ("emission-source-category".equals(dimensionCode)) {
+            validateEmissionSourceCategoryVersionUnique(tableName, bo, currentId);
+            return;
+        }
         if (!"ef-electricity-version".equals(dimensionCode)) {
             return;
         }
         Object factorVersion = firstNonNull(bo.get("factorVersion"), bo.get("factor_version"), bo.get("recordCode"));
-        if (factorVersion == null || StringUtils.isBlank(String.valueOf(factorVersion))) {
-            throw new ServiceException("版本号不能为空");
+        Object effectiveYear = firstNonNull(bo.get("effectiveYear"), bo.get("effective_year"));
+        if (factorVersion == null || StringUtils.isBlank(String.valueOf(factorVersion)) || effectiveYear == null) {
+            throw new ServiceException("年份和对应因子版本不能为空");
         }
-        String sql = "SELECT COUNT(*) FROM " + quoteTable(tableName) + " WHERE " + quoteIdentifier("factor_version") + " = ?";
+        String sql = "SELECT COUNT(*) FROM " + quoteTable(tableName)
+            + " WHERE " + quoteIdentifier("factor_version") + " = ? AND " + quoteIdentifier("effective_year") + " = ?";
         List<Object> args = new ArrayList<>();
         args.add(String.valueOf(factorVersion).trim());
+        args.add(effectiveYear);
         if (currentId != null) {
             sql += " AND " + quoteIdentifier("id") + " <> ?";
             args.add(currentId);
         }
         Long count = jdbcTemplate.queryForObject(sql, Long.class, args.toArray());
         if (count != null && count > 0) {
-            throw new ServiceException("版本号已存在");
+            throw new ServiceException("年份与对应因子版本组合已存在");
+        }
+    }
+
+    private void validateEmissionSourceCategoryVersionUnique(String tableName, Map<String, Object> bo, Object currentId) {
+        Object categoryCode = firstNonNull(bo.get("categoryCode"), bo.get("category_code"), bo.get("recordCode"));
+        String versionNo = normalizeVersionNo(bo.get("versionNo"));
+        if (categoryCode == null || StringUtils.isBlank(String.valueOf(categoryCode))) {
+            throw new ServiceException("排放源分类和版本号不能为空");
+        }
+        String sql = "SELECT COUNT(*) FROM " + quoteTable(tableName)
+            + " WHERE " + quoteIdentifier("category_code") + " = ? AND COALESCE(NULLIF(LTRIM(RTRIM("
+            + quoteIdentifier("version_no") + ")), ''), '1') = ?";
+        List<Object> args = new ArrayList<>();
+        args.add(String.valueOf(categoryCode).trim());
+        args.add(versionNo);
+        if (currentId != null) {
+            sql += " AND " + quoteIdentifier("id") + " <> ?";
+            args.add(currentId);
+        }
+        Long count = jdbcTemplate.queryForObject(sql, Long.class, args.toArray());
+        if (count != null && count > 0) {
+            throw new ServiceException("该版本中已存在相同的排放源分类");
         }
     }
 
@@ -271,7 +337,7 @@ public class CvDimensionDataServiceImpl implements ICvDimensionDataService {
             case "ef-electricity-factor" -> "versionProvinceCode";
             case "emission-source-category" -> "categoryCode";
             case "base-year" -> "baseYearKey";
-            case "ef-electricity-version" -> "factorVersion";
+            case "ef-electricity-version" -> "effectiveYear";
             case "ef-electricity-scope" -> "scopeKey";
             case "greenhouse-gas" -> "gasCode";
             default -> throw new ServiceException("不支持的维度编码: " + dimensionCode);
@@ -305,13 +371,50 @@ public class CvDimensionDataServiceImpl implements ICvDimensionDataService {
         return new ManagedDimension(dimensionCode, tableName);
     }
 
-    private List<Map<String, Object>> queryPageRows(String tableName, long offset, int pageSize) {
+    private List<Map<String, Object>> queryPageRows(String tableName, String whereSql, long offset, int pageSize) {
         String orderSql = " ORDER BY " + quoteIdentifier("sort_order") + " ASC, " + quoteIdentifier("id") + " ASC";
         return jdbcTemplate.queryForList(
-            "SELECT * FROM " + quoteTable(tableName) + " WHERE " + quoteIdentifier("status") + " = '0'" + orderSql + " OFFSET ? ROWS FETCH NEXT ? ROWS ONLY",
+            "SELECT * FROM " + quoteTable(tableName) + whereSql + orderSql + " OFFSET ? ROWS FETCH NEXT ? ROWS ONLY",
             offset,
             pageSize
         );
+    }
+
+    private String activeRowsWhere(String dimensionCode, String tableName) {
+        String statusFilter = " WHERE " + quoteIdentifier("status") + " = '0'";
+        if (!"emission-source-category".equals(dimensionCode)) {
+            return statusFilter;
+        }
+        return statusFilter + " AND COALESCE(NULLIF(LTRIM(RTRIM(" + quoteIdentifier("version_no") + ")), ''), '1') = ("
+            + "SELECT TOP 1 COALESCE(NULLIF(LTRIM(RTRIM(latest." + quoteIdentifier("version_no") + ")), ''), '1') "
+            + "FROM " + quoteTable(tableName) + " latest WHERE latest." + quoteIdentifier("status") + " = '0' "
+            + "ORDER BY TRY_CONVERT(DECIMAL(30,10), latest." + quoteIdentifier("version_no") + ") DESC, "
+            + "latest." + quoteIdentifier("effective_date") + " DESC, latest." + quoteIdentifier("version_no") + " DESC, latest." + quoteIdentifier("id") + " DESC)";
+    }
+
+    private String normalizeVersionNo(Object value) {
+        return value == null || StringUtils.isBlank(String.valueOf(value)) ? "1" : String.valueOf(value).trim();
+    }
+
+    private void normalizeEmissionSourceCategoryCurrentVersion(String dimensionCode, String tableName) {
+        if (!"emission-source-category".equals(dimensionCode)) {
+            return;
+        }
+        String quotedTable = quoteTable(tableName);
+        String versionColumn = quoteIdentifier("version_no");
+        String statusColumn = quoteIdentifier("status");
+        String currentFlagColumn = quoteIdentifier("current_flag");
+        String effectiveDateColumn = quoteIdentifier("effective_date");
+        String idColumn = quoteIdentifier("id");
+        jdbcTemplate.update("UPDATE " + quotedTable + " SET " + currentFlagColumn + " = '0'");
+        jdbcTemplate.update("WITH latest_version AS ("
+            + "SELECT TOP 1 COALESCE(NULLIF(LTRIM(RTRIM(" + versionColumn + ")), ''), '1') AS " + versionColumn
+            + " FROM " + quotedTable + " WHERE " + statusColumn + " = '0'"
+            + " ORDER BY TRY_CONVERT(DECIMAL(30,10), " + versionColumn + ") DESC, "
+            + effectiveDateColumn + " DESC, " + versionColumn + " DESC, " + idColumn + " DESC) "
+            + "UPDATE category SET " + currentFlagColumn + " = '1' FROM " + quotedTable + " category "
+            + "CROSS JOIN latest_version latest WHERE category." + statusColumn + " = '0' "
+            + "AND COALESCE(NULLIF(LTRIM(RTRIM(category." + versionColumn + ")), ''), '1') = latest." + versionColumn);
     }
 
     private List<String> physicalColumns(String tableName) {

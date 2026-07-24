@@ -10,7 +10,7 @@ insert into sys_menu
 (menu_id, menu_name, parent_id, order_num, path, component, query_param, is_frame, is_cache, menu_type, visible, status, perms, icon, create_dept, create_by, create_time, update_by, update_time, remark)
 values
 (910100, '厂商运营', 0, 1, 'vendor', 'Layout', '', 1, 0, 'M', '0', '0', '', 'guide', 103, 1, SYSDATETIME(), null, null, '厂商端运营菜单'),
-(910136, '数据管理', 0, 2, 'data-management', 'Layout', '', 1, 0, 'M', '0', '0', '', 'database', 103, 1, SYSDATETIME(), null, null, '企业端申请与同步的数据源管理目录'),
+(910136, '数据管理', 0, 2, 'data-management', 'Layout', '', 1, 0, 'M', '0', '0', '', 'tree-table', 103, 1, SYSDATETIME(), null, null, '企业端申请与同步的数据源管理目录'),
 (910108, '运营总览', 910100, 0, 'overview', '', '', 1, 0, 'F', '1', '0', 'vendor:overview:query', '#', 103, 1, SYSDATETIME(), null, null, '厂商首页运营总览接口权限'),
 (910101, '客户档案', 910100, 1, 'customer', 'vendor/customer/index', '', 1, 0, 'C', '0', '0', 'vendor:customer:list', 'peoples', 103, 1, SYSDATETIME(), null, null, '厂商客户档案，连接真实后端接口'),
 (910102, '授权管理', 910100, 2, 'license', 'vendor/licenseIssue/index', '', 1, 0, 'C', '0', '0', 'vendor:licenseIssue:list', 'lock', 103, 1, SYSDATETIME(), null, null, '厂商授权签发、撤销与重签入口'),

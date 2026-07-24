@@ -48,9 +48,24 @@ public class CvEmissionSourceCategory extends BaseEntity {
     private String ghgScope;
 
     /**
+     * GHG Protocol范围子类别排序
+     */
+    private Integer ghgScopeCategorySort;
+
+    /**
      * 温室气体范围细分
      */
     private String ghgScopeCategory;
+
+    /**
+     * Scope (GHG Protocol)
+     */
+    private String ghgScopeEn;
+
+    /**
+     * Scope Category (GHG Protocol)
+     */
+    private String ghgScopeCategoryEn;
 
     /**
      * ISO分类
@@ -66,6 +81,16 @@ public class CvEmissionSourceCategory extends BaseEntity {
      * ISO分类描述
      */
     private String isoCategoryDescription;
+
+    /**
+     * ISO 14064-1 Category Description (EN)
+     */
+    private String isoCategoryDescriptionEn;
+
+    /**
+     * ISO 14064-1子类别（自定义）
+     */
+    private String isoCustomSubcategory;
 
     /**
      * 国标范围分类

@@ -24,6 +24,8 @@ import org.dromara.carbon.vendor.dimension.mapper.CvElectricityFactorScopeMapper
 import org.dromara.carbon.vendor.dimension.mapper.CvElectricityFactorVersionMapper;
 import org.dromara.carbon.vendor.dimension.mapper.CvEmissionSourceCategoryMapper;
 import org.dromara.carbon.vendor.dimension.mapper.CvGreenhouseGasMapper;
+import org.dromara.carbon.vendor.dimension.service.ICvEmissionSourcePublicationService;
+import org.dromara.carbon.vendor.dimension.domain.vo.CvEmissionSourcePublicationVo;
 import org.dromara.carbon.vendor.openapi.service.ICvOpenApiAuditService;
 import org.dromara.carbon.vendor.openapi.service.ICvOpenDimensionService;
 import org.dromara.carbon.vendor.shared.VendorManagedTableCatalog;
@@ -48,6 +50,7 @@ public class CvOpenDimensionServiceImpl implements ICvOpenDimensionService {
     private static final int DEFAULT_PAGE_NUM = 1;
     private static final int DEFAULT_PAGE_SIZE = 100;
     private static final int MAX_PAGE_SIZE = 500;
+    private static final String MODE_SINGLE = "SINGLE";
     private final CvLicenseIssueMapper licenseIssueMapper;
     private final CvAdminDivisionMapper adminDivisionMapper;
     private final CvEmissionSourceCategoryMapper emissionSourceCategoryMapper;
@@ -56,6 +59,7 @@ public class CvOpenDimensionServiceImpl implements ICvOpenDimensionService {
     private final CvElectricityFactorVersionMapper electricityFactorVersionMapper;
     private final CvElectricityFactorScopeMapper electricityFactorScopeMapper;
     private final CvGreenhouseGasMapper greenhouseGasMapper;
+    private final ICvEmissionSourcePublicationService publicationService;
     private final ICvOpenApiAuditService openApiAuditService;
 
     @Override
@@ -75,7 +79,9 @@ public class CvOpenDimensionServiceImpl implements ICvOpenDimensionService {
             List<CvOpenDimensionRecordVo> records;
             long total;
 
-            var result = queryStrongTyped(dimensionCode, request, pageNum, pageSize);
+            CvEmissionSourcePublicationVo publication = "emission-source-category".equals(dimensionCode)
+                ? publicationService.queryPolicy() : null;
+            var result = queryStrongTyped(dimensionCode, request, pageNum, pageSize, publication);
             records = result.records;
             total = result.total;
 
@@ -84,6 +90,11 @@ public class CvOpenDimensionServiceImpl implements ICvOpenDimensionService {
             response.setDimensionCode(dimensionCode);
             response.setTotal(total);
             response.setRecords(records);
+            if ("emission-source-category".equals(dimensionCode)) {
+                response.setPublicationId(publication.getPublicationId());
+                response.setPublishMode(publication.getPublishMode());
+                response.setPublishedVersions(publication.getPublishedVersions());
+            }
             openApiAuditService.recordSuccess(API_PATH, HTTP_METHOD, request.getLicenseId(), request.getInstallId(),
                 customerId, requestSummary(request));
             return response;
@@ -98,10 +109,11 @@ public class CvOpenDimensionServiceImpl implements ICvOpenDimensionService {
 
     private record QueryResult(List<CvOpenDimensionRecordVo> records, long total) {}
 
-    private QueryResult queryStrongTyped(String dimensionCode, CvOpenDimensionRequest request, long pageNum, long pageSize) {
+    private QueryResult queryStrongTyped(String dimensionCode, CvOpenDimensionRequest request, long pageNum, long pageSize,
+                                         CvEmissionSourcePublicationVo publication) {
         return switch (dimensionCode) {
             case "admin-division" -> queryAdminDivision(request, pageNum, pageSize);
-            case "emission-source-category" -> queryEmissionSourceCategory(request, pageNum, pageSize);
+            case "emission-source-category" -> queryEmissionSourceCategory(request, pageNum, pageSize, publication);
             case "base-year" -> queryBaseYear(request, pageNum, pageSize);
             case "ef-electricity-factor" -> queryElectricityFactor(request, pageNum, pageSize);
             case "ef-electricity-version" -> queryElectricityFactorVersion(request, pageNum, pageSize);
@@ -132,13 +144,17 @@ public class CvOpenDimensionServiceImpl implements ICvOpenDimensionService {
         return new QueryResult(records, page.getTotal());
     }
 
-    private QueryResult queryEmissionSourceCategory(CvOpenDimensionRequest req, long pageNum, long pageSize) {
+    private QueryResult queryEmissionSourceCategory(CvOpenDimensionRequest req, long pageNum, long pageSize,
+                                                     CvEmissionSourcePublicationVo publication) {
         QueryWrapper<CvEmissionSourceCategory> qw = new QueryWrapper<CvEmissionSourceCategory>()
             .eq("status", "0")
             .like(StringUtils.isNotBlank(req.getRecordCode()), "category_code", req.getRecordCode())
             .like(StringUtils.isNotBlank(req.getRecordName()), "category_name", req.getRecordName())
             .eq(StringUtils.isNotBlank(req.getParentCode()), "parent_code", req.getParentCode())
             .orderByAsc("sort_order").orderByAsc("id");
+        if (MODE_SINGLE.equals(publication.getPublishMode())) {
+            qw.apply("COALESCE(NULLIF(LTRIM(RTRIM(version_no)), ''), '1') = {0}", publication.getVersionNo());
+        }
         Page<CvEmissionSourceCategory> page = emissionSourceCategoryMapper.selectPage(new Page<>(pageNum, pageSize), qw);
         List<CvOpenDimensionRecordVo> records = page.getRecords().stream().map(e -> {
             CvOpenDimensionRecordVo vo = baseVo(e.getId(), "emission-source-category", e.getCategoryCode(), e.getCategoryName(), e.getParentCode());
@@ -146,15 +162,15 @@ public class CvOpenDimensionServiceImpl implements ICvOpenDimensionService {
             vo.setBusinessKey(e.getBusinessKey());
             vo.setCategoryNameEn(e.getCategoryNameEn());
             vo.setGhgScope(e.getGhgScope());
-            vo.setGhgScopeCategorySort(e.getSortOrder());
+            vo.setGhgScopeCategorySort(e.getGhgScopeCategorySort());
             vo.setGhgScopeCategory(e.getGhgScopeCategory());
-            vo.setGhgScopeEn(null);
-            vo.setGhgScopeCategoryEn(null);
+            vo.setGhgScopeEn(e.getGhgScopeEn());
+            vo.setGhgScopeCategoryEn(e.getGhgScopeCategoryEn());
             vo.setIsoCategory(e.getIsoCategory());
             vo.setIsoCategoryEn(e.getIsoCategoryEn());
             vo.setIsoCategoryDescription(e.getIsoCategoryDescription());
-            vo.setIsoCategoryDescriptionEn(null);
-            vo.setIsoCustomSubcategory(null);
+            vo.setIsoCategoryDescriptionEn(e.getIsoCategoryDescriptionEn());
+            vo.setIsoCustomSubcategory(e.getIsoCustomSubcategory());
             vo.setGbScopeCategory(e.getGbScopeCategory());
             vo.setGbSubcategory(e.getGbSubcategory());
             vo.setEffectiveDate(e.getEffectiveDate());
@@ -230,11 +246,12 @@ public class CvOpenDimensionServiceImpl implements ICvOpenDimensionService {
     private QueryResult queryElectricityFactorVersion(CvOpenDimensionRequest req, long pageNum, long pageSize) {
         QueryWrapper<CvElectricityFactorVersion> qw = new QueryWrapper<CvElectricityFactorVersion>()
             .eq("status", "0")
-            .like(StringUtils.isNotBlank(req.getRecordCode()), "factor_version", req.getRecordCode())
+            .like(StringUtils.isNotBlank(req.getRecordCode()), "effective_year", req.getRecordCode())
+            .like(StringUtils.isNotBlank(req.getRecordName()), "factor_version", req.getRecordName())
             .orderByAsc("sort_order").orderByAsc("id");
         Page<CvElectricityFactorVersion> page = electricityFactorVersionMapper.selectPage(new Page<>(pageNum, pageSize), qw);
         List<CvOpenDimensionRecordVo> records = page.getRecords().stream().map(e -> {
-            CvOpenDimensionRecordVo vo = baseVo(e.getId(), "ef-electricity-version", e.getFactorVersion(), e.getFactorVersion(), null);
+            CvOpenDimensionRecordVo vo = baseVo(e.getId(), "ef-electricity-version", String.valueOf(e.getEffectiveYear()), e.getFactorVersion(), null);
             vo.setFactorVersion(e.getFactorVersion());
             vo.setEffectiveYear(e.getEffectiveYear());
             vo.setSortOrder(e.getSortOrder());

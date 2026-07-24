@@ -1,30 +1,32 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-SERVER_HOST="${FX_DEPLOY_HOST:-124.221.155.102}"
-SSH_USER="${FX_DEPLOY_USER:-ubuntu}"
-PASSWORD="${FX_DEPLOY_PASSWORD:-Test0000}"
-REMOTE_PATH="${FX_VENDOR_BACKEND_JAR:-/opt/fx/apps/vendor-backend/app.jar}"
-REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-JAR_PATH="$REPO_ROOT/ruoyi-admin/target/ruoyi-admin.jar"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+ENV_FILE="${ENV_FILE:-$SCRIPT_DIR/.env}"
+COMPOSE_FILE="$SCRIPT_DIR/docker-compose.yml"
+FRESH="${FRESH:-false}"
+INCLUDE_SOURCE_A="${INCLUDE_SOURCE_A:-false}"
+SKIP_BUILD="${SKIP_BUILD:-false}"
+SKIP_DB_INIT="${SKIP_DB_INIT:-false}"
+SKIP_DB_MIGRATION="${SKIP_DB_MIGRATION:-false}"
 
-if [[ "${BUILD:-0}" == "1" ]]; then
-  (cd "$REPO_ROOT" && mvn -DskipTests package)
-fi
-
-if [[ ! -f "$JAR_PATH" ]]; then
-  echo "backend jar not found. Run mvn -DskipTests package first: $JAR_PATH" >&2
+if [[ ! -f "$ENV_FILE" ]]; then
+  echo "Missing env file: $ENV_FILE. Copy deploy/.env.example to deploy/.env and configure it first." >&2
   exit 1
 fi
+command -v docker >/dev/null 2>&1 || { echo "Missing required command: docker" >&2; exit 1; }
 
-SSH=(ssh -o StrictHostKeyChecking=no -o ConnectTimeout=10)
-SCP=(scp -o StrictHostKeyChecking=no -o ConnectTimeout=30)
-if command -v sshpass >/dev/null 2>&1; then
-  SSH=(sshpass -p "$PASSWORD" "${SSH[@]}")
-  SCP=(sshpass -p "$PASSWORD" "${SCP[@]}")
+if [[ "$SKIP_BUILD" != "true" ]]; then
+  "$SCRIPT_DIR/build-image.sh" "$ENV_FILE"
 fi
 
-TARGET="$SSH_USER@$SERVER_HOST"
-"${SCP[@]}" "$JAR_PATH" "$TARGET:$REMOTE_PATH"
-"${SSH[@]}" "$TARGET" "echo '$PASSWORD' | sudo -S systemctl restart vendor-backend && systemctl is-active vendor-backend"
-echo "Vendor backend deployed."
+if [[ "$FRESH" == "true" && "$SKIP_DB_INIT" != "true" ]]; then
+  ENV_FILE="$ENV_FILE" INCLUDE_SOURCE_A="$INCLUDE_SOURCE_A" "$SCRIPT_DIR/init-sqlserver.sh"
+elif [[ "$SKIP_DB_MIGRATION" != "true" ]]; then
+  ENV_FILE="$ENV_FILE" "$SCRIPT_DIR/migrate-sqlserver.sh"
+fi
+
+echo "==> Starting vendor backend"
+docker compose --env-file "$ENV_FILE" -f "$COMPOSE_FILE" up -d
+docker compose --env-file "$ENV_FILE" -f "$COMPOSE_FILE" ps
+echo "Vendor backend deployment complete."

@@ -22,5 +22,12 @@ public class CvOpenDimensionListResponse implements Serializable {
 
     private long total;
 
+    /** Vendor-controlled publication boundary for 103 version synchronization. */
+    private String publicationId;
+
+    private String publishMode;
+
+    private List<String> publishedVersions = new ArrayList<>();
+
     private List<CvOpenDimensionRecordVo> records = new ArrayList<>();
 }

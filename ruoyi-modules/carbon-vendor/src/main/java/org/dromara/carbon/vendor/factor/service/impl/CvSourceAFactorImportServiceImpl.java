@@ -233,30 +233,26 @@ public class CvSourceAFactorImportServiceImpl implements ICvSourceAFactorImportS
     private int insert203Ef(List<Map<String, Object>> rows) {
         String sql = """
             MERGE INTO cv_electricity_factor_version AS target
-            USING (SELECT ? AS factor_version, ? AS effective_year, ? AS remark) AS source
+            USING (SELECT ? AS factor_version, ? AS effective_year, ? AS sort_order, ? AS remark) AS source
                ON target.factor_version = source.factor_version
+              AND target.effective_year = source.effective_year
             WHEN MATCHED THEN
-                UPDATE SET effective_year = CASE
-                        WHEN target.effective_year <= source.effective_year THEN target.effective_year
-                        ELSE source.effective_year
-                    END,
+                UPDATE SET sort_order = source.sort_order,
                     remark = source.remark,
                     update_time = SYSDATETIME()
             WHEN NOT MATCHED THEN
                 INSERT (factor_version, effective_year, sort_order, status, remark, create_time, update_time)
-                VALUES (source.factor_version, source.effective_year, 0, '0', source.remark, SYSDATETIME(), SYSDATETIME());
+                VALUES (source.factor_version, source.effective_year, source.sort_order, '0', source.remark, SYSDATETIME(), SYSDATETIME());
             """;
-        Map<String, Integer> versionYears = new LinkedHashMap<>();
+        List<Object[]> batchArgs = new ArrayList<>();
+        int sortOrder = 1;
         for (Map<String, Object> row : rows) {
             Integer year = integer(row.get("年份"));
             String version = text(row.get("对应因子版本"));
             if (year != null && StringUtils.isNotBlank(version)) {
-                versionYears.merge(version, year, Math::min);
+                batchArgs.add(new Object[]{version, year, sortOrder++, MARK});
             }
         }
-        List<Object[]> batchArgs = versionYears.entrySet().stream()
-            .map(entry -> new Object[]{entry.getKey(), entry.getValue(), MARK})
-            .toList();
         jdbcTemplate.batchUpdate(sql, batchArgs);
         return batchArgs.size();
     }

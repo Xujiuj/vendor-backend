@@ -26,6 +26,16 @@ IF OBJECT_ID(N'dbo.cv_signing_key', N'U') IS NULL
     THROW 51000, 'Missing dbo.cv_signing_key. Run the vendor schema before carbon_vendor_init.sql.', 1;
 GO
 
+IF OBJECT_ID(N'dbo.cv_emission_source_category', N'U') IS NOT NULL
+   AND NOT EXISTS (
+       SELECT 1 FROM sys.indexes
+        WHERE object_id = OBJECT_ID(N'dbo.cv_emission_source_category')
+          AND name = N'ix_cv_emission_source_category_version'
+   )
+    CREATE INDEX ix_cv_emission_source_category_version
+        ON dbo.cv_emission_source_category(version_no, category_code, current_flag);
+GO
+
 BEGIN TRY
     BEGIN TRANSACTION;
 
@@ -96,8 +106,8 @@ BEGIN TRY
         (id, client_id, client_key, client_secret, grant_type, device_type, active_timeout, timeout, status,
          del_flag, create_dept, create_by, create_time, update_by, update_time)
     VALUES
-        (1, N'e5cd7e4891bf95d1d19206ce24a7b32e', N'pc', N'pc123', N'password,social', N'pc', 1800, 604800, N'0', N'0', @createDept, @createBy, @now, NULL, NULL),
-        (2, N'428a8310cd442757ae699df5d894f051', N'app', N'app123', N'password,sms,social', N'android', 1800, 604800, N'0', N'0', @createDept, @createBy, @now, NULL, NULL);
+        (1, N'e5cd7e4891bf95d1d19206ce24a7b32e', N'pc', N'pc123', N'password,social', N'pc', 3600, 3600, N'0', N'0', @createDept, @createBy, @now, NULL, NULL),
+        (2, N'428a8310cd442757ae699df5d894f051', N'app', N'app123', N'password,sms,social', N'android', 3600, 3600, N'0', N'0', @createDept, @createBy, @now, NULL, NULL);
 
     INSERT INTO dbo.sys_config
         (config_id, tenant_id, config_name, config_key, config_value, config_type, create_dept, create_by, create_time, update_by, update_time, remark)
@@ -206,7 +216,7 @@ BEGIN TRY
          visible, status, perms, icon, remark)
     VALUES
         (910100, N'厂商运营', 0, 1, N'vendor', N'Layout', N'', 1, 0, N'M', N'0', N'0', N'', N'guide', N'厂商端运营菜单'),
-        (910136, N'数据管理', 0, 2, N'data-management', N'Layout', N'', 1, 0, N'M', N'0', N'0', N'', N'database', N'厂商端基础数据管理'),
+        (910136, N'数据管理', 0, 2, N'data-management', N'Layout', N'', 1, 0, N'M', N'0', N'0', N'', N'tree-table', N'厂商端基础数据管理'),
         (1, N'系统管理', 0, 3, N'system', N'Layout', N'', 1, 0, N'M', N'0', N'0', N'', N'system', N'系统管理目录'),
         (108, N'日志管理', 0, 4, N'monitor', N'Layout', N'', 1, 0, N'M', N'0', N'0', N'', N'log', N'日志管理目录'),
         (910108, N'运营总览', 910100, 0, N'overview', N'', N'', 1, 0, N'F', N'1', N'0', N'vendor:overview:query', N'#', N'厂商首页运营总览接口权限'),
@@ -432,7 +442,10 @@ BEGIN TRY
         (id, factor_version, effective_year, sort_order, status, create_dept, create_by, create_time, update_by, update_time, remark)
     VALUES
         (1, N'2022', 2023, 1, N'0', @createDept, @createBy, @now, NULL, NULL, N'source(A)'),
-        (2, N'2023', 2025, 2, N'0', @createDept, @createBy, @now, NULL, NULL, N'source(A)');
+        (2, N'2022', 2024, 2, N'0', @createDept, @createBy, @now, NULL, NULL, N'source(A)'),
+        (3, N'2023', 2025, 3, N'0', @createDept, @createBy, @now, NULL, NULL, N'source(A)'),
+        (4, N'2023', 2026, 4, N'0', @createDept, @createBy, @now, NULL, NULL, N'source(A)'),
+        (5, N'2023', 2027, 5, N'0', @createDept, @createBy, @now, NULL, NULL, N'source(A)');
 
     INSERT INTO dbo.cv_electricity_factor
         (id, version_province_code, factor_version, division_code, division_name, region_name, province_factor, region_factor, national_factor, non_fossil_excluded_factor, national_fossil_power_factor, sort_order, status, create_dept, create_by, create_time, update_by, update_time, remark)

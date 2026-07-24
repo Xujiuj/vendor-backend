@@ -315,25 +315,30 @@ def build_seed_block() -> str:
         business_key = text(row.get("BK_业务键")) or str(index)
         category_rows.append({
             "id": index,
-            "category_code": normalize_code(business_key, f"source-a-category-{index}"),
+            "category_code": text(row.get("SK_排放源分类")) or str(index),
             "business_key": business_key,
             "category_name": row.get("GHG Protocol范围子类别"),
             "category_name_en": row.get("Scope Category (GHG Protocol)"),
             "ghg_scope": row.get("GHG Protocol范围"),
+            "ghg_scope_category_sort": first_int(row.get("GHG Protocol范围子类别排序"), index),
             "ghg_scope_category": row.get("GHG Protocol范围子类别"),
+            "ghg_scope_en": row.get("Scope (GHG Protocol)"),
+            "ghg_scope_category_en": row.get("Scope Category (GHG Protocol)"),
             "iso_category": row.get("ISO 14064-1类别"),
             "iso_category_en": row.get("ISO 14064-1 Category"),
             "iso_category_description": row.get("ISO 14064-1类别描述"),
+            "iso_category_description_en": row.get("ISO 14064-1 Category Description (EN)"),
+            "iso_custom_subcategory": row.get("ISO 14064-1子类别（自定义）"),
             "gb_scope_category": row.get("GB/T 32150-2025范围分类"),
             "gb_subcategory": row.get("GB/T 32150-2025子类别"),
             "parent_code": None,
             "effective_date": row.get("生效日期"),
             "expire_date": row.get("失效日期"),
-            "current_flag": "1" if text(row.get("是否当前")) in {"是", "1", "Y", "y", "true", "True"} else "0",
+            "current_flag": "Y" if text(row.get("是否当前")) in {"是", "1", "Y", "y", "true", "True"} else "N",
             "version_no": text(row.get("版本号")),
             "standard_category": row.get("统一标准分类"),
             "category_current_key": business_key,
-            "sort_order": first_int(row.get("GHG Protocol范围子类别排序"), index),
+            "sort_order": index,
             "status": "0",
             "create_dept": "@createDept",
             "create_by": "@createBy",
@@ -344,8 +349,10 @@ def build_seed_block() -> str:
         })
     blocks.append(values_insert("cv_emission_source_category", [
         "id", "category_code", "business_key", "category_name", "category_name_en", "ghg_scope",
-        "ghg_scope_category", "iso_category", "iso_category_en", "iso_category_description", "gb_scope_category",
-        "gb_subcategory", "parent_code", "effective_date", "expire_date", "current_flag", "version_no",
+        "ghg_scope_category_sort", "ghg_scope_category", "ghg_scope_en", "ghg_scope_category_en",
+        "iso_category", "iso_category_en", "iso_category_description", "iso_category_description_en",
+        "iso_custom_subcategory", "gb_scope_category", "gb_subcategory", "parent_code", "effective_date",
+        "expire_date", "current_flag", "version_no",
         "standard_category", "category_current_key", "sort_order", "status", "create_dept", "create_by",
         "create_time", "update_by", "update_time", "remark"
     ], category_rows))
@@ -359,20 +366,14 @@ def build_seed_block() -> str:
         "create_time": "@now", "update_by": None, "update_time": None, "remark": MARK,
     } for index, row in enumerate(ef205, start=1)]))
 
-    version_years: dict[str, int] = {}
-    for row in ef203:
-        version = text(row.get("对应因子版本"))
-        year = integer(row.get("年份"))
-        if version and year is not None:
-            version_years[version] = min(version_years.get(version, year), year)
     blocks.append(values_insert("cv_electricity_factor_version", [
         "id", "factor_version", "effective_year", "sort_order", "status", "create_dept", "create_by",
         "create_time", "update_by", "update_time", "remark"
     ], [{
-        "id": index, "factor_version": version, "effective_year": year, "sort_order": index,
+        "id": index, "factor_version": text(row.get("对应因子版本")), "effective_year": integer(row.get("年份")), "sort_order": index,
         "status": "0", "create_dept": "@createDept", "create_by": "@createBy", "create_time": "@now",
         "update_by": None, "update_time": None, "remark": MARK,
-    } for index, (version, year) in enumerate(version_years.items(), start=1)]))
+    } for index, row in enumerate(ef203, start=1) if text(row.get("对应因子版本")) and integer(row.get("年份")) is not None]))
 
     blocks.append(values_insert("cv_electricity_factor", [
         "id", "version_province_code", "factor_version", "division_code", "division_name", "region_name", "province_factor", "region_factor",

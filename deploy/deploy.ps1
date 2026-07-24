@@ -1,43 +1,40 @@
 param(
-    [switch] $Build,
-    [string] $ServerHost = $(if ($env:FX_DEPLOY_HOST) { $env:FX_DEPLOY_HOST } else { "124.221.155.102" }),
-    [string] $SshUser = $(if ($env:FX_DEPLOY_USER) { $env:FX_DEPLOY_USER } else { "ubuntu" }),
-    [string] $Password = $(if ($env:FX_DEPLOY_PASSWORD) { $env:FX_DEPLOY_PASSWORD } else { "Test0000" }),
-    [string] $RemotePath = $(if ($env:FX_VENDOR_BACKEND_JAR) { $env:FX_VENDOR_BACKEND_JAR } else { "/opt/fx/apps/vendor-backend/app.jar" })
+    [string] $EnvFile = (Join-Path $PSScriptRoot ".env"),
+    [switch] $Fresh,
+    [switch] $IncludeSourceA,
+    [switch] $SkipBuild,
+    [switch] $SkipDbInit,
+    [switch] $SkipDbMigration
 )
 
 $ErrorActionPreference = "Stop"
-$repoRoot = Split-Path -Parent (Split-Path -Parent $MyInvocation.MyCommand.Path)
-$jarPath = Join-Path $repoRoot "ruoyi-admin\target\ruoyi-admin.jar"
+$ComposeFile = Join-Path $PSScriptRoot "docker-compose.yml"
 
-if ($Build) {
-    Push-Location $repoRoot
-    try {
-        & mvn -DskipTests package
-    } finally {
-        Pop-Location
-    }
+if (-not (Test-Path -LiteralPath $EnvFile)) {
+    throw "Missing env file: $EnvFile. Copy deploy\.env.example to deploy\.env and configure it first."
+}
+if (-not (Get-Command docker -ErrorAction SilentlyContinue)) {
+    throw "Missing required command: docker"
 }
 
-if (-not (Test-Path -LiteralPath $jarPath)) {
-    throw "backend jar not found. Run mvn -DskipTests package first: $jarPath"
+if (-not $SkipBuild) {
+    & powershell -NoProfile -ExecutionPolicy Bypass -File (Join-Path $PSScriptRoot "build-image.ps1") -EnvFile $EnvFile
+    if ($LASTEXITCODE -ne 0) { throw "build-image.ps1 failed" }
 }
 
-$askpass = "$env:TEMP\ssh_askpass_vendor_backend.bat"
-Set-Content -Path $askpass -Value "@echo off`necho $Password" -Encoding ASCII
-$env:SSH_ASKPASS = $askpass
-$env:SSH_ASKPASS_REQUIRE = "force"
-$env:DISPLAY = "localhost:0"
-
-$sshTarget = "${SshUser}@${ServerHost}"
-Write-Host "Uploading vendor backend JAR..."
-& scp -o StrictHostKeyChecking=no -o ConnectTimeout=30 $jarPath "${sshTarget}:${RemotePath}" 2>&1
-if ($LASTEXITCODE -ne 0) {
-    Remove-Item -Path $askpass -ErrorAction SilentlyContinue
-    throw "Upload failed with exit code $LASTEXITCODE"
+if ($Fresh -and -not $SkipDbInit) {
+    $initArgs = @("-NoProfile", "-ExecutionPolicy", "Bypass", "-File", (Join-Path $PSScriptRoot "init-sqlserver.ps1"), "-EnvFile", $EnvFile)
+    if ($IncludeSourceA) { $initArgs += "-IncludeSourceA" }
+    & powershell @initArgs
+    if ($LASTEXITCODE -ne 0) { throw "init-sqlserver.ps1 failed" }
+} elseif (-not $SkipDbMigration) {
+    & powershell -NoProfile -ExecutionPolicy Bypass -File (Join-Path $PSScriptRoot "migrate-sqlserver.ps1") -EnvFile $EnvFile
+    if ($LASTEXITCODE -ne 0) { throw "migrate-sqlserver.ps1 failed" }
 }
 
-Write-Host "Restarting vendor-backend service..."
-& ssh -o StrictHostKeyChecking=no -o ConnectTimeout=10 $sshTarget "echo '$Password' | sudo -S systemctl restart vendor-backend && systemctl is-active vendor-backend" 2>&1
-Remove-Item -Path $askpass -ErrorAction SilentlyContinue
-Write-Host "Vendor backend deployed."
+Write-Host "==> Starting vendor backend" -ForegroundColor Cyan
+docker compose --env-file $EnvFile -f $ComposeFile up -d
+if ($LASTEXITCODE -ne 0) { throw "docker compose up failed" }
+
+docker compose --env-file $EnvFile -f $ComposeFile ps
+Write-Host "Vendor backend deployment complete."

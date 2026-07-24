@@ -9,6 +9,7 @@ import org.dromara.carbon.vendor.dimension.mapper.CvElectricityFactorVersionMapp
 import org.dromara.carbon.vendor.dimension.mapper.CvEmissionSourceCategoryMapper;
 import org.dromara.carbon.vendor.dimension.mapper.CvGreenhouseGasMapper;
 import org.dromara.carbon.vendor.dimension.service.impl.CvDimensionDataServiceImpl;
+import org.dromara.carbon.vendor.dimension.service.ICvEmissionSourcePublicationService;
 import org.dromara.common.core.exception.ServiceException;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
@@ -22,10 +23,12 @@ import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -73,14 +76,15 @@ class CvDimensionDataServiceImplTest {
     }
 
     @Test
-    void electricityVersionUsesSingleVersionFieldForCodeAndName() throws Exception {
+    void electricityVersionUsesYearThenCorrespondingVersion() throws Exception {
         Map<String, Object> bo = new LinkedHashMap<>();
-        bo.put("recordCode", "2023");
-        bo.put("recordName", "should-not-overwrite");
+        bo.put("recordCode", "2025");
+        bo.put("recordName", "2023");
 
         applyRecordFields("ef-electricity-version", bo);
 
         assertEquals("2023", bo.get("factorVersion"));
+        assertEquals("2025", bo.get("effectiveYear"));
     }
 
     @Test
@@ -112,21 +116,68 @@ class CvDimensionDataServiceImplTest {
     }
 
     @Test
-    void electricityVersionInsertRejectsDuplicateVersionNumber() {
+    void electricityVersionInsertRejectsDuplicateYearVersionPair() {
         JdbcTemplate jdbcTemplate = mock(JdbcTemplate.class);
         when(jdbcTemplate.queryForObject(
-            eq("SELECT COUNT(*) FROM dbo.[cv_electricity_factor_version] WHERE [factor_version] = ?"),
+            eq("SELECT COUNT(*) FROM dbo.[cv_electricity_factor_version] WHERE [factor_version] = ? AND [effective_year] = ?"),
             eq(Long.class),
             any(Object[].class)
         )).thenReturn(1L);
         Map<String, Object> bo = new LinkedHashMap<>();
-        bo.put("recordCode", "2023");
+        bo.put("recordCode", "2025");
+        bo.put("recordName", "2023");
+        bo.put("effectiveYear", 2025);
 
         ServiceException exception = assertThrows(ServiceException.class, () ->
             service(mock(CvAdminDivisionMapper.class), mock(CvBaseYearMapper.class), mock(CvElectricityMapper.class), jdbcTemplate)
                 .insertByBo("ef-electricity-version", bo));
 
-        assertEquals("版本号已存在", exception.getMessage());
+        assertEquals("年份与对应因子版本组合已存在", exception.getMessage());
+    }
+
+    @Test
+    void emissionSourceCategoryPageFiltersToLatestVersion() throws Exception {
+        Method method = CvDimensionDataServiceImpl.class.getDeclaredMethod("activeRowsWhere", String.class, String.class);
+        method.setAccessible(true);
+
+        String whereSql = (String) method.invoke(service(mock(CvBaseYearMapper.class)),
+            "emission-source-category", "cv_emission_source_category");
+
+        assertTrue(whereSql.contains("SELECT TOP 1"));
+        assertTrue(whereSql.contains("TRY_CONVERT(DECIMAL(30,10), latest.[version_no]) DESC"));
+        assertTrue(whereSql.contains("FROM dbo.[cv_emission_source_category] latest"));
+    }
+
+    @Test
+    void emissionSourceCategoryRejectsDuplicateCodeWithinVersion() {
+        JdbcTemplate jdbcTemplate = mock(JdbcTemplate.class);
+        when(jdbcTemplate.queryForObject(any(String.class), eq(Long.class), any(Object[].class))).thenReturn(1L);
+        Map<String, Object> bo = new LinkedHashMap<>();
+        bo.put("recordCode", "CAT-001");
+        bo.put("recordName", "Stationary combustion");
+        bo.put("versionNo", "2");
+
+        assertThrows(ServiceException.class, () ->
+            service(mock(CvAdminDivisionMapper.class), mock(CvBaseYearMapper.class),
+                mock(CvElectricityMapper.class), jdbcTemplate)
+                .insertByBo("emission-source-category", bo));
+    }
+
+    @Test
+    void emissionSourceCategoryCurrentVersionNormalizationUsesManagedTable() throws Exception {
+        JdbcTemplate jdbcTemplate = mock(JdbcTemplate.class);
+        CvDimensionDataServiceImpl service = service(mock(CvAdminDivisionMapper.class),
+            mock(CvBaseYearMapper.class), mock(CvElectricityMapper.class), jdbcTemplate);
+        Method method = CvDimensionDataServiceImpl.class.getDeclaredMethod(
+            "normalizeEmissionSourceCategoryCurrentVersion", String.class, String.class);
+        method.setAccessible(true);
+
+        method.invoke(service, "emission-source-category", "cv_emission_source_category");
+
+        org.mockito.ArgumentCaptor<String> sql = org.mockito.ArgumentCaptor.forClass(String.class);
+        verify(jdbcTemplate, times(2)).update(sql.capture());
+        assertTrue(sql.getAllValues().stream().allMatch(value -> value.contains("dbo.[cv_emission_source_category]")));
+        assertTrue(sql.getAllValues().get(1).contains("latest.[version_no]"));
     }
 
     @Test
@@ -229,7 +280,8 @@ class CvDimensionDataServiceImplTest {
             mock(CvElectricityFactorVersionMapper.class),
             mock(CvElectricityFactorScopeMapper.class),
             mock(CvGreenhouseGasMapper.class),
-            jdbcTemplate
+            jdbcTemplate,
+            mock(ICvEmissionSourcePublicationService.class)
         );
     }
 
